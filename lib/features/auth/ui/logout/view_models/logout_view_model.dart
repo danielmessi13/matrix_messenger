@@ -12,7 +12,7 @@ class LogoutViewModel extends Cubit<LogoutState> {
   final AuthRepository _repository;
 
   Future<void> logout() async {
-    if (state.status == LogoutStatus.running) return;
+    if (isClosed || state.status == LogoutStatus.running) return;
     emit(const LogoutState(status: LogoutStatus.running));
 
     final result = await _repository.logout();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
+import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/auth/ui/auth_gate/view_models/auth_gate_view_model.dart';
 import 'package:matrix_messenger/features/auth/ui/auth_gate/widgets/auth_gate.dart';
@@ -95,5 +96,36 @@ void main() {
 
     expect(find.text('@bob:matrix.org'), findsOneWidget);
     expect(find.text('@alice:matrix.org'), findsNothing);
+  });
+
+  testWidgets('falha na restauração permite tentar de novo', (tester) async {
+    final repository = FakeAuthRepository(
+      savedSession: kUserSession,
+      restoreFailure: const AuthFailure(AuthFailureType.storage),
+    );
+    await pumpGate(tester, repository);
+
+    expect(find.text('Não foi possível abrir a sessão salva.'), findsOneWidget);
+    expect(find.byKey(const Key('login_submit')), findsNothing);
+
+    repository.restoreFailure = null;
+    await tester.tap(find.byKey(const Key('restore_retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('@alice:matrix.org'), findsOneWidget);
+  });
+
+  testWidgets('falha na restauração permite ir ao login', (tester) async {
+    await pumpGate(
+      tester,
+      FakeAuthRepository(
+        restoreFailure: const AuthFailure(AuthFailureType.storage),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('restore_skip')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('login_submit')), findsOneWidget);
   });
 }

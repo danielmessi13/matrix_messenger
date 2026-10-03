@@ -38,10 +38,6 @@ void main() {
     password: 'secret',
   );
 
-  test('começa sem sessão', () {
-    expect(repository.currentSession, isNull);
-  });
-
   group('restoreSession', () {
     test('com sessão salva atualiza a sessão e emite', () async {
       service.restoreResult = Result.ok(FakeMatrixClient.of(kUserSession));
@@ -50,7 +46,6 @@ void main() {
       await flush();
 
       expect(result, isA<Ok<UserSession?>>());
-      expect(repository.currentSession, kUserSession);
       expect(emitted, [kUserSession]);
     });
 
@@ -59,7 +54,6 @@ void main() {
       await flush();
 
       expect(result, isA<Ok<UserSession?>>());
-      expect(repository.currentSession, isNull);
       expect(emitted, [null]);
     });
 
@@ -72,7 +66,6 @@ void main() {
       await flush();
 
       expect(result, isFailure(AuthFailureType.storage));
-      expect(repository.currentSession, isNull);
       expect(emitted, isEmpty);
     });
   });
@@ -83,7 +76,6 @@ void main() {
       await flush();
 
       expect(result, isA<Ok<UserSession>>());
-      expect(repository.currentSession, kUserSession);
       expect(emitted, [kUserSession]);
     });
 
@@ -131,7 +123,6 @@ void main() {
       await flush();
 
       expect(result, isFailure(AuthFailureType.invalidCredentials));
-      expect(repository.currentSession, isNull);
       expect(emitted, isEmpty);
     });
   });
@@ -144,7 +135,6 @@ void main() {
       await flush();
 
       expect(result, isA<Ok<void>>());
-      expect(repository.currentSession, isNull);
       expect(emitted, [kUserSession, null]);
     });
 
@@ -158,7 +148,6 @@ void main() {
       await flush();
 
       expect(result, isFailure(AuthFailureType.homeserverUnreachable));
-      expect(repository.currentSession, kUserSession);
       expect(emitted, [kUserSession]);
     });
   });

@@ -17,14 +17,24 @@ class AuthGateViewModel extends Cubit<AuthGateState> {
 
   Future<void> init() async {
     _sessionSubscription ??= _repository.sessionChanges.listen(_onSession);
+    await _restore();
+  }
 
+  Future<void> retryRestore() async {
+    if (state is! AuthGateRestoreFailed) return;
+    emit(const AuthGateRestoring());
+    await _restore();
+  }
+
+  void skipRestore() {
+    if (state is AuthGateRestoreFailed) emit(const AuthGateUnauthenticated());
+  }
+
+  Future<void> _restore() async {
     final result = await _repository.restoreSession();
-    switch (result) {
-      case Ok(:final value):
-        _onSession(value);
-      case Error(:final error):
-        log('Não foi possível restaurar a sessão', name: 'auth', error: error);
-        _onSession(null);
+    if (result case Error(:final error)) {
+      log('Não foi possível restaurar a sessão', name: 'auth', error: error);
+      if (!isClosed) emit(const AuthGateRestoreFailed());
     }
   }
 

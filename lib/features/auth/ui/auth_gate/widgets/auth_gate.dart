@@ -8,6 +8,7 @@ import '../../login/view_models/login_view_model.dart';
 import '../../login/widgets/login_screen.dart';
 import '../view_models/auth_gate_state.dart';
 import '../view_models/auth_gate_view_model.dart';
+import 'restore_failed_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key, required this.viewModel});
@@ -22,6 +23,7 @@ class AuthGate extends StatelessWidget {
         AuthGateRestoring() => const Scaffold(
           body: Center(child: CircularProgressIndicator()),
         ),
+        AuthGateRestoreFailed() => RestoreFailedScreen(viewModel: viewModel),
         AuthGateUnauthenticated() => BlocProvider(
           create: (context) => LoginViewModel(context.read<AuthRepository>()),
           child: Builder(

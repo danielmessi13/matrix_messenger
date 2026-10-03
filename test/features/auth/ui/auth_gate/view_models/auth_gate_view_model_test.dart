@@ -36,14 +36,61 @@ void main() {
   );
 
   blocTest<AuthGateViewModel, AuthGateState>(
-    'falha na restauração leva ao login',
+    'falha na restauração emite restoreFailed, sem ir ao login',
     build: () => AuthGateViewModel(
       repository = FakeAuthRepository(
         restoreFailure: const AuthFailure(AuthFailureType.storage),
       ),
     ),
     act: (viewModel) => viewModel.init(),
-    expect: () => const [AuthGateUnauthenticated()],
+    expect: () => const [AuthGateRestoreFailed()],
+  );
+
+  blocTest<AuthGateViewModel, AuthGateState>(
+    'tentar de novo depois de uma falha restaura a sessão',
+    build: () => AuthGateViewModel(
+      repository = FakeAuthRepository(
+        savedSession: kUserSession,
+        restoreFailure: const AuthFailure(AuthFailureType.storage),
+      ),
+    ),
+    act: (viewModel) async {
+      await viewModel.init();
+      repository.restoreFailure = null;
+      await viewModel.retryRestore();
+    },
+    expect: () => const [
+      AuthGateRestoreFailed(),
+      AuthGateRestoring(),
+      AuthGateAuthenticated(kUserSession),
+    ],
+  );
+
+  blocTest<AuthGateViewModel, AuthGateState>(
+    'pular a restauração depois de uma falha leva ao login',
+    build: () => AuthGateViewModel(
+      repository = FakeAuthRepository(
+        restoreFailure: const AuthFailure(AuthFailureType.storage),
+      ),
+    ),
+    act: (viewModel) async {
+      await viewModel.init();
+      viewModel.skipRestore();
+    },
+    expect: () => const [AuthGateRestoreFailed(), AuthGateUnauthenticated()],
+  );
+
+  blocTest<AuthGateViewModel, AuthGateState>(
+    'tentar de novo ou pular sem falha não faz nada',
+    build: () => AuthGateViewModel(
+      repository = FakeAuthRepository(savedSession: kUserSession),
+    ),
+    act: (viewModel) async {
+      await viewModel.init();
+      await viewModel.retryRestore();
+      viewModel.skipRestore();
+    },
+    expect: () => const [AuthGateAuthenticated(kUserSession)],
   );
 
   blocTest<AuthGateViewModel, AuthGateState>(

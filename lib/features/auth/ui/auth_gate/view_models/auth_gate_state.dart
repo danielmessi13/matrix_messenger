@@ -13,6 +13,10 @@ final class AuthGateRestoring extends AuthGateState {
   const AuthGateRestoring();
 }
 
+final class AuthGateRestoreFailed extends AuthGateState {
+  const AuthGateRestoreFailed();
+}
+
 final class AuthGateUnauthenticated extends AuthGateState {
   const AuthGateUnauthenticated();
 }

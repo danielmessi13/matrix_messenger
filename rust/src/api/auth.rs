@@ -1,4 +1,8 @@
-use std::{mem::ManuallyDrop, path::Path};
+use std::{
+    mem::ManuallyDrop,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use flutter_rust_bridge::frb;
 use matrix_sdk::{ruma::api::error::ErrorKind, Client, ClientBuildError, HttpError};
@@ -7,6 +11,9 @@ use tokio::runtime::Handle;
 use crate::session_store::{self, StoredSession};
 
 const DEVICE_DISPLAY_NAME: &str = "Matrix Messenger (desktop)";
+
+// Por padrão, o SDK repete requisições com resposta 5xx ou 429 por até 15 minutos.
+const LOGOUT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[frb(opaque)]
 pub struct MatrixClient {
@@ -43,9 +50,7 @@ impl MatrixClient {
             {
                 Ok(client) => client,
                 Err(error) => {
-                    run_blocking(move || std::fs::remove_dir_all(store_path))
-                        .await
-                        .ok();
+                    remove_failed_store(store_path).await;
                     return Err(error);
                 }
             };
@@ -100,14 +105,16 @@ impl MatrixClient {
     }
 
     pub async fn logout(&self) -> Result<(), AuthError> {
-        self.client.logout().await.ok();
-        if !self.session_saved {
-            return Ok(());
+        if self.session_saved {
+            let data_dir = self.data_dir.clone();
+            run_blocking(move || session_store::delete(&data_dir))
+                .await
+                .map_err(AuthError::storage)?;
         }
-        let data_dir = self.data_dir.clone();
-        run_blocking(move || session_store::delete(&data_dir))
+        tokio::time::timeout(LOGOUT_TIMEOUT, self.client.logout())
             .await
-            .map_err(AuthError::storage)
+            .ok();
+        Ok(())
     }
 
     #[frb(sync, getter)]
@@ -162,6 +169,18 @@ async fn login_new_device(
         .await?;
 
     Ok(client)
+}
+
+// No Windows, o SQLite ainda pode estar fechando os arquivos logo após o drop do `Client`.
+async fn remove_failed_store(path: PathBuf) {
+    for _ in 0..10 {
+        let attempt = path.clone();
+        match run_blocking(move || std::fs::remove_dir_all(attempt)).await {
+            Ok(()) => return,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(_) => tokio::time::sleep(Duration::from_millis(100)).await,
+        }
+    }
 }
 
 async fn run_blocking<T: Send + 'static>(task: impl FnOnce() -> T + Send + 'static) -> T {

@@ -91,4 +91,13 @@ void main() {
 
     await expectLater(logout, completes);
   });
+
+  test('logout com o ViewModel já fechado não faz nada', () async {
+    repository = FakeAuthRepository();
+    final viewModel = LogoutViewModel(repository);
+    await viewModel.close();
+
+    await expectLater(viewModel.logout(), completes);
+    expect(repository.logoutCalls, 0);
+  });
 }

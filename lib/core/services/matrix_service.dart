@@ -14,10 +14,11 @@ class MatrixService {
 
   MatrixClient? _client;
 
-  MatrixClient? get client => _client;
-
   Future<Result<MatrixClient?>> restoreSession() => _guard(() async {
-    final client = await MatrixClient.restoreSession(dataDir: await _dataDir());
+    final dataDir = await _dataDir();
+    // Dois clientes no mesmo store gravariam estados de criptografia diferentes por cima um do outro.
+    _releaseClient();
+    final client = await MatrixClient.restoreSession(dataDir: dataDir);
     return _client = client;
   });
 

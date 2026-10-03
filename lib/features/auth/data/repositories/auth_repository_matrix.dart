@@ -15,11 +15,6 @@ class AuthRepositoryMatrix implements AuthRepository {
 
   final _sessionChanges = StreamController<UserSession?>.broadcast();
 
-  UserSession? _currentSession;
-
-  @override
-  UserSession? get currentSession => _currentSession;
-
   // TODO: emitir null quando o token for revogado em outro cliente (`SessionChange::UnknownToken`).
   @override
   Stream<UserSession?> get sessionChanges => _sessionChanges.stream;
@@ -72,7 +67,6 @@ class AuthRepositoryMatrix implements AuthRepository {
   Future<void> dispose() => _sessionChanges.close();
 
   void _setSession(UserSession? session) {
-    _currentSession = session;
     // Uma operação pode terminar depois do dispose.
     if (!_sessionChanges.isClosed) _sessionChanges.add(session);
   }

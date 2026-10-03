@@ -85,4 +85,23 @@ void main() {
 
     expect(repository.logoutCalls, 2);
   });
+
+  testWidgets('um novo logout esconde o aviso da falha anterior', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository(
+      logoutFailure: const AuthFailure(AuthFailureType.storage),
+    );
+    await pumpButton(tester, repository);
+
+    await tester.tap(find.byKey(const Key('logout')));
+    await tester.pumpAndSettle();
+    expect(find.text('Não foi possível sair.'), findsOneWidget);
+
+    repository.logoutFailure = null;
+    await tester.tap(find.byKey(const Key('logout')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Não foi possível sair.'), findsNothing);
+  });
 }

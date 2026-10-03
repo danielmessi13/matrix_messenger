@@ -20,9 +20,9 @@ class FakeAuthRepository implements AuthRepository {
 
   UserSession? savedSession;
 
-  final Exception? restoreFailure;
+  Exception? restoreFailure;
   final Exception? loginFailure;
-  final Exception? logoutFailure;
+  Exception? logoutFailure;
 
   final Completer<void>? restoreCompleter;
   final Completer<void>? loginCompleter;
@@ -36,11 +36,6 @@ class FakeAuthRepository implements AuthRepository {
   int logoutCalls = 0;
 
   final _sessionChanges = StreamController<UserSession?>.broadcast();
-
-  UserSession? _currentSession;
-
-  @override
-  UserSession? get currentSession => _currentSession;
 
   @override
   Stream<UserSession?> get sessionChanges => _sessionChanges.stream;
@@ -87,7 +82,6 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> dispose() => _sessionChanges.close();
 
   void _setSession(UserSession? session) {
-    _currentSession = session;
     if (!_sessionChanges.isClosed) _sessionChanges.add(session);
   }
 }

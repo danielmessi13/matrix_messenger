@@ -16,9 +16,6 @@ class FakeMatrixService implements MatrixService {
       <({String homeserver, String username, String password})>[];
 
   @override
-  MatrixClient? get client => null;
-
-  @override
   Future<Result<MatrixClient?>> restoreSession() async => restoreResult;
 
   @override

@@ -13,9 +13,14 @@ class LogoutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocConsumer<LogoutViewModel, LogoutState>(
       bloc: viewModel,
-      listenWhen: (previous, current) => current.status == LogoutStatus.failure,
+      listenWhen: (previous, current) => previous.status != current.status,
       listener: (context, state) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        final messenger = ScaffoldMessenger.of(context);
+        if (state.status == LogoutStatus.running) {
+          messenger.hideCurrentSnackBar();
+        }
+        if (state.status != LogoutStatus.failure) return;
+        messenger.showSnackBar(
           SnackBar(
             content: const Text('Não foi possível sair.'),
             action: SnackBarAction(
