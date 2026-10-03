@@ -1,26 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:matrix_messenger/src/rust/api/simple.dart';
-import 'package:matrix_messenger/src/rust/frb_generated.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'app/app.dart';
+import 'config/dependencies.dart';
+import 'src/rust/frb_generated.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('flutter_rust_bridge quickstart')),
-        body: Center(
-          child: Text(
-            'Action: Call Rust `greet("Tom")`\nResult: `${greet(name: "aa")}`',
-          ),
-        ),
-      ),
-    );
-  }
+  runApp(
+    MultiRepositoryProvider(
+      providers: providers(),
+      child: const MessengerApp(),
+    ),
+  );
 }
