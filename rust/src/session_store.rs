@@ -63,11 +63,20 @@ impl SavedAuth {
 }
 
 pub(crate) fn load(data_dir: &str) -> Result<Option<StoredSession>, String> {
-    match keyring_entry(data_dir)?.get_password() {
+    parse_loaded(Entry::new(KEYRING_SERVICE, data_dir).and_then(|entry| entry.get_password()))
+}
+
+fn parse_loaded(read: keyring::Result<String>) -> Result<Option<StoredSession>, String> {
+    match read {
         Ok(json) => serde_json::from_str(&json)
             .map(Some)
             .map_err(|e| format!("sessão salva ilegível: {e}")),
         Err(keyring::Error::NoEntry) => Ok(None),
+        // Sem cofre o login não salva a sessão, então não há o que restaurar.
+        Err(keyring::Error::NoDefaultStore) => {
+            log::warn!("cofre do sistema indisponível, sessão não restaurada");
+            Ok(None)
+        }
         Err(e) => Err(format!("falha ao ler o cofre do sistema: {e}")),
     }
 }
@@ -218,5 +227,16 @@ mod tests {
 
         assert_eq!(*restored.client_id, "client");
         assert_eq!(restored.user.meta.user_id, "@alice:example.org");
+    }
+
+    #[test]
+    fn missing_vault_loads_no_session() {
+        assert!(matches!(parse_loaded(Err(keyring::Error::NoDefaultStore)), Ok(None)));
+    }
+
+    #[test]
+    fn locked_vault_is_an_error() {
+        let locked = keyring::Error::NoStorageAccess("bloqueado".into());
+        assert!(parse_loaded(Err(locked)).is_err());
     }
 }
