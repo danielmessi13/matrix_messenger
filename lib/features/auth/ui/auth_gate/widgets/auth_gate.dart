@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../home/ui/view_models/home_view_model.dart';
 import '../../../../home/ui/widgets/home_screen.dart';
+import '../../../../../core/services/browser_launcher.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../login/view_models/login_view_model.dart';
 import '../../login/widgets/login_screen.dart';
@@ -25,7 +26,10 @@ class AuthGate extends StatelessWidget {
         ),
         AuthGateRestoreFailed() => RestoreFailedScreen(viewModel: viewModel),
         AuthGateUnauthenticated() => BlocProvider(
-          create: (context) => LoginViewModel(context.read<AuthRepository>()),
+          create: (context) => LoginViewModel(
+            context.read<AuthRepository>(),
+            context.read<BrowserLauncher>(),
+          ),
           child: Builder(
             builder: (context) =>
                 LoginScreen(viewModel: context.read<LoginViewModel>()),

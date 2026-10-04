@@ -5,6 +5,12 @@ enum AuthFailureType {
   userDeactivated,
   rateLimited,
   storage,
+  oidcNotSupported,
+  authorizationDenied,
+  timedOut,
+  cancelled,
+  browserUnavailable,
+  sessionRevoked,
   unknown,
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/core/services/browser_launcher.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
@@ -8,6 +9,7 @@ import 'package:matrix_messenger/features/auth/ui/auth_gate/view_models/auth_gat
 import 'package:matrix_messenger/features/auth/ui/auth_gate/widgets/auth_gate.dart';
 
 import '../../../../../../testing/fakes/repositories/fake_auth_repository.dart';
+import '../../../../../../testing/fakes/services/fake_browser_launcher.dart';
 import '../../../../../../testing/models/user_session.dart';
 
 void main() {
@@ -17,8 +19,13 @@ void main() {
   ) async {
     addTearDown(repository.dispose);
     await tester.pumpWidget(
-      RepositoryProvider<AuthRepository>.value(
-        value: repository,
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<AuthRepository>.value(value: repository),
+          RepositoryProvider<BrowserLauncher>.value(
+            value: FakeBrowserLauncher(),
+          ),
+        ],
         child: MaterialApp(
           home: BlocProvider(
             create: (context) =>
@@ -127,5 +134,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('login_submit')), findsOneWidget);
+  });
+
+  testWidgets('sessão revogada volta ao login com a mensagem', (tester) async {
+    final repository = FakeAuthRepository(savedSession: kUserSession);
+    await pumpGate(tester, repository);
+
+    repository.revokeSession();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('login_submit')), findsOneWidget);
+    expect(
+      find.text('Sua sessão foi encerrada. Entre novamente.'),
+      findsOneWidget,
+    );
   });
 }

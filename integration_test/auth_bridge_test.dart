@@ -7,6 +7,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:matrix_messenger/app/app.dart';
 import 'package:matrix_messenger/config/dependencies.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/oidc.dart';
 import 'package:matrix_messenger/src/rust/frb_generated.dart';
 
 void main() {
@@ -32,6 +33,22 @@ void main() {
         homeserver: 'isto não é um servidor',
         username: 'alice',
         password: 'senha',
+        dataDir: dataDir.path,
+      ),
+      throwsA(
+        isA<AuthError>().having(
+          (e) => e.kind,
+          'kind',
+          AuthErrorKind.invalidHomeserver,
+        ),
+      ),
+    );
+  });
+
+  test('login pelo navegador com servidor malformado falha no Rust', () async {
+    await expectLater(
+      OidcLogin.start(
+        homeserver: 'isto não é um servidor',
         dataDir: dataDir.path,
       ),
       throwsA(

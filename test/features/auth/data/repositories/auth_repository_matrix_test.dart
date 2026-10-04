@@ -38,6 +38,81 @@ void main() {
     password: 'secret',
   );
 
+  Future<Result<UserSession>> loginWithBrowser([void Function(Uri)? onUrl]) =>
+      repository.loginWithBrowser(
+        homeserver: 'matrix.org',
+        onAuthorizationUrl: onUrl ?? (_) {},
+      );
+
+  group('loginWithBrowser', () {
+    test('repassa o servidor e a URL, atualiza a sessão e emite', () async {
+      final urls = <Uri>[];
+
+      final result = await loginWithBrowser(urls.add);
+      await flush();
+
+      expect(result, isA<Ok<UserSession>>());
+      expect(service.loginWithBrowserCalls, ['matrix.org']);
+      expect(urls, [service.authorizationUrl]);
+      expect(emitted, [kUserSession]);
+    });
+
+    test('com erro devolve a falha e não emite', () async {
+      service.loginWithBrowserResult = const Result.error(
+        AuthError(kind: AuthErrorKind.authorizationDenied, message: 'negado'),
+      );
+
+      final result = await loginWithBrowser();
+      await flush();
+
+      expect(result, isFailure(AuthFailureType.authorizationDenied));
+      expect(emitted, isEmpty);
+    });
+
+    test('cancelBrowserLogin repassa ao service', () async {
+      await repository.cancelBrowserLogin();
+      expect(service.cancelBrowserLoginCalls, 1);
+    });
+  });
+
+  group('sessão revogada', () {
+    setUp(() async {
+      await login();
+      await flush();
+      emitted.clear();
+    });
+
+    test('emite null e guarda o motivo', () async {
+      service.revokedController.add(null);
+      await flush();
+
+      expect(emitted, [null]);
+      expect(repository.lastSignOutReason, AuthFailureType.sessionRevoked);
+    });
+
+    test('novo login limpa o motivo', () async {
+      service.revokedController.add(null);
+      await flush();
+
+      await login();
+
+      expect(repository.lastSignOutReason, isNull);
+    });
+
+    test(
+      'logout manual depois de um novo login não traz o motivo de volta',
+      () async {
+        service.revokedController.add(null);
+        await flush();
+        await loginWithBrowser();
+
+        await repository.logout();
+
+        expect(repository.lastSignOutReason, isNull);
+      },
+    );
+  });
+
   group('restoreSession', () {
     test('com sessão salva atualiza a sessão e emite', () async {
       service.restoreResult = Result.ok(FakeMatrixClient.of(kUserSession));
@@ -184,6 +259,10 @@ void main() {
       AuthErrorKind.userDeactivated: AuthFailureType.userDeactivated,
       AuthErrorKind.rateLimited: AuthFailureType.rateLimited,
       AuthErrorKind.storage: AuthFailureType.storage,
+      AuthErrorKind.oidcNotSupported: AuthFailureType.oidcNotSupported,
+      AuthErrorKind.authorizationDenied: AuthFailureType.authorizationDenied,
+      AuthErrorKind.timedOut: AuthFailureType.timedOut,
+      AuthErrorKind.cancelled: AuthFailureType.cancelled,
       AuthErrorKind.unknown: AuthFailureType.unknown,
     };
 

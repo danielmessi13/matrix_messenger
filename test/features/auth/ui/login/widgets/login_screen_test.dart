@@ -7,13 +7,18 @@ import 'package:matrix_messenger/features/auth/ui/login/view_models/login_view_m
 import 'package:matrix_messenger/features/auth/ui/login/widgets/login_screen.dart';
 
 import '../../../../../../testing/fakes/repositories/fake_auth_repository.dart';
+import '../../../../../../testing/fakes/services/fake_browser_launcher.dart';
 
 void main() {
   Future<void> pumpScreen(
     WidgetTester tester,
-    FakeAuthRepository repository,
-  ) async {
-    final viewModel = LoginViewModel(repository);
+    FakeAuthRepository repository, {
+    FakeBrowserLauncher? launcher,
+  }) async {
+    final viewModel = LoginViewModel(
+      repository,
+      launcher ?? FakeBrowserLauncher(),
+    );
     addTearDown(viewModel.close);
     addTearDown(repository.dispose);
     await tester.pumpWidget(
@@ -92,6 +97,51 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Usuário ou senha incorretos.'), findsOneWidget);
+    expect(find.byKey(const Key('login_submit')), findsOneWidget);
+  });
+
+  testWidgets('entrar pelo navegador exige só o servidor', (tester) async {
+    final repository = FakeAuthRepository();
+    await pumpScreen(tester, repository);
+
+    await tester.enterText(find.byKey(const Key('login_homeserver')), '');
+    await tester.tap(find.byKey(const Key('login_browser')));
+    await tester.pump();
+    expect(find.text('Informe o servidor.'), findsOneWidget);
+    expect(repository.browserLoginCalls, isEmpty);
+
+    await tester.enterText(
+      find.byKey(const Key('login_homeserver')),
+      'matrix.org',
+    );
+    await tester.tap(find.byKey(const Key('login_browser')));
+    await tester.pumpAndSettle();
+    expect(find.text('Informe o usuário.'), findsNothing);
+    expect(repository.browserLoginCalls, ['matrix.org']);
+  });
+
+  testWidgets('durante a espera mostra o painel com reabrir e cancelar', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository(browserLoginCompleter: Completer());
+    final launcher = FakeBrowserLauncher();
+    await pumpScreen(tester, repository, launcher: launcher);
+
+    await tester.tap(find.byKey(const Key('login_browser')));
+    await tester.pump();
+    expect(
+      find.text('Continue o login no navegador que foi aberto.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('login_submit')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('login_browser_reopen')));
+    await tester.pump();
+    expect(launcher.opened, hasLength(2));
+
+    await tester.tap(find.byKey(const Key('login_browser_cancel')));
+    await tester.pumpAndSettle();
+    expect(repository.cancelBrowserLoginCalls, 1);
     expect(find.byKey(const Key('login_submit')), findsOneWidget);
   });
 }

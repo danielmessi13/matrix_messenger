@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
+import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 
 import '../../models/user_session.dart';
@@ -16,6 +17,9 @@ class FakeAuthRepository implements AuthRepository {
     this.loginCompleter,
     this.logoutCompleter,
     this.loginSession = kUserSession,
+    this.lastSignOutReason,
+    this.browserLoginFailure,
+    this.browserLoginCompleter,
   });
 
   UserSession? savedSession;
@@ -34,6 +38,18 @@ class FakeAuthRepository implements AuthRepository {
       <({String homeserver, String username, String password})>[];
 
   int logoutCalls = 0;
+
+  @override
+  AuthFailureType? lastSignOutReason;
+
+  Exception? browserLoginFailure;
+  final Completer<void>? browserLoginCompleter;
+  Uri authorizationUrl = Uri.parse(
+    'https://account.matrix.org/authorize?state=abc',
+  );
+  final browserLoginCalls = <String>[];
+  int cancelBrowserLoginCalls = 0;
+  Completer<void>? _browserCancel;
 
   final _sessionChanges = StreamController<UserSession?>.broadcast();
 
@@ -76,6 +92,41 @@ class FakeAuthRepository implements AuthRepository {
     savedSession = null;
     _setSession(null);
     return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<UserSession>> loginWithBrowser({
+    required String homeserver,
+    required void Function(Uri url) onAuthorizationUrl,
+  }) async {
+    browserLoginCalls.add(homeserver);
+    final cancel = _browserCancel = Completer<void>();
+    onAuthorizationUrl(authorizationUrl);
+    await Future.any([
+      cancel.future,
+      browserLoginCompleter?.future ?? Future<void>.value(),
+    ]);
+    if (cancel.isCompleted) {
+      return const Result.error(AuthFailure(AuthFailureType.cancelled));
+    }
+    if (browserLoginFailure case final failure?) return Result.error(failure);
+    savedSession = loginSession;
+    _setSession(loginSession);
+    return Result.ok(loginSession);
+  }
+
+  @override
+  Future<void> cancelBrowserLogin() async {
+    cancelBrowserLoginCalls++;
+    if (_browserCancel case final cancel? when !cancel.isCompleted) {
+      cancel.complete();
+    }
+  }
+
+  void revokeSession() {
+    lastSignOutReason = AuthFailureType.sessionRevoked;
+    savedSession = null;
+    _setSession(null);
   }
 
   @override

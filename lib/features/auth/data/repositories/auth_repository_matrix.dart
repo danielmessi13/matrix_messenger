@@ -9,13 +9,24 @@ import '../../domain/models/user_session.dart';
 import 'auth_repository.dart';
 
 class AuthRepositoryMatrix implements AuthRepository {
-  AuthRepositoryMatrix(this._service);
+  AuthRepositoryMatrix(this._service) {
+    _revokedSubscription = _service.sessionRevoked.listen((_) {
+      _lastSignOutReason = AuthFailureType.sessionRevoked;
+      _setSession(null);
+    });
+  }
 
   final MatrixService _service;
 
   final _sessionChanges = StreamController<UserSession?>.broadcast();
 
-  // TODO: emitir null quando o token for revogado em outro cliente (`SessionChange::UnknownToken`).
+  late final StreamSubscription<void> _revokedSubscription;
+
+  AuthFailureType? _lastSignOutReason;
+
+  @override
+  AuthFailureType? get lastSignOutReason => _lastSignOutReason;
+
   @override
   Stream<UserSession?> get sessionChanges => _sessionChanges.stream;
 
@@ -37,11 +48,34 @@ class AuthRepositoryMatrix implements AuthRepository {
     required String username,
     required String password,
   }) async {
-    final result = await _service.login(
-      homeserver: homeserver,
-      username: username,
-      password: password,
+    _lastSignOutReason = null;
+    return _adoptLogin(
+      await _service.login(
+        homeserver: homeserver,
+        username: username,
+        password: password,
+      ),
     );
+  }
+
+  @override
+  Future<Result<UserSession>> loginWithBrowser({
+    required String homeserver,
+    required void Function(Uri url) onAuthorizationUrl,
+  }) async {
+    _lastSignOutReason = null;
+    return _adoptLogin(
+      await _service.loginWithBrowser(
+        homeserver: homeserver,
+        onAuthorizationUrl: onAuthorizationUrl,
+      ),
+    );
+  }
+
+  @override
+  Future<void> cancelBrowserLogin() => _service.cancelBrowserLogin();
+
+  Result<UserSession> _adoptLogin(Result<MatrixClient> result) {
     switch (result) {
       case Ok(:final value):
         final session = _toSession(value);
@@ -54,6 +88,7 @@ class AuthRepositoryMatrix implements AuthRepository {
 
   @override
   Future<Result<void>> logout() async {
+    _lastSignOutReason = null;
     switch (await _service.logout()) {
       case Ok():
         _setSession(null);
@@ -64,7 +99,10 @@ class AuthRepositoryMatrix implements AuthRepository {
   }
 
   @override
-  Future<void> dispose() => _sessionChanges.close();
+  Future<void> dispose() async {
+    await _revokedSubscription.cancel();
+    await _sessionChanges.close();
+  }
 
   void _setSession(UserSession? session) {
     // Uma operação pode terminar depois do dispose.
@@ -89,6 +127,7 @@ class AuthRepositoryMatrix implements AuthRepository {
     _ => AuthFailure(AuthFailureType.unknown, '$error'),
   };
 
+  // Mantém o tipo gerado pela ponte fora do domínio; o switch quebra se o Rust ganhar um kind novo.
   AuthFailureType _toFailureType(AuthErrorKind kind) => switch (kind) {
     AuthErrorKind.invalidHomeserver => AuthFailureType.invalidHomeserver,
     AuthErrorKind.homeserverUnreachable =>
@@ -97,6 +136,10 @@ class AuthRepositoryMatrix implements AuthRepository {
     AuthErrorKind.userDeactivated => AuthFailureType.userDeactivated,
     AuthErrorKind.rateLimited => AuthFailureType.rateLimited,
     AuthErrorKind.storage => AuthFailureType.storage,
+    AuthErrorKind.oidcNotSupported => AuthFailureType.oidcNotSupported,
+    AuthErrorKind.authorizationDenied => AuthFailureType.authorizationDenied,
+    AuthErrorKind.timedOut => AuthFailureType.timedOut,
+    AuthErrorKind.cancelled => AuthFailureType.cancelled,
     AuthErrorKind.unknown => AuthFailureType.unknown,
   };
 }
