@@ -1,43 +1,179 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
+import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 
+import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
+import '../../../../../testing/models/room.dart';
 import '../../../../../testing/models/user_session.dart';
 
 void main() {
+  late FakeAuthRepository authRepository;
+  late FakeRoomRepository roomRepository;
+
+  setUp(() {
+    authRepository = FakeAuthRepository(savedSession: kUserSession);
+    roomRepository = FakeRoomRepository();
+  });
+
+  tearDown(() async {
+    await authRepository.dispose();
+    await roomRepository.dispose();
+  });
+
   Future<void> pumpScreen(
-    WidgetTester tester,
-    FakeAuthRepository repository, {
+    WidgetTester tester, {
     UserSession session = kUserSession,
+    Size size = const Size(1440, 900),
   }) async {
+    useDesktopSize(tester, size);
     final viewModel = HomeViewModel(session);
+    final roomListViewModel = RoomListViewModel(roomRepository)..init();
     addTearDown(viewModel.close);
-    addTearDown(repository.dispose);
+    addTearDown(roomListViewModel.close);
     await tester.pumpWidget(
       RepositoryProvider<AuthRepository>.value(
-        value: repository,
-        child: MaterialApp(home: HomeScreen(viewModel: viewModel)),
+        value: authRepository,
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: HomeScreen(
+            viewModel: viewModel,
+            roomListViewModel: roomListViewModel,
+            clock: () => kNow,
+          ),
+        ),
       ),
     );
   }
 
-  testWidgets('mostra o usuário e o device conectados', (tester) async {
-    await pumpScreen(tester, FakeAuthRepository());
+  Future<void> showRooms(WidgetTester tester, [List<Room>? rooms]) async {
+    roomRepository.roomsController.add(rooms ?? kRooms);
+    await tester.pump();
+  }
 
-    expect(find.text('@alice:matrix.org'), findsOneWidget);
-    expect(find.text('Device DEVICE123'), findsOneWidget);
-    expect(find.byKey(const Key('session_not_saved')), findsNothing);
+  testWidgets('antes da primeira lista mostra esqueleto e nenhuma sala', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    expect(find.byKey(const Key('room_skeleton')), findsWidgets);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
   });
 
-  testWidgets('avisa quando a sessão não pôde ser salva', (tester) async {
+  testWidgets('clicar numa sala mostra o cabeçalho dela', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(Key('room_${kTeamRoom.id}')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('conversation_title')), findsOneWidget);
+    expect(find.text('#lançamento-q4'), findsOneWidget);
+    expect(find.text('Selecione uma conversa'), findsNothing);
+  });
+
+  testWidgets('filtro Diretas mostra só DMs', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('filter_direct')));
+    await tester.pump();
+
+    expect(find.byKey(Key('room_${kDirectRoom.id}')), findsOneWidget);
+    expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
+  });
+
+  testWidgets('busca filtra pelo nome', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.enterText(find.byKey(const Key('room_search')), 'design');
+    await tester.pump();
+
+    expect(find.byKey(Key('room_${kQuietRoom.id}')), findsOneWidget);
+    expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
+    expect(find.text('Resultados'), findsOneWidget);
+  });
+
+  for (final modifier in [
+    LogicalKeyboardKey.controlLeft,
+    LogicalKeyboardKey.metaLeft,
+  ]) {
+    testWidgets('${modifier.keyLabel}+K foca a busca', (tester) async {
+      await pumpScreen(tester);
+      bool focused() => tester
+          .widget<TextField>(find.byKey(const Key('room_search')))
+          .focusNode!
+          .hasFocus;
+
+      expect(focused(), isFalse);
+      await tester.sendKeyDownEvent(modifier);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+      await tester.sendKeyUpEvent(modifier);
+      await tester.pump();
+
+      expect(focused(), isTrue);
+    });
+  }
+
+  testWidgets('Cmd+K foca a busca depois de clicar fora dela', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+    final search = find.byKey(const Key('room_search'));
+    bool focused() => tester.widget<TextField>(search).focusNode!.hasFocus;
+
+    await tester.tap(search);
+    await tester.pump();
+    expect(focused(), isTrue);
+
+    await tester.tap(find.byKey(Key('room_${kTeamRoom.id}')));
+    await tester.pump();
+    expect(focused(), isFalse);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+
+    expect(focused(), isTrue);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('recolher rail e lista', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('toggle_filters')));
+    await tester.pump();
+    expect(find.text('FILTROS'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('toggle_room_list')));
+    await tester.pump();
+    expect(find.byKey(Key('room_avatar_${kTeamRoom.id}')), findsOneWidget);
+  });
+
+  testWidgets('sair pelo menu do avatar', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('user_menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('logout')));
+    await tester.pumpAndSettle();
+
+    expect(authRepository.logoutCalls, 1);
+  });
+
+  testWidgets('aviso de sessão não salva pode ser dispensado', (tester) async {
     await pumpScreen(
       tester,
-      FakeAuthRepository(),
       session: const UserSession(
         userId: '@alice:matrix.org',
         deviceId: 'DEVICE123',
@@ -46,15 +182,35 @@ void main() {
     );
 
     expect(find.byKey(const Key('session_not_saved')), findsOneWidget);
+    await tester.tap(find.text('Entendi'));
+    await tester.pump();
+    expect(find.byKey(const Key('session_not_saved')), findsNothing);
   });
 
-  testWidgets('o botão de sair usa o repository do app', (tester) async {
-    final repository = FakeAuthRepository(savedSession: kUserSession);
-    await pumpScreen(tester, repository);
+  testWidgets('nomes e prévias longas na largura mínima não estouram', (
+    tester,
+  ) async {
+    final long = 'muito ' * 40;
+    await pumpScreen(tester, size: const Size(1024, 640));
+    await showRooms(tester, [
+      Room(
+        id: '!longa:b.c',
+        name: 'sala com um nome $long',
+        unreadMessages: 1234,
+        memberCount: 9999,
+        heroes: const ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa'],
+        latest: LatestMessage(
+          senderName: 'Alguém Com Nome Enorme',
+          isOwn: false,
+          kind: LatestMessageKind.text,
+          body: long,
+          timestamp: kNow,
+        ),
+      ),
+    ]);
+    await tester.tap(find.byKey(const Key('room_!longa:b.c')));
+    await tester.pump();
 
-    await tester.tap(find.byKey(const Key('logout')));
-    await tester.pumpAndSettle();
-
-    expect(repository.logoutCalls, 1);
+    expect(tester.takeException(), isNull);
   });
 }
