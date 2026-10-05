@@ -5,7 +5,7 @@ class FakeBrowserLauncher implements BrowserLauncher {
 
   bool result;
 
-  Object? error;
+  Error? error;
 
   final opened = <Uri>[];
 

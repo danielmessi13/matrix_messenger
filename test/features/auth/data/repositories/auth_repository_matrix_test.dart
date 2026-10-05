@@ -22,7 +22,10 @@ void main() {
     repository.sessionChanges.listen(emitted.add);
   });
 
-  tearDown(() => repository.dispose());
+  tearDown(() async {
+    await repository.dispose();
+    await service.dispose();
+  });
 
   Future<void> flush() => Future<void>.delayed(Duration.zero);
 

@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../src/rust/api/auth.dart';
 import '../../src/rust/api/oidc.dart';
+import '../../src/rust/api/rooms.dart';
 import '../utils/result.dart';
 import 'local_storage_exception.dart';
 import 'matrix_bridge.dart';
@@ -77,6 +78,12 @@ class MatrixService {
   });
 
   Future<void> cancelBrowserLogin() async => _pendingBrowserLogin?.cancel();
+
+  Stream<List<RoomSummary>> watchRooms() =>
+      _client?.watchRooms() ?? const Stream.empty();
+
+  Stream<SyncStatus> watchSyncStatus() =>
+      _client?.watchSyncStatus() ?? const Stream.empty();
 
   Future<Result<void>> logout() => _guard(() async {
     final client = _client;

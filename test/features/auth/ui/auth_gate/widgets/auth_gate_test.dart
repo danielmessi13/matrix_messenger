@@ -1,32 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/core/services/browser_launcher.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/auth/ui/auth_gate/view_models/auth_gate_view_model.dart';
 import 'package:matrix_messenger/features/auth/ui/auth_gate/widgets/auth_gate.dart';
+import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 
+import '../../../../../../testing/desktop_size.dart';
 import '../../../../../../testing/fakes/repositories/fake_auth_repository.dart';
+import '../../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../../testing/fakes/services/fake_browser_launcher.dart';
 import '../../../../../../testing/models/user_session.dart';
 
 void main() {
   Future<void> pumpGate(
     WidgetTester tester,
-    FakeAuthRepository repository,
-  ) async {
+    FakeAuthRepository repository, {
+    Size size = const Size(1440, 900),
+  }) async {
+    useDesktopSize(tester, size);
+    final roomRepository = FakeRoomRepository();
     addTearDown(repository.dispose);
+    addTearDown(roomRepository.dispose);
     await tester.pumpWidget(
       MultiRepositoryProvider(
         providers: [
           RepositoryProvider<AuthRepository>.value(value: repository),
+          RepositoryProvider<RoomRepository>.value(value: roomRepository),
           RepositoryProvider<BrowserLauncher>.value(
             value: FakeBrowserLauncher(),
           ),
         ],
         child: MaterialApp(
+          theme: buildAppTheme(),
           home: BlocProvider(
             create: (context) =>
                 AuthGateViewModel(context.read<AuthRepository>())..init(),
@@ -52,7 +62,7 @@ void main() {
   ) async {
     await pumpGate(tester, FakeAuthRepository(savedSession: kUserSession));
 
-    expect(find.text('@alice:matrix.org'), findsOneWidget);
+    expect(find.byTooltip('@alice:matrix.org'), findsOneWidget);
     expect(find.byKey(const Key('login_submit')), findsNothing);
   });
 
@@ -66,13 +76,26 @@ void main() {
     await tester.tap(find.byKey(const Key('login_submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text('@alice:matrix.org'), findsOneWidget);
+    expect(find.byTooltip('@alice:matrix.org'), findsOneWidget);
+  });
+
+  testWidgets('janela estreita abre com a lista recolhida', (tester) async {
+    await pumpGate(
+      tester,
+      FakeAuthRepository(savedSession: kUserSession),
+      size: const Size(1100, 800),
+    );
+
+    expect(find.byKey(const Key('toggle_room_list')), findsOneWidget);
+    expect(find.text('Caixa de entrada'), findsNothing);
   });
 
   testWidgets('sair volta para o formulário de login', (tester) async {
     final repository = FakeAuthRepository(savedSession: kUserSession);
     await pumpGate(tester, repository);
 
+    await tester.tap(find.byKey(const Key('user_menu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('logout')));
     await tester.pumpAndSettle();
 
@@ -101,8 +124,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('@bob:matrix.org'), findsOneWidget);
-    expect(find.text('@alice:matrix.org'), findsNothing);
+    expect(find.byTooltip('@bob:matrix.org'), findsOneWidget);
+    expect(find.byTooltip('@alice:matrix.org'), findsNothing);
   });
 
   testWidgets('falha na restauração permite tentar de novo', (tester) async {
@@ -119,7 +142,7 @@ void main() {
     await tester.tap(find.byKey(const Key('restore_retry')));
     await tester.pumpAndSettle();
 
-    expect(find.text('@alice:matrix.org'), findsOneWidget);
+    expect(find.byTooltip('@alice:matrix.org'), findsOneWidget);
   });
 
   testWidgets('falha na restauração permite ir ao login', (tester) async {

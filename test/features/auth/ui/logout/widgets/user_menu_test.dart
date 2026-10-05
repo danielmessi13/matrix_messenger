@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/ui/logout/view_models/logout_view_model.dart';
-import 'package:matrix_messenger/features/auth/ui/logout/widgets/logout_button.dart';
+import 'package:matrix_messenger/features/auth/ui/logout/widgets/user_menu.dart';
 
 import '../../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 
 void main() {
-  Future<void> pumpButton(
+  Future<void> pumpMenu(
     WidgetTester tester,
     FakeAuthRepository repository,
   ) async {
@@ -18,67 +19,70 @@ void main() {
     addTearDown(repository.dispose);
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: Scaffold(
-          appBar: AppBar(actions: [LogoutButton(viewModel: viewModel)]),
+          body: Center(
+            child: UserMenu(viewModel: viewModel, userId: '@alice:matrix.org'),
+          ),
         ),
       ),
     );
   }
 
-  IconButton findButton(WidgetTester tester) =>
-      tester.widget<IconButton>(find.byKey(const Key('logout')));
-
-  testWidgets('tocar no botão chama o logout do repository', (tester) async {
-    final repository = FakeAuthRepository();
-    await pumpButton(tester, repository);
-
+  Future<void> tapLogout(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('user_menu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('logout')));
+  }
+
+  testWidgets('mostra as iniciais e o Matrix ID no tooltip', (tester) async {
+    await pumpMenu(tester, FakeAuthRepository());
+
+    expect(find.text('AL'), findsOneWidget);
+    expect(find.byTooltip('@alice:matrix.org'), findsOneWidget);
+  });
+
+  testWidgets('"Sair" chama o logout do repository', (tester) async {
+    final repository = FakeAuthRepository();
+    await pumpMenu(tester, repository);
+
+    await tapLogout(tester);
     await tester.pumpAndSettle();
 
     expect(repository.logoutCalls, 1);
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('clique duplo faz um logout só', (tester) async {
-    final completer = Completer<void>();
-    final repository = FakeAuthRepository(logoutCompleter: completer);
-    await pumpButton(tester, repository);
-
-    // Os dois toques acontecem no mesmo frame, antes de o botão ser desabilitado.
-    await tester.tap(find.byKey(const Key('logout')));
-    await tester.tap(find.byKey(const Key('logout')));
-    completer.complete();
-    await tester.pumpAndSettle();
-
-    expect(repository.logoutCalls, 1);
-  });
-
   testWidgets('fica desabilitado enquanto o logout está em andamento', (
     tester,
   ) async {
     final completer = Completer<void>();
-    await pumpButton(tester, FakeAuthRepository(logoutCompleter: completer));
+    await pumpMenu(tester, FakeAuthRepository(logoutCompleter: completer));
 
-    await tester.tap(find.byKey(const Key('logout')));
-    await tester.pump();
-    expect(findButton(tester).onPressed, isNull);
+    await tapLogout(tester);
+    await tester.pumpAndSettle();
+    final menu = tester.widget<PopupMenuButton<void>>(
+      find.byKey(const Key('user_menu')),
+    );
+    expect(menu.enabled, isFalse);
 
     completer.complete();
     await tester.pumpAndSettle();
-    expect(findButton(tester).onPressed, isNotNull);
+    final reenabled = tester.widget<PopupMenuButton<void>>(
+      find.byKey(const Key('user_menu')),
+    );
+    expect(reenabled.enabled, isTrue);
   });
 
   testWidgets('falha mostra aviso e permite tentar de novo', (tester) async {
     final repository = FakeAuthRepository(
       logoutFailure: const AuthFailure(AuthFailureType.storage),
     );
-    await pumpButton(tester, repository);
+    await pumpMenu(tester, repository);
 
-    await tester.tap(find.byKey(const Key('logout')));
+    await tapLogout(tester);
     await tester.pumpAndSettle();
-
     expect(find.text('Não foi possível sair.'), findsOneWidget);
-    expect(findButton(tester).onPressed, isNotNull);
 
     await tester.tap(find.text('Tentar de novo'));
     await tester.pumpAndSettle();
@@ -92,16 +96,17 @@ void main() {
     final repository = FakeAuthRepository(
       logoutFailure: const AuthFailure(AuthFailureType.storage),
     );
-    await pumpButton(tester, repository);
+    await pumpMenu(tester, repository);
 
-    await tester.tap(find.byKey(const Key('logout')));
+    await tapLogout(tester);
     await tester.pumpAndSettle();
     expect(find.text('Não foi possível sair.'), findsOneWidget);
 
     repository.logoutFailure = null;
-    await tester.tap(find.byKey(const Key('logout')));
+    await tapLogout(tester);
     await tester.pumpAndSettle();
 
+    expect(repository.logoutCalls, 2);
     expect(find.text('Não foi possível sair.'), findsNothing);
   });
 }

@@ -41,6 +41,7 @@ dependencies:
   equatable: ^3.0.0
   path_provider: ^2.1.6
   url_launcher: ^6.3.3
+  diacritic: ^0.1.6
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +67,26 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/fonts/OFL-Newsreader.txt
+    - assets/fonts/OFL-IBMPlexSans.txt
+
+  fonts:
+    - family: Newsreader
+      fonts:
+        - asset: assets/fonts/Newsreader-Regular.ttf
+        - asset: assets/fonts/Newsreader-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Newsreader-Italic.ttf
+          style: italic
+    - family: IBMPlexSans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
+        - asset: assets/fonts/IBMPlexSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+          weight: 600
 
   # To add assets to your application, add an assets section, like this:
   # assets:

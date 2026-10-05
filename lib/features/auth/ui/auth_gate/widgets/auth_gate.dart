@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../home/ui/view_models/home_view_model.dart';
-import '../../../../home/ui/widgets/home_screen.dart';
-import '../../../../../core/services/browser_launcher.dart';
-import '../../../data/repositories/auth_repository.dart';
-import '../../login/view_models/login_view_model.dart';
-import '../../login/widgets/login_screen.dart';
 import '../view_models/auth_gate_state.dart';
 import '../view_models/auth_gate_view_model.dart';
+import 'authenticated_view.dart';
 import 'restore_failed_screen.dart';
+import 'restoring_screen.dart';
+import 'unauthenticated_view.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key, required this.viewModel});
@@ -21,28 +18,13 @@ class AuthGate extends StatelessWidget {
     return BlocBuilder<AuthGateViewModel, AuthGateState>(
       bloc: viewModel,
       builder: (context, state) => switch (state) {
-        AuthGateRestoring() => const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        AuthGateRestoring() => const RestoringScreen(),
         AuthGateRestoreFailed() => RestoreFailedScreen(viewModel: viewModel),
-        AuthGateUnauthenticated() => BlocProvider(
-          create: (context) => LoginViewModel(
-            context.read<AuthRepository>(),
-            context.read<BrowserLauncher>(),
-          ),
-          child: Builder(
-            builder: (context) =>
-                LoginScreen(viewModel: context.read<LoginViewModel>()),
-          ),
-        ),
-        AuthGateAuthenticated(:final session) => BlocProvider(
-          // Uma sessão diferente recria a home, em vez de reaproveitar o ViewModel da anterior.
+        AuthGateUnauthenticated() => const UnauthenticatedView(),
+        AuthGateAuthenticated(:final session) => AuthenticatedView(
+          // Uma sessão diferente recria a home, em vez de reaproveitar os ViewModels da anterior.
           key: ValueKey(session),
-          create: (context) => HomeViewModel(session),
-          child: Builder(
-            builder: (context) =>
-                HomeScreen(viewModel: context.read<HomeViewModel>()),
-          ),
+          session: session,
         ),
       },
     );

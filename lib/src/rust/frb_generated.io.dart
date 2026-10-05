@@ -5,6 +5,7 @@
 
 import 'api/auth.dart';
 import 'api/oidc.dart';
+import 'api/rooms.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -70,9 +71,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<List<RoomSummary>> dco_decode_StreamSink_list_room_summary_Sse(
+    dynamic raw,
+  );
+
+  @protected
   RustStreamSink<SessionEvent> dco_decode_StreamSink_session_event_Sse(
     dynamic raw,
   );
+
+  @protected
+  RustStreamSink<SyncStatus> dco_decode_StreamSink_sync_status_Sse(dynamic raw);
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -93,10 +102,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  LatestMessage dco_decode_box_autoadd_latest_message(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  LatestMessage dco_decode_latest_message(dynamic raw);
+
+  @protected
+  LatestMessageKind dco_decode_latest_message_kind(dynamic raw);
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<RoomSummary> dco_decode_list_room_summary(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
 
   @protected
   MatrixClient?
@@ -105,7 +135,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  LatestMessage? dco_decode_opt_box_autoadd_latest_message(dynamic raw);
+
+  @protected
+  RoomSummary dco_decode_room_summary(dynamic raw);
+
+  @protected
   SessionEvent dco_decode_session_event(dynamic raw);
+
+  @protected
+  SyncStatus dco_decode_sync_status(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -156,7 +198,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<List<RoomSummary>> sse_decode_StreamSink_list_room_summary_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RustStreamSink<SessionEvent> sse_decode_StreamSink_session_event_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<SyncStatus> sse_decode_StreamSink_sync_status_Sse(
     SseDeserializer deserializer,
   );
 
@@ -179,10 +231,35 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  LatestMessage sse_decode_box_autoadd_latest_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  LatestMessage sse_decode_latest_message(SseDeserializer deserializer);
+
+  @protected
+  LatestMessageKind sse_decode_latest_message_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<RoomSummary> sse_decode_list_room_summary(SseDeserializer deserializer);
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
   MatrixClient?
@@ -191,7 +268,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  LatestMessage? sse_decode_opt_box_autoadd_latest_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RoomSummary sse_decode_room_summary(SseDeserializer deserializer);
+
+  @protected
   SessionEvent sse_decode_session_event(SseDeserializer deserializer);
+
+  @protected
+  SyncStatus sse_decode_sync_status(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -251,8 +342,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_list_room_summary_Sse(
+    RustStreamSink<List<RoomSummary>> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_StreamSink_session_event_Sse(
     RustStreamSink<SessionEvent> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_sync_status_Sse(
+    RustStreamSink<SyncStatus> self,
     SseSerializer serializer,
   );
 
@@ -276,13 +379,43 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_latest_message(
+    LatestMessage self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_latest_message(LatestMessage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_latest_message_kind(
+    LatestMessageKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_list_room_summary(
+    List<RoomSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
   void
@@ -292,7 +425,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_latest_message(
+    LatestMessage? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_room_summary(RoomSummary self, SseSerializer serializer);
+
+  @protected
   void sse_encode_session_event(SessionEvent self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_status(SyncStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
