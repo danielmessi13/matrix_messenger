@@ -65,6 +65,16 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case WM_GETMINMAXINFO: {
+      auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+      const double scale =
+          FlutterDesktopGetDpiForMonitor(
+              MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
+          96.0;
+      info->ptMinTrackSize.x = static_cast<LONG>(1024 * scale);
+      info->ptMinTrackSize.y = static_cast<LONG>(640 * scale);
+      return 0;
+    }
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
