@@ -1,7 +1,7 @@
 ## O que muda
 <!-- Resumo em 1–3 frases do que o PR entrega. -->
 
-## Por quê
+## Objetivo
 <!-- Motivo ou requisito do desafio que isso atende. -->
 
 ## Como testar
