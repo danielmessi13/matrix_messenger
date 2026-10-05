@@ -24,7 +24,6 @@ class _LoginScreenState extends State<LoginScreen> {
   );
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
   bool _browserRequested = false;
 
   @override
@@ -56,8 +55,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return BlocBuilder<LoginViewModel, LoginState>(
       bloc: widget.viewModel,
       builder: (context, state) {
@@ -65,141 +62,90 @@ class _LoginScreenState extends State<LoginScreen> {
         final failureType = state.failureType;
         final awaitingBrowser = state.status == LoginStatus.awaitingBrowser;
 
-        return Scaffold(
-          body: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Form(
-                      key: _formKey,
-                      child: AutofillGroup(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Icon(
-                              Icons.forum_outlined,
-                              size: 48,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Entrar no Matrix',
-                              style: theme.textTheme.headlineSmall,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 32),
-                            if (awaitingBrowser)
-                              _BrowserWaitingPanel(
-                                onReopen: widget.viewModel.reopenBrowser,
-                                onCancel: widget.viewModel.cancelBrowserLogin,
-                              )
-                            else ...[
-                              KeyedSubtree(
-                                key: const Key('login_homeserver'),
-                                child: TextFormField(
-                                  key: _homeserverField,
-                                  controller: _homeserverController,
-                                  enabled: !submitting,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Servidor',
-                                    prefixIcon: Icon(Icons.dns_outlined),
-                                  ),
-                                  textInputAction: TextInputAction.next,
-                                  autofillHints: const [AutofillHints.url],
-                                  validator: (value) =>
-                                      _required(value, 'o servidor'),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                key: const Key('login_username'),
-                                controller: _usernameController,
-                                enabled: !submitting,
-                                autofocus: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Usuário',
-                                  hintText: 'alice ou @alice:matrix.org',
-                                  prefixIcon: Icon(Icons.person_outline),
-                                ),
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.username],
-                                validator: (value) =>
-                                    _required(value, 'o usuário'),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                key: const Key('login_password'),
-                                controller: _passwordController,
-                                enabled: !submitting,
-                                obscureText: _obscurePassword,
-                                decoration: InputDecoration(
-                                  labelText: 'Senha',
-                                  prefixIcon: const Icon(Icons.lock_outline),
-                                  suffixIcon: IconButton(
-                                    tooltip: _obscurePassword
-                                        ? 'Mostrar senha'
-                                        : 'Ocultar senha',
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                    ),
-                                    onPressed: () => setState(
-                                      () =>
-                                          _obscurePassword = !_obscurePassword,
-                                    ),
-                                  ),
-                                ),
-                                textInputAction: TextInputAction.done,
-                                autofillHints: const [AutofillHints.password],
-                                onFieldSubmitted: (_) => _submit(),
-                                validator: (value) =>
-                                    (value == null || value.isEmpty)
-                                    ? 'Informe a senha.'
-                                    : null,
-                              ),
-                              if (state.status == LoginStatus.failure &&
-                                  failureType != null) ...[
-                                const SizedBox(height: 16),
-                                _ErrorBanner(message: failureType.message),
-                              ],
-                              const SizedBox(height: 24),
-                              FilledButton(
-                                key: const Key('login_submit'),
-                                onPressed: submitting ? null : _submit,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(48),
-                                ),
-                                child: submitting && !_browserRequested
-                                    ? const _ButtonSpinner()
-                                    : const Text('Entrar'),
-                              ),
-                              const SizedBox(height: 16),
-                              const _OrDivider(),
-                              const SizedBox(height: 16),
-                              OutlinedButton.icon(
-                                key: const Key('login_browser'),
-                                onPressed: submitting ? null : _submitBrowser,
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(48),
-                                ),
-                                icon: submitting && _browserRequested
-                                    ? const _ButtonSpinner()
-                                    : const Icon(Icons.open_in_browser),
-                                label: const Text('Entrar pelo navegador'),
-                              ),
-                            ],
-                          ],
+        return _LoginCard(
+          child: Form(
+            key: _formKey,
+            child: AutofillGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _LoginHeader(),
+                  const SizedBox(height: 32),
+                  if (awaitingBrowser)
+                    _BrowserWaitingPanel(
+                      onReopen: widget.viewModel.reopenBrowser,
+                      onCancel: widget.viewModel.cancelBrowserLogin,
+                    )
+                  else ...[
+                    KeyedSubtree(
+                      key: const Key('login_homeserver'),
+                      child: TextFormField(
+                        key: _homeserverField,
+                        controller: _homeserverController,
+                        enabled: !submitting,
+                        decoration: const InputDecoration(
+                          labelText: 'Servidor',
+                          prefixIcon: Icon(Icons.dns_outlined),
                         ),
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.url],
+                        validator: (value) => _required(value, 'o servidor'),
                       ),
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      key: const Key('login_username'),
+                      controller: _usernameController,
+                      enabled: !submitting,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Usuário',
+                        hintText: 'alice ou @alice:matrix.org',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.username],
+                      validator: (value) => _required(value, 'o usuário'),
+                    ),
+                    const SizedBox(height: 16),
+                    _PasswordField(
+                      controller: _passwordController,
+                      enabled: !submitting,
+                      onSubmitted: _submit,
+                    ),
+                    if (state.status == LoginStatus.failure &&
+                        failureType != null) ...[
+                      const SizedBox(height: 16),
+                      _ErrorBanner(message: failureType.message),
+                    ],
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      key: const Key('login_submit'),
+                      onPressed: submitting ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: submitting && !_browserRequested
+                          ? const _ButtonSpinner()
+                          : const Text('Entrar'),
+                    ),
+                    const SizedBox(height: 16),
+                    const _OrDivider(),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      key: const Key('login_browser'),
+                      onPressed: submitting ? null : _submitBrowser,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      icon: submitting && _browserRequested
+                          ? const _ButtonSpinner()
+                          : const Icon(Icons.open_in_browser),
+                      label: const Text('Entrar pelo navegador'),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -207,6 +153,93 @@ class _LoginScreenState extends State<LoginScreen> {
       },
     );
   }
+}
+
+class _LoginCard extends StatelessWidget {
+  const _LoginCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Card(
+            child: Padding(padding: const EdgeInsets.all(32), child: child),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _LoginHeader extends StatelessWidget {
+  const _LoginHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Icon(Icons.forum_outlined, size: 48, color: theme.colorScheme.primary),
+        const SizedBox(height: 16),
+        Text(
+          'Entrar no Matrix',
+          style: theme.textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+class _PasswordField extends StatefulWidget {
+  const _PasswordField({
+    required this.controller,
+    required this.enabled,
+    required this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+
+  final bool enabled;
+
+  final VoidCallback onSubmitted;
+
+  @override
+  State<_PasswordField> createState() => _PasswordFieldState();
+}
+
+class _PasswordFieldState extends State<_PasswordField> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+    key: const Key('login_password'),
+    controller: widget.controller,
+    enabled: widget.enabled,
+    obscureText: _obscure,
+    decoration: InputDecoration(
+      labelText: 'Senha',
+      prefixIcon: const Icon(Icons.lock_outline),
+      suffixIcon: IconButton(
+        tooltip: _obscure ? 'Mostrar senha' : 'Ocultar senha',
+        icon: Icon(
+          _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+        ),
+        onPressed: () => setState(() => _obscure = !_obscure),
+      ),
+    ),
+    textInputAction: TextInputAction.done,
+    autofillHints: const [AutofillHints.password],
+    onFieldSubmitted: (_) => widget.onSubmitted(),
+    validator: (value) =>
+        (value == null || value.isEmpty) ? 'Informe a senha.' : null,
+  );
 }
 
 class _ErrorBanner extends StatelessWidget {
