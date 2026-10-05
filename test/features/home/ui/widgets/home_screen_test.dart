@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -104,26 +105,49 @@ void main() {
     expect(find.text('Resultados'), findsOneWidget);
   });
 
-  for (final modifier in [
-    LogicalKeyboardKey.controlLeft,
-    LogicalKeyboardKey.metaLeft,
-  ]) {
-    testWidgets('${modifier.keyLabel}+K foca a busca', (tester) async {
-      await pumpScreen(tester);
-      bool focused() => tester
-          .widget<TextField>(find.byKey(const Key('room_search')))
-          .focusNode!
-          .hasFocus;
+  const desktopPlatforms = TargetPlatformVariant({
+    TargetPlatform.macOS,
+    TargetPlatform.linux,
+    TargetPlatform.windows,
+  });
 
-      expect(focused(), isFalse);
-      await tester.sendKeyDownEvent(modifier);
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
-      await tester.sendKeyUpEvent(modifier);
-      await tester.pump();
+  LogicalKeyboardKey platformModifier() =>
+      defaultTargetPlatform == TargetPlatform.macOS
+      ? LogicalKeyboardKey.metaLeft
+      : LogicalKeyboardKey.controlLeft;
 
-      expect(focused(), isTrue);
-    });
+  LogicalKeyboardKey otherModifier() =>
+      defaultTargetPlatform == TargetPlatform.macOS
+      ? LogicalKeyboardKey.controlLeft
+      : LogicalKeyboardKey.metaLeft;
+
+  Future<void> pressK(WidgetTester tester, LogicalKeyboardKey modifier) async {
+    await tester.sendKeyDownEvent(modifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(modifier);
+    await tester.pump();
   }
+
+  bool searchFocused(WidgetTester tester) => tester
+      .widget<TextField>(find.byKey(const Key('room_search')))
+      .focusNode!
+      .hasFocus;
+
+  testWidgets('o atalho da plataforma foca a busca', (tester) async {
+    await pumpScreen(tester);
+
+    await pressK(tester, platformModifier());
+
+    expect(searchFocused(tester), isTrue);
+  }, variant: desktopPlatforms);
+
+  testWidgets('o atalho da outra plataforma não foca a busca', (tester) async {
+    await pumpScreen(tester);
+
+    await pressK(tester, otherModifier());
+
+    expect(searchFocused(tester), isFalse);
+  }, variant: desktopPlatforms);
 
   testWidgets('Cmd+K foca a busca depois de clicar fora dela', (tester) async {
     await pumpScreen(tester);

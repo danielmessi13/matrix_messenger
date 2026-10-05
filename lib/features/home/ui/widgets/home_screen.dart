@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -47,14 +48,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final rooms = widget.roomListViewModel;
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
     return BlocProvider(
       create: (context) => LogoutViewModel(context.read<AuthRepository>()),
       child: CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-              _searchFocus.requestFocus,
-          const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
-              _searchFocus.requestFocus,
+          SingleActivator(
+            LogicalKeyboardKey.keyK,
+            control: !isMac,
+            meta: isMac,
+          ): _searchFocus.requestFocus,
         },
         // Scope próprio: o unfocus da busca devolve o foco para cá, dentro do atalho.
         child: FocusScope(
