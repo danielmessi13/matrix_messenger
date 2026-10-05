@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:matrix_messenger/core/services/matrix_service.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/rooms.dart';
 
 import '../../models/user_session.dart';
 import 'fake_matrix_client.dart';
@@ -22,6 +23,10 @@ class FakeMatrixService implements MatrixService {
   final loginWithBrowserCalls = <String>[];
   int cancelBrowserLoginCalls = 0;
   final revokedController = StreamController<void>.broadcast();
+
+  final roomsController = StreamController<List<RoomSummary>>.broadcast();
+
+  final syncStatusController = StreamController<SyncStatus>.broadcast();
 
   final loginCalls =
       <({String homeserver, String username, String password})>[];
@@ -61,4 +66,16 @@ class FakeMatrixService implements MatrixService {
 
   @override
   Future<void> cancelBrowserLogin() async => cancelBrowserLoginCalls++;
+
+  @override
+  Stream<List<RoomSummary>> watchRooms() => roomsController.stream;
+
+  @override
+  Stream<SyncStatus> watchSyncStatus() => syncStatusController.stream;
+
+  Future<void> dispose() async {
+    await revokedController.close();
+    await roomsController.close();
+    await syncStatusController.close();
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/core/services/matrix_service.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/rooms.dart';
 
 import '../../../testing/fakes/services/fake_matrix_bridge.dart';
 import '../../../testing/fakes/services/fake_matrix_client.dart';
@@ -96,5 +97,32 @@ void main() {
   test('cancelar sem login pendente não faz nada', () async {
     await service.cancelBrowserLogin();
     expect(bridge.browserLogin.cancelCalls, 0);
+  });
+
+  test('watchRooms repassa o stream do cliente atual', () async {
+    final client = FakeMatrixClient.of(kUserSession);
+    bridge.loginClient = client;
+    await login();
+    const summary = RoomSummary(
+      id: '!a:b.c',
+      name: 'Sala A',
+      isDirect: false,
+      isInvite: false,
+      unreadMessages: 0,
+      unreadMentions: 0,
+      memberCount: 1,
+      heroes: [],
+      latest: null,
+    );
+
+    final received = service.watchRooms().first;
+    client.roomsController.add([summary]);
+
+    expect(await received, [summary]);
+  });
+
+  test('sem cliente, os streams de salas terminam vazios', () async {
+    expect(await service.watchRooms().toList(), isEmpty);
+    expect(await service.watchSyncStatus().toList(), isEmpty);
   });
 }

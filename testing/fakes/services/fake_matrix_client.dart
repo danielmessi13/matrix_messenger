@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/rooms.dart';
 
 class FakeMatrixClient implements MatrixClient {
   FakeMatrixClient({
@@ -37,6 +38,21 @@ class FakeMatrixClient implements MatrixClient {
   @override
   Stream<SessionEvent> sessionEvents() => sessionEventsController.stream;
 
+  final roomsController = StreamController<List<RoomSummary>>.broadcast();
+
+  final syncStatusController = StreamController<SyncStatus>.broadcast();
+
   @override
-  void dispose() => isDisposed = true;
+  Stream<List<RoomSummary>> watchRooms() => roomsController.stream;
+
+  @override
+  Stream<SyncStatus> watchSyncStatus() => syncStatusController.stream;
+
+  @override
+  void dispose() {
+    isDisposed = true;
+    sessionEventsController.close();
+    roomsController.close();
+    syncStatusController.close();
+  }
 }
