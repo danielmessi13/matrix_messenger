@@ -67,12 +67,17 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       break;
     case WM_GETMINMAXINFO: {
       auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
-      const double scale =
-          FlutterDesktopGetDpiForMonitor(
-              MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
-          96.0;
-      info->ptMinTrackSize.x = static_cast<LONG>(1024 * scale);
-      info->ptMinTrackSize.y = static_cast<LONG>(640 * scale);
+      const UINT dpi = FlutterDesktopGetDpiForMonitor(
+          MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST));
+      const double scale = dpi / 96.0;
+      // ptMinTrackSize inclui a moldura; Linux e macOS limitam só a área útil.
+      RECT rect = {0, 0, static_cast<LONG>(1024 * scale),
+                   static_cast<LONG>(640 * scale)};
+      AdjustWindowRectExForDpi(
+          &rect, static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_STYLE)), FALSE,
+          static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_EXSTYLE)), dpi);
+      info->ptMinTrackSize.x = rect.right - rect.left;
+      info->ptMinTrackSize.y = rect.bottom - rect.top;
       return 0;
     }
   }
