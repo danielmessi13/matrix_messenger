@@ -178,10 +178,11 @@ class _Message extends StatelessWidget {
 }
 
 class _SkeletonTile extends StatelessWidget {
-  const _SkeletonTile() : super(key: const Key('room_skeleton'));
+  const _SkeletonTile();
 
   @override
   Widget build(BuildContext context) => Container(
+    key: const Key('room_skeleton'),
     padding: const EdgeInsets.fromLTRB(28, 16, 28, 16),
     decoration: BoxDecoration(
       border: Border(bottom: BorderSide(color: context.colors.rowDivider)),
