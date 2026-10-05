@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            package: matrix_messenger-windows-x64.zip
+          - os: macos-latest
+            platform: macos
+            package: matrix_messenger-macos.dmg
+          - os: ubuntu-latest
+            platform: linux
+            package: matrix_messenger-linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.4
+          channel: stable
+          cache: true
+      - if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - run: flutter pub get
+      - run: flutter build ${{ matrix.platform }} --release
+
+      - if: matrix.platform == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath ${{ matrix.package }}
+      # O atalho para /Applications deixa o .dmg pronto para arrastar e instalar.
+      - if: matrix.platform == 'macos'
+        run: |
+          mkdir dmg
+          cp -R build/macos/Build/Products/Release/matrix_messenger.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Matrix Messenger" -srcfolder dmg -format UDZO ${{ matrix.package }}
+      - if: matrix.platform == 'linux'
+        run: tar -czf ${{ matrix.package }} -C build/linux/x64/release bundle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}
+          path: ${{ matrix.package }}
+          if-no-files-found: error
+
+  # Só publica com os três builds prontos; é o único job com escrita no repositório.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --generate-notes
+          fi
