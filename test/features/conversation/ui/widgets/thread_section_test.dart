@@ -60,6 +60,41 @@ void main() {
     expect(find.text('Recolher thread'), findsOneWidget);
   });
 
+  testWidgets('resposta própria que falhou permite tentar de novo', (
+    tester,
+  ) async {
+    final thread = FakeConversation();
+    await pump(tester, viewModel: opened(() async => Result.ok(thread)));
+    await tester.pump();
+    thread.snapshots.add(
+      ConversationSnapshot(
+        items: [
+          MessageItem(
+            id: 'txn',
+            senderId: '@alice:matrix.org',
+            senderName: 'Alice',
+            isOwn: true,
+            timestamp: DateTime(2026, 10, 4, 10, 30),
+            kind: MessageKind.text,
+            body: 'resposta',
+            edited: true,
+            sendState: SendState.failed,
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Não enviada'), findsOneWidget);
+    expect(find.textContaining('(editada)'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('message_retry')));
+    await tester.pump();
+
+    expect(thread.retried, ['txn']);
+  });
+
   testWidgets('falha ao carregar permite tentar de novo', (tester) async {
     var calls = 0;
     final thread = FakeConversation();

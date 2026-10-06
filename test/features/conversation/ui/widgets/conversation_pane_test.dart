@@ -260,6 +260,35 @@ void main() {
     sendState: state,
   );
 
+  testWidgets('timeline que esvazia e volta com mensagem nova não quebra', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    final many = [for (var i = 0; i < 30; i++) msg(i)];
+    await show(tester, ConversationSnapshot(items: many, reachedStart: true));
+    await tester.drag(
+      find.byKey(const Key('timeline_list')),
+      const Offset(0, 800),
+    );
+    await tester.pump();
+
+    await show(
+      tester,
+      const ConversationSnapshot(items: [], reachedStart: true),
+    );
+    expect(find.text('Nenhuma mensagem ainda.'), findsOneWidget);
+
+    await show(
+      tester,
+      ConversationSnapshot(items: [msg(99)], reachedStart: true),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('mensagem 99'), findsOneWidget);
+    expect(find.byKey(const Key('jump_to_latest')), findsNothing);
+  });
+
   testWidgets(
     'mensagem nova com a leitura mais acima não move o conteúdo visível',
     (tester) async {

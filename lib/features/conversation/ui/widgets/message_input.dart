@@ -119,57 +119,6 @@ class _MessageInputState extends State<MessageInput> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final enabled = widget.enabled;
-    Widget buildTools(bool narrow) => Row(
-      children: [
-        _Tool(
-          key: const Key('format_bold'),
-          icon: Icons.format_bold,
-          dense: narrow,
-          tooltip: 'Negrito',
-          onTap: enabled ? () => _wrap('**') : null,
-        ),
-        _Tool(
-          key: const Key('format_italic'),
-          icon: Icons.format_italic,
-          dense: narrow,
-          tooltip: 'Itálico',
-          onTap: enabled ? () => _wrap('_') : null,
-        ),
-        _Tool(
-          key: const Key('format_strike'),
-          icon: Icons.format_strikethrough,
-          dense: narrow,
-          tooltip: 'Riscado',
-          onTap: enabled ? () => _wrap('~~') : null,
-        ),
-        _Tool(
-          key: const Key('format_code'),
-          icon: Icons.code,
-          dense: narrow,
-          tooltip: 'Código',
-          onTap: enabled ? () => _wrap('`') : null,
-        ),
-        _Tool(
-          key: const Key('format_list'),
-          icon: Icons.format_list_bulleted,
-          dense: narrow,
-          tooltip: 'Lista',
-          onTap: enabled ? _bullet : null,
-        ),
-        Container(
-          width: 1,
-          height: 20,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
-          color: colors.borderStrong,
-        ),
-        _Tool(icon: Icons.add, tooltip: 'Em breve', dense: narrow),
-        _Tool(
-          icon: Icons.alternate_email,
-          tooltip: 'Em breve',
-          dense: narrow,
-        ),
-      ],
-    );
     final send = ListenableBuilder(
       listenable: _controller,
       builder: (context, _) => FilledButton(
@@ -238,7 +187,12 @@ class _MessageInputState extends State<MessageInput> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        buildTools(narrow),
+                        _FormatTools(
+                          enabled: enabled,
+                          dense: narrow,
+                          onWrap: _wrap,
+                          onBullet: _bullet,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(child: narrow ? const SizedBox() : hint),
                         const SizedBox(width: 12),
@@ -253,6 +207,79 @@ class _MessageInputState extends State<MessageInput> {
           ),
         );
       },
+    );
+  }
+}
+
+class _FormatTools extends StatelessWidget {
+  const _FormatTools({
+    required this.enabled,
+    required this.dense,
+    required this.onWrap,
+    required this.onBullet,
+  });
+
+  final bool enabled;
+
+  final bool dense;
+
+  final ValueChanged<String> onWrap;
+
+  final VoidCallback onBullet;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Row(
+      children: [
+        _Tool(
+          key: const Key('format_bold'),
+          icon: Icons.format_bold,
+          dense: dense,
+          tooltip: 'Negrito',
+          onTap: enabled ? () => onWrap('**') : null,
+        ),
+        _Tool(
+          key: const Key('format_italic'),
+          icon: Icons.format_italic,
+          dense: dense,
+          tooltip: 'Itálico',
+          onTap: enabled ? () => onWrap('_') : null,
+        ),
+        _Tool(
+          key: const Key('format_strike'),
+          icon: Icons.format_strikethrough,
+          dense: dense,
+          tooltip: 'Riscado',
+          onTap: enabled ? () => onWrap('~~') : null,
+        ),
+        _Tool(
+          key: const Key('format_code'),
+          icon: Icons.code,
+          dense: dense,
+          tooltip: 'Código',
+          onTap: enabled ? () => onWrap('`') : null,
+        ),
+        _Tool(
+          key: const Key('format_list'),
+          icon: Icons.format_list_bulleted,
+          dense: dense,
+          tooltip: 'Lista',
+          onTap: enabled ? onBullet : null,
+        ),
+        Container(
+          width: 1,
+          height: 20,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          color: colors.borderStrong,
+        ),
+        _Tool(icon: Icons.add, tooltip: 'Em breve', dense: dense),
+        _Tool(
+          icon: Icons.alternate_email,
+          tooltip: 'Em breve',
+          dense: dense,
+        ),
+      ],
     );
   }
 }

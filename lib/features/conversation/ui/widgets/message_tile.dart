@@ -12,22 +12,32 @@ class MessageTile extends StatelessWidget {
     required this.onRetry,
     required this.onCancel,
     this.thread,
+    this.compact = false,
   });
 
   final MessageItem message;
 
-  final VoidCallback onRetry;
+  final Future<bool> Function() onRetry;
 
-  final VoidCallback onCancel;
+  final Future<bool> Function() onCancel;
 
   final Widget? thread;
+
+  // Respostas de thread: corpo menor e sem "Responder em thread".
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final content = message.isOwn
-        ? _OwnMessage(message: message, onRetry: onRetry, onCancel: onCancel, colors: colors)
-        : _OtherMessage(message: message, colors: colors);
+        ? _OwnMessage(
+            message: message,
+            onRetry: onRetry,
+            onCancel: onCancel,
+            compact: compact,
+            colors: colors,
+          )
+        : _OtherMessage(message: message, compact: compact, colors: colors);
     return Column(
       key: Key('message_${message.id}'),
       crossAxisAlignment: message.isOwn
@@ -39,9 +49,15 @@ class MessageTile extends StatelessWidget {
 }
 
 class _OtherMessage extends StatelessWidget {
-  const _OtherMessage({required this.message, required this.colors});
+  const _OtherMessage({
+    required this.message,
+    required this.compact,
+    required this.colors,
+  });
 
   final MessageItem message;
+
+  final bool compact;
 
   final AppColors colors;
 
@@ -70,13 +86,16 @@ class _OtherMessage extends StatelessWidget {
             formatMessageTime(message.timestamp),
             style: TextStyle(fontSize: 12.5, color: colors.textMuted),
           ),
-          const SizedBox(width: 16),
-          _ReplyInThread(colors: colors),
+          if (!compact) ...[
+            const SizedBox(width: 16),
+            _ReplyInThread(colors: colors),
+          ],
         ],
       ),
       const SizedBox(height: 6),
-      if (message.replyTo case final reply?) _ReplyQuote(reply: reply, colors: colors),
-      _Body(message: message, colors: colors, italic: false),
+      if (message.replyTo case final reply?)
+        _ReplyQuote(reply: reply, colors: colors),
+      _Body(message: message, colors: colors, italic: false, compact: compact),
     ],
   );
 }
@@ -86,14 +105,17 @@ class _OwnMessage extends StatelessWidget {
     required this.message,
     required this.onRetry,
     required this.onCancel,
+    required this.compact,
     required this.colors,
   });
 
   final MessageItem message;
 
-  final VoidCallback onRetry;
+  final Future<bool> Function() onRetry;
 
-  final VoidCallback onCancel;
+  final Future<bool> Function() onCancel;
+
+  final bool compact;
 
   final AppColors colors;
 
@@ -111,8 +133,10 @@ class _OwnMessage extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ReplyInThread(colors: colors),
-              const SizedBox(width: 16),
+              if (!compact) ...[
+                _ReplyInThread(colors: colors),
+                const SizedBox(width: 16),
+              ],
               Text(
                 formatMessageTime(message.timestamp),
                 style: TextStyle(fontSize: 12.5, color: colors.textMuted),
@@ -137,10 +161,21 @@ class _OwnMessage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          if (message.replyTo case final reply?) _ReplyQuote(reply: reply, colors: colors),
-          _Body(message: message, colors: colors, italic: true),
+          if (message.replyTo case final reply?)
+            _ReplyQuote(reply: reply, colors: colors),
+          _Body(
+            message: message,
+            colors: colors,
+            italic: true,
+            compact: compact,
+          ),
           const SizedBox(height: 6),
-          _Status(message: message, onRetry: onRetry, onCancel: onCancel, colors: colors),
+          _Status(
+            message: message,
+            onRetry: onRetry,
+            onCancel: onCancel,
+            colors: colors,
+          ),
         ],
       ),
     ),
@@ -195,7 +230,12 @@ class _ReplyQuote extends StatelessWidget {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.message, required this.colors, required this.italic});
+  const _Body({
+    required this.message,
+    required this.colors,
+    required this.italic,
+    required this.compact,
+  });
 
   final MessageItem message;
 
@@ -203,12 +243,14 @@ class _Body extends StatelessWidget {
 
   final bool italic;
 
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final placeholder = kindPlaceholder(message.kind);
     final base = TextStyle(
       fontFamily: AppFonts.serif,
-      fontSize: 20,
+      fontSize: compact ? 16 : 20,
       height: 1.5,
       fontStyle: italic ? FontStyle.italic : FontStyle.normal,
       color: colors.textPrimary,
@@ -217,7 +259,11 @@ class _Body extends StatelessWidget {
       return Text(
         placeholder ?? '',
         textAlign: italic ? TextAlign.end : TextAlign.start,
-        style: base.copyWith(fontStyle: FontStyle.italic, color: colors.textMuted, fontSize: 17),
+        style: base.copyWith(
+          fontStyle: FontStyle.italic,
+          color: colors.textMuted,
+          fontSize: compact ? 14.5 : 17,
+        ),
       );
     }
     return Text.rich(
@@ -228,14 +274,18 @@ class _Body extends StatelessWidget {
             style: base,
             codeStyle: TextStyle(
               fontFamily: 'monospace',
-              fontSize: 16,
+              fontSize: compact ? 13.5 : 16,
               backgroundColor: colors.surfaceHigh,
             ),
           ),
           if (message.edited)
             TextSpan(
               text: ' (editada)',
-              style: TextStyle(fontSize: 12.5, fontStyle: FontStyle.normal, color: colors.textMuted),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontStyle: FontStyle.normal,
+                color: colors.textMuted,
+              ),
             ),
         ],
       ),
@@ -254,9 +304,9 @@ class _Status extends StatelessWidget {
 
   final MessageItem message;
 
-  final VoidCallback onRetry;
+  final Future<bool> Function() onRetry;
 
-  final VoidCallback onCancel;
+  final Future<bool> Function() onCancel;
 
   final AppColors colors;
 
@@ -276,10 +326,22 @@ class _Status extends StatelessWidget {
           Text('Não enviada', style: muted.copyWith(color: error)),
           if (message.sendState == SendState.failed) ...[
             Text(' · ', style: muted),
-            _Action(key: const Key('message_retry'), label: 'Tentar de novo', color: error, onTap: onRetry),
+            _Action(
+              key: const Key('message_retry'),
+              label: 'Tentar de novo',
+              failure: 'Não foi possível reenviar.',
+              color: error,
+              onTap: onRetry,
+            ),
           ],
           Text(' · ', style: muted),
-          _Action(key: const Key('message_cancel'), label: 'Cancelar', color: colors.textSecondary, onTap: onCancel),
+          _Action(
+            key: const Key('message_cancel'),
+            label: 'Cancelar',
+            failure: 'Não foi possível cancelar o envio.',
+            color: colors.textSecondary,
+            onTap: onCancel,
+          ),
         ],
       ),
     };
@@ -287,17 +349,31 @@ class _Status extends StatelessWidget {
 }
 
 class _Action extends StatelessWidget {
-  const _Action({super.key, required this.label, required this.color, required this.onTap});
+  const _Action({
+    super.key,
+    required this.label,
+    required this.failure,
+    required this.color,
+    required this.onTap,
+  });
 
   final String label;
 
+  final String failure;
+
   final Color color;
 
-  final VoidCallback onTap;
+  final Future<bool> Function() onTap;
+
+  Future<void> _run(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (await onTap()) return;
+    messenger.showSnackBar(SnackBar(content: Text(failure)));
+  }
 
   @override
   Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
+    onTap: () => _run(context),
     child: Text(
       label,
       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),

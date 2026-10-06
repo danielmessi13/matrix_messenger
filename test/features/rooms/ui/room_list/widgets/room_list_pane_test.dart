@@ -51,6 +51,27 @@ void main() {
     expect(find.text('# lançamento-q4'), findsOneWidget);
   });
 
+  testWidgets('filtro Threads conta respostas de thread também na linha', (
+    tester,
+  ) async {
+    const room = Room(
+      id: '!thread:matrix.org',
+      name: 'thread',
+      unreadThreadReplies: 3,
+    );
+    await pump(
+      tester,
+      const RoomListState(
+        rooms: [room],
+        loaded: true,
+        filter: RoomFilter.threads,
+      ),
+    );
+
+    expect(find.text('3 não lidas'), findsOneWidget);
+    expect(find.text('3 novas'), findsOneWidget);
+  });
+
   testWidgets('uma não lida fica no singular', (tester) async {
     const room = Room(id: '!um:matrix.org', name: 'um', unreadMessages: 1);
     await pump(tester, const RoomListState(rooms: [room], loaded: true));

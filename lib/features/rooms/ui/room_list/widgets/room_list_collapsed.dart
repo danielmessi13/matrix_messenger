@@ -37,6 +37,7 @@ class RoomListCollapsed extends StatelessWidget {
                 child: RoomAvatarTile(
                   room: room,
                   selected: room.id == state.selectedRoomId,
+                  unread: state.filter.unreadOf(room),
                   onTap: () => onSelect(room.id),
                 ),
               );

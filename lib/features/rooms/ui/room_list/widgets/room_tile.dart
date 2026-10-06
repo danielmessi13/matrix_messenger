@@ -9,6 +9,7 @@ class RoomTile extends StatelessWidget {
     super.key,
     required this.room,
     required this.selected,
+    required this.unread,
     required this.now,
     required this.onTap,
   });
@@ -16,6 +17,8 @@ class RoomTile extends StatelessWidget {
   final Room room;
 
   final bool selected;
+
+  final int unread;
 
   final DateTime now;
 
@@ -62,9 +65,9 @@ class RoomTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  if (room.unreadMessages > 0) ...[
+                  if (unread > 0) ...[
                     Text(
-                      unreadLabel(room.unreadMessages),
+                      unreadLabel(unread),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

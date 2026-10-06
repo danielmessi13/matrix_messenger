@@ -118,4 +118,26 @@ void main() {
     expect(plain('a\r\nb'), isNot(contains('\r')));
     expect(plain('a\r\n\r\nb'), 'a\nb');
   });
+
+  test('mesmo texto com outro estilo usa o estilo novo', () {
+    const other = TextStyle(fontSize: 14);
+    markdownSpan('**repetido**', style: style, codeStyle: code);
+    final span = markdownSpan('**repetido**', style: other, codeStyle: code);
+
+    expect(find(span, 'repetido').style?.fontSize, 14);
+    expect(find(span, 'repetido').style?.fontWeight, FontWeight.w600);
+  });
+
+  test('textos além do limite do cache continuam corretos', () {
+    for (var i = 0; i < 600; i++) {
+      markdownSpan('_msg ${i}_', style: style, codeStyle: code);
+    }
+
+    final first = markdownSpan('_msg 0_', style: style, codeStyle: code);
+    final last = markdownSpan('_msg 599_', style: style, codeStyle: code);
+
+    expect(first.toPlainText(), 'msg 0');
+    expect(find(first, 'msg 0').style?.fontStyle, FontStyle.italic);
+    expect(last.toPlainText(), 'msg 599');
+  });
 }

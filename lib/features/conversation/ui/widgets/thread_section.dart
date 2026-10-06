@@ -5,8 +5,8 @@ import '../../../../app/theme.dart';
 import '../../domain/models/timeline_item.dart';
 import '../thread/view_models/thread_state.dart';
 import '../thread/view_models/thread_view_model.dart';
-import 'markdown_text.dart';
 import 'message_labels.dart';
+import 'message_tile.dart';
 
 class ThreadSection extends StatelessWidget {
   const ThreadSection({
@@ -172,39 +172,35 @@ class _Replies extends StatelessWidget {
                         onPressed: context.read<ThreadViewModel>().loadOlder,
                         child: const Text('Carregar respostas anteriores'),
                       ),
-              for (final reply in state.replies) ...[
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: reply.senderName,
-                        style: TextStyle(fontWeight: FontWeight.w600, color: colors.textPrimary),
-                      ),
-                      TextSpan(
-                        text: '  ${formatMessageTime(reply.timestamp)}',
-                        style: TextStyle(fontSize: 12.5, color: colors.textMuted),
-                      ),
-                    ],
-                  ),
-                  style: const TextStyle(fontSize: 14.5),
-                ),
-                const SizedBox(height: 2),
-                Text.rich(
-                  markdownSpan(
-                    reply.body ?? kindPlaceholder(reply.kind) ?? '',
-                    style: TextStyle(fontSize: 14.5, height: 1.5, color: colors.textSecondary),
-                    codeStyle: const TextStyle(fontFamily: 'monospace'),
+              for (final reply in state.replies)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  // Largura total para a resposta minha alinhar à direita como na timeline.
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: MessageTile(
+                      message: reply,
+                      compact: true,
+                      onRetry: () =>
+                          context.read<ThreadViewModel>().retry(reply.id),
+                      onCancel: () =>
+                          context.read<ThreadViewModel>().cancel(reply.id),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
             ],
           },
           TextButton.icon(
             key: Key('thread_toggle_$rootEventId'),
             onPressed: onCollapse,
-            icon: Text('▲', style: TextStyle(fontSize: 9, color: colors.accent)),
-            label: Text('Recolher thread', style: TextStyle(color: colors.accent, fontSize: 13.5)),
+            icon: Text(
+              '▲',
+              style: TextStyle(fontSize: 9, color: colors.accent),
+            ),
+            label: Text(
+              'Recolher thread',
+              style: TextStyle(color: colors.accent, fontSize: 13.5),
+            ),
           ),
         ],
       ),

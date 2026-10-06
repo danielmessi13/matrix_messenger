@@ -72,6 +72,22 @@ void main() {
     expect(find.text('Chave de recuperação inválida.'), findsOneWidget);
   });
 
+  testWidgets('reabrir o diálogo não mostra o erro anterior', (tester) async {
+    repository.recoverResult = const Result.error(
+      RecoveryFailure(RecoveryFailureType.invalidKey),
+    );
+    await pumpBanner(tester);
+    await submitKey(tester, 'errada');
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('recovery_open')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('recovery_dialog')), findsOneWidget);
+    expect(find.text('Chave de recuperação inválida.'), findsNothing);
+  });
+
   testWidgets('sucesso fecha o diálogo e o banner', (tester) async {
     await pumpBanner(tester);
 

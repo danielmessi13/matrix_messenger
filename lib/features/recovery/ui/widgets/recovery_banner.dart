@@ -58,6 +58,12 @@ class _RecoveryDialogState extends State<_RecoveryDialog> {
   final _controller = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    widget.viewModel.resetSubmit();
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();

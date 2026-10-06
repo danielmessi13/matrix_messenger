@@ -60,6 +60,18 @@ void main() {
   );
 
   blocTest<RecoveryViewModel, RecoveryState>(
+    'resetSubmit limpa a falha anterior',
+    build: () => RecoveryViewModel(repository),
+    seed: () => const RecoveryState(
+      status: RecoveryStatus.incomplete,
+      submit: RecoverySubmit.failure,
+      failure: RecoveryFailureType.invalidKey,
+    ),
+    act: (viewModel) => viewModel.resetSubmit(),
+    expect: () => const [RecoveryState(status: RecoveryStatus.incomplete)],
+  );
+
+  blocTest<RecoveryViewModel, RecoveryState>(
     'chave inválida guarda a falha',
     build: () {
       repository.recoverResult = const Result.error(

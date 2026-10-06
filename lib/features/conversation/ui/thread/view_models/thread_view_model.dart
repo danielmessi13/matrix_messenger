@@ -38,27 +38,33 @@ class ThreadViewModel extends Cubit<ThreadState> {
     switch (result) {
       case Ok(:final value):
         _thread = value;
-        _updates = value.updates.listen((snapshot) {
-          if (_closing || isClosed) return;
-          final replies = snapshot.items.whereType<MessageItem>().toList();
-          emit(
-            state.copyWith(
-              status: ThreadStatus.ready,
-              replies: replies,
-              reachedStart: snapshot.reachedStart,
-            ),
-          );
-          // Expandir é o que marca a thread como lida, como na conversa principal.
-          final latest = replies.lastOrNull;
-          if (latest != null && latest.id != _latestReplyId && !latest.isOwn) {
-            _thread?.markAsRead();
-          }
-          _latestReplyId = latest?.id;
-        });
+        _updates = value.updates.listen(
+          _onSnapshot,
+          onError: (Object error) => _onUpdatesFailed('erro', error),
+          onDone: () => _onUpdatesFailed('fim', null),
+        );
       case Error(:final error):
         log('Falha ao abrir a thread', name: 'conversation', error: error);
         emit(const ThreadState(status: ThreadStatus.failed));
     }
+  }
+
+  void _onSnapshot(ConversationSnapshot snapshot) {
+    if (_closing || isClosed) return;
+    final replies = snapshot.items.whereType<MessageItem>().toList();
+    emit(
+      state.copyWith(
+        status: ThreadStatus.ready,
+        replies: replies,
+        reachedStart: snapshot.reachedStart,
+      ),
+    );
+    // Expandir é o que marca a thread como lida, como na conversa principal.
+    final latest = replies.lastOrNull;
+    if (latest != null && latest.id != _latestReplyId && !latest.isOwn) {
+      _thread?.markAsRead();
+    }
+    _latestReplyId = latest?.id;
   }
 
   Future<void> loadOlder() async {
@@ -79,6 +85,22 @@ class ThreadViewModel extends Cubit<ThreadState> {
         reachedStart: state.reachedStart || reached,
       ),
     );
+  }
+
+  Future<bool> retry(String messageId) async =>
+      await _thread?.retry(messageId) is Ok;
+
+  Future<bool> cancel(String messageId) async =>
+      await _thread?.cancel(messageId) is Ok;
+
+  void _onUpdatesFailed(String reason, Object? error) {
+    log('Atualizações da thread: $reason', name: 'conversation', error: error);
+    if (_closing || isClosed || state.status != ThreadStatus.loading) return;
+    _updates?.cancel();
+    _updates = null;
+    _thread?.dispose();
+    _thread = null;
+    emit(const ThreadState(status: ThreadStatus.failed));
   }
 
   @override

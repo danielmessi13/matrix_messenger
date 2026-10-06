@@ -154,6 +154,7 @@ class _Body extends StatelessWidget {
         return RoomTile(
           room: room,
           selected: room.id == state.selectedRoomId,
+          unread: state.filter.unreadOf(room),
           now: now,
           onTap: () => onSelect(room.id),
         );

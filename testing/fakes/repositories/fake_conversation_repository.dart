@@ -20,6 +20,8 @@ class FakeConversation implements Conversation {
   final sent = <String>[];
   final retried = <String>[];
   final cancelled = <String>[];
+  Result<void> retryResult = const Result.ok(null);
+  Result<void> cancelResult = const Result.ok(null);
   int markAsReadCalls = 0;
   Result<Conversation>? threadResult;
   final openedThreads = <String>[];
@@ -44,13 +46,13 @@ class FakeConversation implements Conversation {
   @override
   Future<Result<void>> retry(String messageId) async {
     retried.add(messageId);
-    return const Result.ok(null);
+    return retryResult;
   }
 
   @override
   Future<Result<void>> cancel(String messageId) async {
     cancelled.add(messageId);
-    return const Result.ok(null);
+    return cancelResult;
   }
 
   @override

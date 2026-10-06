@@ -6,12 +6,24 @@ TextSpan markdownSpan(
   required TextStyle style,
   required TextStyle codeStyle,
 }) {
+  final lines = _lines(_parse(source), style, codeStyle);
+  return TextSpan(style: style, children: _joinLines(lines));
+}
+
+const _parsedLimit = 500;
+
+// Cada snapshot reconstrói os tiles visíveis; o parse é o caro, montar os spans não.
+final _parsed = <String, List<md.Node>>{};
+
+List<md.Node> _parse(String source) {
+  final cached = _parsed.remove(source);
+  if (cached != null) return _parsed[source] = cached;
   final nodes = md.Document(
     encodeHtml: false,
     extensionSet: md.ExtensionSet.gitHubFlavored,
   ).parseLines(source.replaceAll('\r\n', '\n').split('\n'));
-  final lines = _lines(nodes, style, codeStyle);
-  return TextSpan(style: style, children: _joinLines(lines));
+  if (_parsed.length >= _parsedLimit) _parsed.remove(_parsed.keys.first);
+  return _parsed[source] = nodes;
 }
 
 class MarkdownText extends StatelessWidget {

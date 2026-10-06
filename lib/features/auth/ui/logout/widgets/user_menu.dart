@@ -47,7 +47,8 @@ class _UserMenuState extends State<UserMenu> {
       },
       builder: (context, state) => PopupMenuButton<void>(
         key: const Key('user_menu'),
-        tooltip: null,
+        tooltip: '',
+        borderRadius: BorderRadius.circular(21),
         enabled: state.status != LogoutStatus.running,
         offset: const Offset(0, 50),
         constraints: const BoxConstraints(minWidth: 292, maxWidth: 292),

@@ -19,7 +19,15 @@ class RecoveryViewModel extends Cubit<RecoveryState> {
   void init() {
     _status ??= _repository.status.listen(
       (status) => emit(state.copyWith(status: status)),
+      onError: (Object error) =>
+          log('Status da recuperação falhou', name: 'recovery', error: error),
     );
+  }
+
+  // O erro é de uma tentativa; um diálogo novo começa limpo.
+  void resetSubmit() {
+    if (state.submit != RecoverySubmit.failure) return;
+    emit(state.copyWith(submit: RecoverySubmit.idle, failure: () => null));
   }
 
   void dismiss() => emit(state.copyWith(dismissed: true));

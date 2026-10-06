@@ -17,7 +17,13 @@ void main() {
   testWidgets('mostra nome, não lidas, horário e prévia', (tester) async {
     await pump(
       tester,
-      RoomTile(room: kTeamRoom, selected: false, now: kNow, onTap: () {}),
+      RoomTile(
+        room: kTeamRoom,
+        selected: false,
+        unread: kTeamRoom.unreadMessages,
+        now: kNow,
+        onTap: () {},
+      ),
     );
 
     expect(find.text('# lançamento-q4'), findsOneWidget);
@@ -29,7 +35,13 @@ void main() {
   testWidgets('convite troca o horário pela etiqueta', (tester) async {
     await pump(
       tester,
-      RoomTile(room: kInviteRoom, selected: false, now: kNow, onTap: () {}),
+      RoomTile(
+        room: kInviteRoom,
+        selected: false,
+        unread: kInviteRoom.unreadMessages,
+        now: kNow,
+        onTap: () {},
+      ),
     );
 
     expect(find.text('Convite'), findsOneWidget);
@@ -39,7 +51,13 @@ void main() {
   testWidgets('sem não lidas não mostra "novas"', (tester) async {
     await pump(
       tester,
-      RoomTile(room: kQuietRoom, selected: false, now: kNow, onTap: () {}),
+      RoomTile(
+        room: kQuietRoom,
+        selected: false,
+        unread: kQuietRoom.unreadMessages,
+        now: kNow,
+        onTap: () {},
+      ),
     );
 
     expect(find.textContaining('nova'), findsNothing);
@@ -53,6 +71,7 @@ void main() {
       RoomTile(
         room: kDirectRoom,
         selected: true,
+        unread: 0,
         now: kNow,
         onTap: () => taps++,
       ),
@@ -67,7 +86,12 @@ void main() {
     var taps = 0;
     await pump(
       tester,
-      RoomAvatarTile(room: kDirectRoom, selected: false, onTap: () => taps++),
+      RoomAvatarTile(
+        room: kDirectRoom,
+        selected: false,
+        unread: kDirectRoom.unreadMessages,
+        onTap: () => taps++,
+      ),
     );
 
     expect(find.text('AR'), findsOneWidget);

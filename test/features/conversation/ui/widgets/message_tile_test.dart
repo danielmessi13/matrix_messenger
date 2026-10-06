@@ -10,8 +10,10 @@ import '../../../../../testing/models/message.dart';
 void main() {
   Future<({List<String> retried, List<String> cancelled})> pump(
     WidgetTester tester,
-    MessageItem message,
-  ) async {
+    MessageItem message, {
+    bool succeeds = true,
+    bool compact = false,
+  }) async {
     useDesktopSize(tester);
     final retried = <String>[];
     final cancelled = <String>[];
@@ -21,8 +23,15 @@ void main() {
         home: Scaffold(
           body: MessageTile(
             message: message,
-            onRetry: () => retried.add(message.id),
-            onCancel: () => cancelled.add(message.id),
+            compact: compact,
+            onRetry: () async {
+              retried.add(message.id);
+              return succeeds;
+            },
+            onCancel: () async {
+              cancelled.add(message.id);
+              return succeeds;
+            },
           ),
         ),
       ),
@@ -79,6 +88,31 @@ void main() {
 
     expect(calls.retried, ['txn']);
     expect(calls.cancelled, ['txn']);
+  });
+
+  testWidgets('falha ao reenviar avisa', (tester) async {
+    await pump(tester, own(SendState.failed), succeeds: false);
+
+    await tester.tap(find.byKey(const Key('message_retry')));
+    await tester.pump();
+
+    expect(find.text('Não foi possível reenviar.'), findsOneWidget);
+  });
+
+  testWidgets('falha ao cancelar avisa', (tester) async {
+    await pump(tester, own(SendState.failed), succeeds: false);
+
+    await tester.tap(find.byKey(const Key('message_cancel')));
+    await tester.pump();
+
+    expect(find.text('Não foi possível cancelar o envio.'), findsOneWidget);
+  });
+
+  testWidgets('compacta não mostra "Responder em thread"', (tester) async {
+    await pump(tester, kOtherMessage, compact: true);
+
+    expect(find.text('Diego Alves'), findsOneWidget);
+    expect(find.byTooltip('Em breve'), findsNothing);
   });
 
   testWidgets('rejeitada: só cancelar', (tester) async {

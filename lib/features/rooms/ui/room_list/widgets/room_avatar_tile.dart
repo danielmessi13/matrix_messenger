@@ -9,12 +9,15 @@ class RoomAvatarTile extends StatelessWidget {
     super.key,
     required this.room,
     required this.selected,
+    required this.unread,
     required this.onTap,
   });
 
   final Room room;
 
   final bool selected;
+
+  final int unread;
 
   final VoidCallback onTap;
 
@@ -50,7 +53,7 @@ class RoomAvatarTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (room.unreadMessages > 0)
+            if (unread > 0)
               Positioned(
                 right: -5,
                 top: -5,
@@ -65,7 +68,7 @@ class RoomAvatarTile extends StatelessWidget {
                     border: Border.all(color: colors.listBackground, width: 2),
                   ),
                   child: Text(
-                    '${room.unreadMessages}',
+                    '$unread',
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,

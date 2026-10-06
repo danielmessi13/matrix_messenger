@@ -51,6 +51,11 @@ class _TimelineViewState extends State<TimelineView> {
   void didUpdateWidget(TimelineView old) {
     super.didUpdateWidget(old);
     final items = widget.state.items;
+    // A lista some no estado vazio; quando volta, recomeça no fim.
+    if (!_scroll.hasClients) {
+      _awayFromLatest = false;
+      _unseenNewer = false;
+    }
     if (_awayFromLatest && items.lastOrNull != old.state.items.lastOrNull) {
       _onNewerItems(old);
     }
@@ -83,7 +88,7 @@ class _TimelineViewState extends State<TimelineView> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToLatest());
       return;
     }
-    // Na lista invertida o item novo entra no índice 0 e empurra o que está na tela.
+    // Com a rolagem invertida, o item novo entra embaixo e empurra o que está na tela.
     final oldMax = _scroll.position.maxScrollExtent;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
@@ -134,7 +139,7 @@ class _TimelineViewState extends State<TimelineView> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final items = widget.state.items.reversed.toList();
+    final items = widget.state.items;
     if (items.isEmpty && widget.state.reachedStart) {
       return Center(
         child: Text('Nenhuma mensagem ainda.', style: _italic(colors, 17)),
@@ -142,28 +147,38 @@ class _TimelineViewState extends State<TimelineView> {
     }
     return Stack(
       children: [
-        ListView.builder(
+        // Sem lista lazy: toda mensagem carregada fica montada, e dá para rolar até qualquer uma.
+        SingleChildScrollView(
           key: const Key('timeline_list'),
           controller: _scroll,
           reverse: true,
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          itemCount: items.length + 1,
-          itemBuilder: (context, index) {
-            if (index == items.length) return _top(colors);
-            return Center(
-              key: switch (items[index]) {
-                MessageItem(:final id) => ValueKey(id),
-                DateDividerItem(:final day) => ValueKey(day),
-              },
-              child: SizedBox(
-                width: 880,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: _item(items[index], colors),
-                ),
+          child: Column(
+            children: [
+              _TimelineTop(
+                state: widget.state,
+                onLoadOlder: widget.viewModel.loadOlder,
               ),
-            );
-          },
+              for (final item in items)
+                Center(
+                  key: switch (item) {
+                    MessageItem(:final id) => ValueKey(id),
+                    DateDividerItem(:final day) => ValueKey(day),
+                  },
+                  child: SizedBox(
+                    width: 880,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: _TimelineEntry(
+                        item: item,
+                        now: widget.now,
+                        viewModel: widget.viewModel,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
         if (_unseenNewer)
           Positioned(
@@ -181,23 +196,35 @@ class _TimelineViewState extends State<TimelineView> {
       ],
     );
   }
+}
 
-  Widget _top(AppColors colors) {
-    if (widget.state.reachedStart) {
+class _TimelineTop extends StatelessWidget {
+  const _TimelineTop({required this.state, required this.onLoadOlder});
+
+  final ConversationState state;
+
+  final VoidCallback onLoadOlder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.reachedStart) {
       return Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Center(
-          child: Text('Início da conversa', style: _italic(colors, 15)),
+          child: Text(
+            'Início da conversa',
+            style: _italic(context.colors, 15),
+          ),
         ),
       );
     }
-    if (!widget.state.loadingOlder) {
+    if (!state.loadingOlder) {
       return Padding(
         padding: const EdgeInsets.all(4),
         child: Center(
           child: TextButton(
             key: const Key('timeline_load_older'),
-            onPressed: widget.viewModel.loadOlder,
+            onPressed: onLoadOlder,
             child: const Text('Carregar anteriores'),
           ),
         ),
@@ -214,33 +241,48 @@ class _TimelineViewState extends State<TimelineView> {
       ),
     );
   }
+}
 
-  Widget _item(TimelineItem item, AppColors colors) => switch (item) {
+class _TimelineEntry extends StatelessWidget {
+  const _TimelineEntry({
+    required this.item,
+    required this.now,
+    required this.viewModel,
+  });
+
+  final TimelineItem item;
+
+  final DateTime now;
+
+  final ConversationViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) => switch (item) {
     DateDividerItem(:final day) => Center(
       child: Text(
-        formatDayDivider(day, widget.now),
-        style: _italic(colors, 17),
+        formatDayDivider(day, now),
+        style: _italic(context.colors, 17),
       ),
     ),
-    MessageItem() => MessageTile(
-      message: item,
-      onRetry: () => widget.viewModel.retry(item.id),
-      onCancel: () => widget.viewModel.cancel(item.id),
-      thread: switch (item.thread) {
+    final MessageItem message => MessageTile(
+      message: message,
+      onRetry: () => viewModel.retry(message.id),
+      onCancel: () => viewModel.cancel(message.id),
+      thread: switch (message.thread) {
         null => null,
         final thread => ThreadSection(
           summary: thread,
-          viewModel: widget.viewModel.thread(thread.rootEventId),
-          onToggle: () => widget.viewModel.toggleThread(thread.rootEventId),
+          viewModel: viewModel.thread(thread.rootEventId),
+          onToggle: () => viewModel.toggleThread(thread.rootEventId),
         ),
       },
     ),
   };
-
-  static TextStyle _italic(AppColors colors, double size) => TextStyle(
-    fontFamily: AppFonts.serif,
-    fontStyle: FontStyle.italic,
-    fontSize: size,
-    color: colors.textMuted,
-  );
 }
+
+TextStyle _italic(AppColors colors, double size) => TextStyle(
+  fontFamily: AppFonts.serif,
+  fontStyle: FontStyle.italic,
+  fontSize: size,
+  color: colors.textMuted,
+);

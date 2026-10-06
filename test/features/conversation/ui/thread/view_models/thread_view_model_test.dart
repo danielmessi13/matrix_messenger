@@ -190,4 +190,29 @@ void main() {
     expect(thread.markAsReadCalls, 0);
     await viewModel.close();
   });
+
+  test('erro no stream antes do primeiro snapshot vira falha', () async {
+    final viewModel = await opened();
+
+    thread.snapshots.addError(Exception('rust'));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.state.status, ThreadStatus.failed);
+    expect(thread.isDisposed, isTrue);
+    await viewModel.close();
+  });
+
+  test('retry e cancel repassam o id e o resultado', () async {
+    final viewModel = await opened();
+    thread.cancelResult = const Result.error(
+      FakeConversationRepository.notFound,
+    );
+
+    expect(await viewModel.retry('txn1'), isTrue);
+    expect(await viewModel.cancel('txn2'), isFalse);
+
+    expect(thread.retried, ['txn1']);
+    expect(thread.cancelled, ['txn2']);
+    await viewModel.close();
+  });
 }

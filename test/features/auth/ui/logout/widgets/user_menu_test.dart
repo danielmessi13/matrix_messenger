@@ -51,6 +51,19 @@ void main() {
     expect(find.text('Sair'), findsOneWidget);
   });
 
+  testWidgets('gatilho sem tooltip e com hover arredondado', (tester) async {
+    await pumpMenu(tester, FakeAuthRepository());
+
+    expect(find.byTooltip('Show menu'), findsNothing);
+    final ink = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const Key('user_menu')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    expect(ink.borderRadius, BorderRadius.circular(21));
+  });
+
   testWidgets('"Sair" chama o logout do repository', (tester) async {
     final repository = FakeAuthRepository();
     await pumpMenu(tester, repository);

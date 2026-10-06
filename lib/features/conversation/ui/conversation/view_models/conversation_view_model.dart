@@ -49,7 +49,11 @@ class ConversationViewModel extends Cubit<ConversationState> {
     switch (result) {
       case Ok(:final value):
         _conversation = value;
-        _updates = value.updates.listen(_onSnapshot);
+        _updates = value.updates.listen(
+          _onSnapshot,
+          onError: (Object error) => _onUpdatesFailed('erro', error),
+          onDone: () => _onUpdatesFailed('fim', null),
+        );
       case Error(:final error):
         log('Falha ao abrir a conversa', name: 'conversation', error: error);
         emit(state.copyWith(status: ConversationStatus.failed));
@@ -77,17 +81,17 @@ class ConversationViewModel extends Cubit<ConversationState> {
   }
 
   Future<bool> send(String text) async {
-    final markdown = text.trim();
     final conversation = _conversation;
-    if (markdown.isEmpty || conversation == null) return false;
-    final result = await conversation.send(markdown);
+    if (text.trim().isEmpty || conversation == null) return false;
+    final result = await conversation.send(text);
     return result is Ok;
   }
 
-  Future<void> retry(String messageId) async => _conversation?.retry(messageId);
+  Future<bool> retry(String messageId) async =>
+      await _conversation?.retry(messageId) is Ok;
 
-  Future<void> cancel(String messageId) async =>
-      _conversation?.cancel(messageId);
+  Future<bool> cancel(String messageId) async =>
+      await _conversation?.cancel(messageId) is Ok;
 
   void toggleThread(String rootEventId) {
     final expanded = {...state.expandedThreads};
@@ -121,6 +125,22 @@ class ConversationViewModel extends Cubit<ConversationState> {
       _conversation?.markAsRead();
     }
     _latestMessageId = latest?.id;
+  }
+
+  void _onUpdatesFailed(String reason, Object? error) {
+    log(
+      'Atualizações da conversa: $reason',
+      name: 'conversation',
+      error: error,
+    );
+    if (_closing || isClosed || state.status != ConversationStatus.opening) {
+      return;
+    }
+    _updates?.cancel();
+    _updates = null;
+    _conversation?.dispose();
+    _conversation = null;
+    emit(state.copyWith(status: ConversationStatus.failed));
   }
 
   @override

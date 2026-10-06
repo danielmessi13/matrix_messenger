@@ -134,7 +134,7 @@ void main() {
     await viewModel.close();
   });
 
-  test('send apara o texto e ignora vazio', () async {
+  test('send ignora vazio e envia o texto sem aparar', () async {
     final viewModel = build();
     await viewModel.open();
 
@@ -145,7 +145,7 @@ void main() {
     );
     expect(await viewModel.send('falha'), isFalse);
 
-    expect(conversation.sent, ['**oi**', 'falha']);
+    expect(conversation.sent, ['  **oi**\n', 'falha']);
     await viewModel.close();
   });
 
@@ -153,11 +153,71 @@ void main() {
     final viewModel = build();
     await viewModel.open();
 
-    await viewModel.retry('txn1');
-    await viewModel.cancel('txn2');
+    expect(await viewModel.retry('txn1'), isTrue);
+    expect(await viewModel.cancel('txn2'), isTrue);
 
     expect(conversation.retried, ['txn1']);
     expect(conversation.cancelled, ['txn2']);
+    await viewModel.close();
+  });
+
+  test('retry e cancel devolvem false quando falham', () async {
+    final viewModel = build();
+    await viewModel.open();
+    conversation
+      ..retryResult = const Result.error(FakeConversationRepository.notFound)
+      ..cancelResult = const Result.error(FakeConversationRepository.notFound);
+
+    expect(await viewModel.retry('txn1'), isFalse);
+    expect(await viewModel.cancel('txn2'), isFalse);
+    await viewModel.close();
+  });
+
+  test(
+    'erro no stream antes do primeiro snapshot vira falha e reabre',
+    () async {
+      final viewModel = build();
+      await viewModel.open();
+
+      conversation.snapshots.addError(Exception('rust'));
+      await flush();
+
+      expect(viewModel.state.status, ConversationStatus.failed);
+      expect(conversation.isDisposed, isTrue);
+
+      final next = FakeConversation();
+      repository.conversation = next;
+      await viewModel.open();
+      next.snapshots.add(kSnapshot);
+      await flush();
+
+      expect(viewModel.state.status, ConversationStatus.ready);
+      await viewModel.close();
+    },
+  );
+
+  test('stream que fecha antes do primeiro snapshot vira falha', () async {
+    final viewModel = build();
+    await viewModel.open();
+
+    await conversation.snapshots.close();
+    await flush();
+
+    expect(viewModel.state.status, ConversationStatus.failed);
+    await viewModel.close();
+  });
+
+  test('erro no stream depois de pronta mantém a timeline', () async {
+    final viewModel = build();
+    await viewModel.open();
+    conversation.snapshots.add(kSnapshot);
+    await flush();
+
+    conversation.snapshots.addError(Exception('rust'));
+    await flush();
+
+    expect(viewModel.state.status, ConversationStatus.ready);
+    expect(conversation.isDisposed, isFalse);
     await viewModel.close();
   });
 
