@@ -172,6 +172,76 @@ void main() {
     expect(items.map((m) => m.replyTo?.state), ReplyState.values);
   });
 
+  test('converte evento de sala', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      const bridge.TimelineSnapshot(
+        items: [
+          bridge.TimelineEntry(
+            roomEvent: bridge.RoomEvent(
+              id: '\$e1',
+              senderName: 'Bob',
+              isOwn: false,
+              timestampMs: 3000,
+              kind: bridge.RoomEventKind.invited,
+              targetName: 'Ana',
+              targetIsOwn: true,
+              value: 'x',
+            ),
+          ),
+        ],
+        reachedStart: true,
+        paginating: false,
+      ),
+    );
+
+    expect(
+      (await received).items,
+      [
+        RoomEventItem(
+          id: '\$e1',
+          senderName: 'Bob',
+          isOwn: false,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(3000),
+          kind: RoomEventKind.invited,
+          targetName: 'Ana',
+          targetIsOwn: true,
+          value: 'x',
+        ),
+      ],
+    );
+  });
+
+  test('converte cada tipo de evento de sala', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      bridge.TimelineSnapshot(
+        items: [
+          for (final (i, kind) in bridge.RoomEventKind.values.indexed)
+            bridge.TimelineEntry(
+              roomEvent: bridge.RoomEvent(
+                id: '\$e$i',
+                senderName: 'Bob',
+                isOwn: true,
+                timestampMs: 0,
+                kind: kind,
+                targetIsOwn: false,
+              ),
+            ),
+        ],
+        reachedStart: false,
+        paginating: false,
+      ),
+    );
+
+    final items = (await received).items.cast<RoomEventItem>();
+    expect(items.map((e) => e.kind), RoomEventKind.values);
+    expect(items.map((e) => e.isOwn), everyElement(isTrue));
+    expect(items.map((e) => e.value), everyElement(isNull));
+  });
+
   test('ações repassam para o RoomTimeline', () async {
     final conversation = await open();
     timeline.reachedStartOnPaginate = true;
@@ -194,6 +264,22 @@ void main() {
     expect(timeline.openedThreads, ['\$root']);
     expect(thread, isA<Ok<Conversation>>());
     expect(timeline.isDisposed, isTrue);
+  });
+
+  test('digitação repassa para o RoomTimeline e falha é silenciosa', () async {
+    final conversation = await open();
+    final names = conversation.typing.first;
+    timeline.typingNames.add(['Bob']);
+
+    await conversation.setTyping(true);
+    timeline.error = const bridge.TimelineError(
+      kind: bridge.TimelineErrorKind.network,
+      message: 'offline',
+    );
+    await conversation.setTyping(false);
+
+    expect(await names, ['Bob']);
+    expect(timeline.typingSent, [true]);
   });
 
   test('TimelineError vira ConversationFailure', () async {

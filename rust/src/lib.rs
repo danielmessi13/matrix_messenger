@@ -11,3 +11,4 @@ mod session_store;
 mod test_support;
 mod threads;
 mod timeline;
+mod typing;

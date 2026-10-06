@@ -6,8 +6,10 @@ import '../conversation/view_models/conversation_state.dart';
 import '../conversation/view_models/conversation_view_model.dart';
 import 'delayed_indicator.dart';
 import 'focus_flash.dart';
+import 'message_grouping.dart';
 import 'message_labels.dart';
 import 'message_tile.dart';
+import 'room_event_labels.dart';
 import 'thread_section.dart';
 
 // Pede mensagens antigas a duas alturas da área visível do topo, como o Element X, para chegarem antes de o usuário ver a borda.
@@ -185,23 +187,29 @@ class _TimelineViewState extends State<TimelineView>
                     _scroll.hasClients && _scroll.position.maxScrollExtent > 0,
                 onLoadOlder: widget.viewModel.loadOlder,
               ),
-              for (final item in items)
+              for (final (i, item) in items.indexed)
                 Center(
                   key: switch (item) {
                     MessageItem(:final id) => keyFor(id),
                     DateDividerItem(:final day) => ValueKey(day),
+                    RoomEventItem(:final id) => ValueKey(id),
                   },
                   child: SizedBox(
                     width: 880,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 24),
-                      child: _TimelineEntry(
-                        item: item,
-                        now: widget.now,
-                        viewModel: widget.viewModel,
-                        openThreadId: widget.state.openThreadId,
-                        flashing: item is MessageItem && item.id == flashing,
-                      ),
+                    child: _TimelineEntry(
+                      item: item,
+                      now: widget.now,
+                      viewModel: widget.viewModel,
+                      openThreadId: widget.state.openThreadId,
+                      flashing: item is MessageItem && item.id == flashing,
+                      continuation:
+                          item is MessageItem &&
+                          continuesGroup(i > 0 ? items[i - 1] : null, item),
+                      followsRoomEvent: i > 0 && items[i - 1] is RoomEventItem,
+                      continuedBelow: switch (items.elementAtOrNull(i + 1)) {
+                        final MessageItem next => continuesGroup(item, next),
+                        _ => false,
+                      },
                     ),
                   ),
                 ),
@@ -314,6 +322,9 @@ class _TimelineEntry extends StatelessWidget {
     required this.viewModel,
     required this.openThreadId,
     required this.flashing,
+    required this.continuation,
+    required this.continuedBelow,
+    required this.followsRoomEvent,
   });
 
   final TimelineItem item;
@@ -326,47 +337,119 @@ class _TimelineEntry extends StatelessWidget {
 
   final bool flashing;
 
+  final bool continuation;
+
+  final bool continuedBelow;
+
+  final bool followsRoomEvent;
+
   @override
-  Widget build(BuildContext context) => switch (item) {
-    DateDividerItem(:final day) => Center(
-      child: Text(
-        formatDayDivider(day, now),
-        style: _italic(context.colors, 17),
-      ),
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(
+      top: switch (item) {
+        RoomEventItem() => followsRoomEvent ? 4 : 12,
+        _ => continuation ? 0 : 24,
+      },
     ),
-    final MessageItem message => MessageHighlight(
-      flashing: flashing,
-      open: message.eventId != null && message.eventId == openThreadId,
-      child: MessageTile(
-        message: message,
-        onRetry: () => viewModel.retry(message.id),
-        onCancel: () => viewModel.cancel(message.id),
-        onReply: () => viewModel.startReply(message),
-        // "Thread" só para quem ainda não tem uma e não está aberta.
-        onStartThread: switch (message.eventId) {
-          final eventId?
-              when message.thread == null && openThreadId != eventId =>
-            () => viewModel.openThread(eventId),
-          _ => null,
-        },
-        onQuoteTap: viewModel.goTo,
-        thread: switch ((message.thread, message.eventId)) {
-          (final summary?, _) => ThreadSection(
-            rootEventId: summary.rootEventId,
-            summary: summary,
-            open: openThreadId == summary.rootEventId,
-            onTap: () => viewModel.toggleThread(summary.rootEventId),
-          ),
-          (null, final eventId?) when openThreadId == eventId => ThreadSection(
-            rootEventId: eventId,
-            open: true,
-            onTap: viewModel.closeThread,
-          ),
-          _ => null,
-        },
+    child: switch (item) {
+      final RoomEventItem event => _RoomEventLine(event: event),
+      DateDividerItem(:final day) => Center(
+        child: Text(
+          formatDayDivider(day, now),
+          style: _italic(context.colors, 17),
+        ),
       ),
-    ),
-  };
+      final MessageItem message => MessageHighlight(
+        flashing: flashing,
+        open: message.eventId != null && message.eventId == openThreadId,
+        padding: EdgeInsets.fromLTRB(
+          14,
+          continuation ? 3 : 10,
+          14,
+          continuedBelow ? 3 : 10,
+        ),
+        child: MessageTile(
+          message: message,
+          continuation: continuation,
+          onRetry: () => viewModel.retry(message.id),
+          onCancel: () => viewModel.cancel(message.id),
+          onReply: () => viewModel.startReply(message),
+          onStartThread: switch (message.eventId) {
+            final eventId?
+                when message.thread == null && openThreadId != eventId =>
+              () => viewModel.openThread(eventId),
+            _ => null,
+          },
+          onQuoteTap: viewModel.goTo,
+          thread: switch ((message.thread, message.eventId)) {
+            (final summary?, _) => ThreadSection(
+              rootEventId: summary.rootEventId,
+              summary: summary,
+              open: openThreadId == summary.rootEventId,
+              onTap: () => viewModel.toggleThread(summary.rootEventId),
+            ),
+            (null, final eventId?) when openThreadId == eventId =>
+              ThreadSection(
+                rootEventId: eventId,
+                open: true,
+                onTap: viewModel.closeThread,
+              ),
+            _ => null,
+          },
+        ),
+      ),
+    },
+  );
+}
+
+class _RoomEventLine extends StatelessWidget {
+  const _RoomEventLine({required this.event});
+
+  final RoomEventItem event;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final style = TextStyle(fontSize: 13.5, color: colors.textMuted);
+    return Padding(
+      key: Key('room_event_${event.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            switch (event.kind) {
+              RoomEventKind.created => Icons.add_circle_outline,
+              RoomEventKind.joined => Icons.login,
+              RoomEventKind.left => Icons.logout,
+              RoomEventKind.invited => Icons.person_add_alt,
+              RoomEventKind.inviteDeclined => Icons.person_remove_alt_1,
+              RoomEventKind.kicked => Icons.person_remove_alt_1,
+              RoomEventKind.banned => Icons.block,
+              RoomEventKind.unbanned => Icons.undo,
+              RoomEventKind.nameChanged => Icons.edit_outlined,
+              RoomEventKind.topicChanged => Icons.notes,
+              RoomEventKind.avatarChanged => Icons.image_outlined,
+              RoomEventKind.encryptionEnabled => Icons.lock_outline,
+              RoomEventKind.displayNameChanged => Icons.badge_outlined,
+            },
+            size: 14,
+            color: colors.textMuted,
+          ),
+          const SizedBox(width: 6),
+          Flexible(child: Text(roomEventLabel(event), style: style)),
+          const SizedBox(width: 8),
+          Text(
+            formatMessageTime(event.timestamp),
+            style: style.copyWith(
+              fontSize: 12,
+              color: colors.textMuted.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ReplyNotice extends StatelessWidget {

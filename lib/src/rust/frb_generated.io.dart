@@ -96,6 +96,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<List<String>> dco_decode_StreamSink_list_String_Sse(
+    dynamic raw,
+  );
+
+  @protected
   RustStreamSink<List<RoomSummary>> dco_decode_StreamSink_list_room_summary_Sse(
     dynamic raw,
   );
@@ -150,6 +155,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReplyPreview dco_decode_box_autoadd_reply_preview(dynamic raw);
+
+  @protected
+  RoomEvent dco_decode_box_autoadd_room_event(dynamic raw);
 
   @protected
   ThreadInfo dco_decode_box_autoadd_thread_info(dynamic raw);
@@ -230,6 +238,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReplyPreview? dco_decode_opt_box_autoadd_reply_preview(dynamic raw);
 
   @protected
+  RoomEvent? dco_decode_opt_box_autoadd_room_event(dynamic raw);
+
+  @protected
   ThreadInfo? dco_decode_opt_box_autoadd_thread_info(dynamic raw);
 
   @protected
@@ -249,6 +260,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReplyState dco_decode_reply_state(dynamic raw);
+
+  @protected
+  RoomEvent dco_decode_room_event(dynamic raw);
+
+  @protected
+  RoomEventKind dco_decode_room_event_kind(dynamic raw);
 
   @protected
   RoomSummary dco_decode_room_summary(dynamic raw);
@@ -356,6 +373,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<List<String>> sse_decode_StreamSink_list_String_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RustStreamSink<List<RoomSummary>> sse_decode_StreamSink_list_room_summary_Sse(
     SseDeserializer deserializer,
   );
@@ -416,6 +438,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReplyPreview sse_decode_box_autoadd_reply_preview(
     SseDeserializer deserializer,
   );
+
+  @protected
+  RoomEvent sse_decode_box_autoadd_room_event(SseDeserializer deserializer);
 
   @protected
   ThreadInfo sse_decode_box_autoadd_thread_info(SseDeserializer deserializer);
@@ -512,6 +537,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RoomEvent? sse_decode_opt_box_autoadd_room_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ThreadInfo? sse_decode_opt_box_autoadd_thread_info(
     SseDeserializer deserializer,
   );
@@ -537,6 +567,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReplyState sse_decode_reply_state(SseDeserializer deserializer);
+
+  @protected
+  RoomEvent sse_decode_room_event(SseDeserializer deserializer);
+
+  @protected
+  RoomEventKind sse_decode_room_event_kind(SseDeserializer deserializer);
 
   @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer);
@@ -658,6 +694,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_list_String_Sse(
+    RustStreamSink<List<String>> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_StreamSink_list_room_summary_Sse(
     RustStreamSink<List<RoomSummary>> self,
     SseSerializer serializer,
@@ -730,6 +772,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_reply_preview(
     ReplyPreview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_room_event(
+    RoomEvent self,
     SseSerializer serializer,
   );
 
@@ -855,6 +903,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_room_event(
+    RoomEvent? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_thread_info(
     ThreadInfo? self,
     SseSerializer serializer,
@@ -886,6 +940,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reply_state(ReplyState self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_room_event(RoomEvent self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_room_event_kind(RoomEventKind self, SseSerializer serializer);
 
   @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer);

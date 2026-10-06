@@ -78,7 +78,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 966158432;
+  int get rustContentHash => -1088396667;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -210,7 +210,16 @@ abstract class RustLibApi extends BaseApi {
     required String inReplyTo,
   });
 
+  Future<void> crateApiTimelineRoomTimelineSetTyping({
+    required RoomTimeline that,
+    required bool typing,
+  });
+
   Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
+    required RoomTimeline that,
+  });
+
+  Stream<List<String>> crateApiTimelineRoomTimelineWatchTyping({
     required RoomTimeline that,
   });
 
@@ -1314,6 +1323,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiTimelineRoomTimelineSetTyping({
+    required RoomTimeline that,
+    required bool typing,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_bool(typing, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 30,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineSetTypingConstMeta,
+        argValues: [that, typing],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineSetTypingConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_set_typing",
+        argNames: ["that", "typing"],
+      );
+
+  @override
   Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
     required RoomTimeline that,
   }) {
@@ -1331,7 +1378,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 30,
+              funcId: 31,
               port: port_,
             );
           },
@@ -1355,6 +1402,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Stream<List<String>> crateApiTimelineRoomTimelineWatchTyping({
+    required RoomTimeline that,
+  }) {
+    final sink = RustStreamSink<List<String>>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+              that,
+              serializer,
+            );
+            sse_encode_StreamSink_list_String_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 32,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiTimelineRoomTimelineWatchTypingConstMeta,
+          argValues: [that, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineWatchTypingConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_watch_typing",
+        argNames: ["that", "sink"],
+      );
+
+  @override
   Future<void> crateApiInitInitApp() {
     return handler.executeNormal(
       NormalTask(
@@ -1363,7 +1451,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1495,6 +1583,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<List<String>> dco_decode_StreamSink_list_String_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
   RustStreamSink<List<RoomSummary>> dco_decode_StreamSink_list_room_summary_Sse(
     dynamic raw,
   ) {
@@ -1603,6 +1699,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ReplyPreview dco_decode_box_autoadd_reply_preview(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_reply_preview(raw);
+  }
+
+  @protected
+  RoomEvent dco_decode_box_autoadd_room_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_room_event(raw);
   }
 
   @protected
@@ -1804,6 +1906,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomEvent? dco_decode_opt_box_autoadd_room_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_room_event(raw);
+  }
+
+  @protected
   ThreadInfo? dco_decode_opt_box_autoadd_thread_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_thread_info(raw);
@@ -1859,6 +1967,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ReplyState dco_decode_reply_state(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ReplyState.values[raw as int];
+  }
+
+  @protected
+  RoomEvent dco_decode_room_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return RoomEvent(
+      id: dco_decode_String(arr[0]),
+      senderName: dco_decode_String(arr[1]),
+      isOwn: dco_decode_bool(arr[2]),
+      timestampMs: dco_decode_i_64(arr[3]),
+      kind: dco_decode_room_event_kind(arr[4]),
+      targetName: dco_decode_opt_String(arr[5]),
+      targetIsOwn: dco_decode_bool(arr[6]),
+      value: dco_decode_opt_String(arr[7]),
+    );
+  }
+
+  @protected
+  RoomEventKind dco_decode_room_event_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RoomEventKind.values[raw as int];
   }
 
   @protected
@@ -1919,11 +2051,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TimelineEntry dco_decode_timeline_entry(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return TimelineEntry(
       dateDividerMs: dco_decode_opt_box_autoadd_i_64(arr[0]),
       message: dco_decode_opt_box_autoadd_timeline_message(arr[1]),
+      roomEvent: dco_decode_opt_box_autoadd_room_event(arr[2]),
     );
   }
 
@@ -2140,6 +2273,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<List<String>> sse_decode_StreamSink_list_String_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
   RustStreamSink<List<RoomSummary>> sse_decode_StreamSink_list_room_summary_Sse(
     SseDeserializer deserializer,
   ) {
@@ -2252,6 +2393,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_reply_preview(deserializer));
+  }
+
+  @protected
+  RoomEvent sse_decode_box_autoadd_room_event(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_room_event(deserializer));
   }
 
   @protected
@@ -2508,6 +2655,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomEvent? sse_decode_opt_box_autoadd_room_event(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_room_event(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   ThreadInfo? sse_decode_opt_box_autoadd_thread_info(
     SseDeserializer deserializer,
   ) {
@@ -2584,6 +2744,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomEvent sse_decode_room_event(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_senderName = sse_decode_String(deserializer);
+    var var_isOwn = sse_decode_bool(deserializer);
+    var var_timestampMs = sse_decode_i_64(deserializer);
+    var var_kind = sse_decode_room_event_kind(deserializer);
+    var var_targetName = sse_decode_opt_String(deserializer);
+    var var_targetIsOwn = sse_decode_bool(deserializer);
+    var var_value = sse_decode_opt_String(deserializer);
+    return RoomEvent(
+      id: var_id,
+      senderName: var_senderName,
+      isOwn: var_isOwn,
+      timestampMs: var_timestampMs,
+      kind: var_kind,
+      targetName: var_targetName,
+      targetIsOwn: var_targetIsOwn,
+      value: var_value,
+    );
+  }
+
+  @protected
+  RoomEventKind sse_decode_room_event_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return RoomEventKind.values[inner];
+  }
+
+  @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -2655,9 +2845,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_dateDividerMs = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_message = sse_decode_opt_box_autoadd_timeline_message(deserializer);
+    var var_roomEvent = sse_decode_opt_box_autoadd_room_event(deserializer);
     return TimelineEntry(
       dateDividerMs: var_dateDividerMs,
       message: var_message,
+      roomEvent: var_roomEvent,
     );
   }
 
@@ -2891,6 +3083,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_StreamSink_list_String_Sse(
+    RustStreamSink<List<String>> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_StreamSink_list_room_summary_Sse(
     RustStreamSink<List<RoomSummary>> self,
     SseSerializer serializer,
@@ -3056,6 +3265,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_reply_preview(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_room_event(
+    RoomEvent self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_room_event(self, serializer);
   }
 
   @protected
@@ -3306,6 +3524,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_room_event(
+    RoomEvent? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_room_event(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_thread_info(
     ThreadInfo? self,
     SseSerializer serializer,
@@ -3374,6 +3605,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_room_event(RoomEvent self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.senderName, serializer);
+    sse_encode_bool(self.isOwn, serializer);
+    sse_encode_i_64(self.timestampMs, serializer);
+    sse_encode_room_event_kind(self.kind, serializer);
+    sse_encode_opt_String(self.targetName, serializer);
+    sse_encode_bool(self.targetIsOwn, serializer);
+    sse_encode_opt_String(self.value, serializer);
+  }
+
+  @protected
+  void sse_encode_room_event_kind(
+    RoomEventKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -3422,6 +3675,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_opt_box_autoadd_i_64(self.dateDividerMs, serializer);
     sse_encode_opt_box_autoadd_timeline_message(self.message, serializer);
+    sse_encode_opt_box_autoadd_room_event(self.roomEvent, serializer);
   }
 
   @protected
@@ -3685,8 +3939,16 @@ class RoomTimelineImpl extends RustOpaque implements RoomTimeline {
         inReplyTo: inReplyTo,
       );
 
+  Future<void> setTyping({required bool typing}) => RustLib.instance.api
+      .crateApiTimelineRoomTimelineSetTyping(that: this, typing: typing);
+
   Stream<TimelineSnapshot> watch() =>
       RustLib.instance.api.crateApiTimelineRoomTimelineWatch(
+        that: this,
+      );
+
+  Stream<List<String>> watchTyping() =>
+      RustLib.instance.api.crateApiTimelineRoomTimelineWatchTyping(
         that: this,
       );
 }

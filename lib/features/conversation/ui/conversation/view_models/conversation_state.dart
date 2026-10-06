@@ -18,6 +18,7 @@ final class ConversationState extends Equatable {
     this.openThreadId,
     this.replyTo,
     this.focusRequest,
+    this.typing = const [],
   });
 
   final ConversationStatus status;
@@ -40,6 +41,8 @@ final class ConversationState extends Equatable {
 
   final FocusRequest? focusRequest;
 
+  final List<String> typing;
+
   // `openThreadId`/`replyTo: null` limpam; sem o argumento, mantêm.
   ConversationState copyWith({
     ConversationStatus? status,
@@ -51,6 +54,7 @@ final class ConversationState extends Equatable {
     Object? openThreadId = _unset,
     Object? replyTo = _unset,
     FocusRequest? focusRequest,
+    List<String>? typing,
   }) => ConversationState(
     status: status ?? this.status,
     items: items ?? this.items,
@@ -65,6 +69,7 @@ final class ConversationState extends Equatable {
         ? this.replyTo
         : replyTo as MessageItem?,
     focusRequest: focusRequest ?? this.focusRequest,
+    typing: typing ?? this.typing,
   );
 
   @override
@@ -78,5 +83,6 @@ final class ConversationState extends Equatable {
     openThreadId,
     replyTo,
     focusRequest,
+    typing,
   ];
 }

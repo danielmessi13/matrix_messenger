@@ -4,6 +4,8 @@ import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 class FakeRoomTimeline implements RoomTimeline {
   final snapshots = StreamController<TimelineSnapshot>.broadcast();
+  final typingNames = StreamController<List<String>>.broadcast();
+  final typingSent = <bool>[];
 
   bool reachedStartOnPaginate = false;
   int paginateCalls = 0;
@@ -54,6 +56,15 @@ class FakeRoomTimeline implements RoomTimeline {
   Future<void> markAsRead() async => markAsReadCalls++;
 
   @override
+  Stream<List<String>> watchTyping() => typingNames.stream;
+
+  @override
+  Future<void> setTyping({required bool typing}) async {
+    _throwIfError();
+    typingSent.add(typing);
+  }
+
+  @override
   Future<RoomTimeline> openThread({required String rootEventId}) async {
     openedThreads.add(rootEventId);
     _throwIfError();
@@ -64,6 +75,7 @@ class FakeRoomTimeline implements RoomTimeline {
   void dispose() {
     isDisposed = true;
     snapshots.close();
+    typingNames.close();
   }
 
   void _throwIfError() {

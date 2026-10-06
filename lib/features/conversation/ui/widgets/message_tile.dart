@@ -14,6 +14,7 @@ class MessageTile extends StatelessWidget {
     required this.onCancel,
     this.thread,
     this.compact = false,
+    this.continuation = false,
     this.onReply,
     this.onStartThread,
     this.onQuoteTap,
@@ -29,6 +30,8 @@ class MessageTile extends StatelessWidget {
 
   // Respostas de thread: corpo menor.
   final bool compact;
+
+  final bool continuation;
 
   final VoidCallback? onReply;
 
@@ -46,12 +49,14 @@ class MessageTile extends StatelessWidget {
             onCancel: onCancel,
             onQuoteTap: onQuoteTap,
             compact: compact,
+            continuation: continuation,
             colors: colors,
           )
         : _OtherMessage(
             message: message,
             onQuoteTap: onQuoteTap,
             compact: compact,
+            continuation: continuation,
             colors: colors,
           );
     return _HoverActions(
@@ -60,6 +65,7 @@ class MessageTile extends StatelessWidget {
       // Sem id do servidor, responder e abrir thread falhariam.
       onReply: message.canReply ? onReply : null,
       onStartThread: message.canReply ? onStartThread : null,
+      time: continuation ? formatMessageTime(message.timestamp) : null,
       thread: thread,
       child: content,
     );
@@ -71,6 +77,7 @@ class _OtherMessage extends StatelessWidget {
     required this.message,
     required this.onQuoteTap,
     required this.compact,
+    required this.continuation,
     required this.colors,
   });
 
@@ -79,6 +86,8 @@ class _OtherMessage extends StatelessWidget {
   final ValueChanged<String>? onQuoteTap;
 
   final bool compact;
+
+  final bool continuation;
 
   final AppColors colors;
 
@@ -89,38 +98,40 @@ class _OtherMessage extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Flexible(
-              child: Text(
-                message.senderName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: colors.textPrimary,
+        if (!continuation) ...[
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: Text(
+                  message.senderName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textPrimary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              formatMessageTime(message.timestamp),
-              style: TextStyle(fontSize: 12.5, color: colors.textMuted),
-            ),
-            if (message.replyTo?.isOwn ?? false) ...[
               const SizedBox(width: 10),
               Text(
-                'respondeu a você',
-                style: TextStyle(fontSize: 12.5, color: colors.accent),
+                formatMessageTime(message.timestamp),
+                style: TextStyle(fontSize: 12.5, color: colors.textMuted),
               ),
+              if (message.replyTo?.isOwn ?? false) ...[
+                const SizedBox(width: 10),
+                Text(
+                  'respondeu a você',
+                  style: TextStyle(fontSize: 12.5, color: colors.accent),
+                ),
+              ],
             ],
-          ],
-        ),
-        const SizedBox(height: 6),
+          ),
+          const SizedBox(height: 6),
+        ],
         _QuotedBody(
           reply: message.replyTo,
           alignEnd: false,
@@ -145,6 +156,7 @@ class _OwnMessage extends StatelessWidget {
     required this.onCancel,
     required this.onQuoteTap,
     required this.compact,
+    required this.continuation,
     required this.colors,
   });
 
@@ -157,6 +169,8 @@ class _OwnMessage extends StatelessWidget {
   final ValueChanged<String>? onQuoteTap;
 
   final bool compact;
+
+  final bool continuation;
 
   final AppColors colors;
 
@@ -171,33 +185,38 @@ class _OwnMessage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                formatMessageTime(message.timestamp),
-                style: TextStyle(fontSize: 12.5, color: colors.textMuted),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colors.accent,
-                  borderRadius: BorderRadius.circular(4),
+          if (!continuation) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  formatMessageTime(message.timestamp),
+                  style: TextStyle(fontSize: 12.5, color: colors.textMuted),
                 ),
-                child: Text(
-                  'VOCÊ',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.7,
-                    color: colors.background,
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.accent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'VOCÊ',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.7,
+                      color: colors.background,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           _QuotedBody(
             reply: message.replyTo,
             alignEnd: true,
@@ -379,6 +398,7 @@ class _HoverActions extends StatefulWidget {
     required this.alignEnd,
     required this.onReply,
     required this.onStartThread,
+    required this.time,
     required this.thread,
     required this.child,
   });
@@ -390,6 +410,8 @@ class _HoverActions extends StatefulWidget {
   final VoidCallback? onReply;
 
   final VoidCallback? onStartThread;
+
+  final String? time;
 
   final Widget? thread;
 
@@ -424,7 +446,8 @@ class _HoverActionsState extends State<_HoverActions> {
     final onReply = widget.onReply;
     final onStartThread = widget.onStartThread;
     final end = widget.alignEnd;
-    final hasMenu = onReply != null || onStartThread != null;
+    final time = widget.time;
+    final hasMenu = onReply != null || onStartThread != null || time != null;
     Widget row(Widget bubble) => SizedBox(
       width: double.infinity,
       child: Column(
@@ -454,6 +477,7 @@ class _HoverActionsState extends State<_HoverActions> {
             onExit: (_) => _hover(bar: false),
             child: _ActionBar(
               messageId: widget.messageId,
+              time: time,
               onReply: onReply,
               onStartThread: onStartThread,
             ),
@@ -473,11 +497,14 @@ class _HoverActionsState extends State<_HoverActions> {
 class _ActionBar extends StatelessWidget {
   const _ActionBar({
     required this.messageId,
+    required this.time,
     required this.onReply,
     required this.onStartThread,
   });
 
   final String messageId;
+
+  final String? time;
 
   final VoidCallback? onReply;
 
@@ -505,6 +532,18 @@ class _ActionBar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (time case final time?)
+              Padding(
+                key: Key('message_time_$messageId'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                child: Text(
+                  time,
+                  style: TextStyle(fontSize: 12.5, color: colors.textMuted),
+                ),
+              ),
             if (onReply case final onReply?)
               _ActionButton(
                 key: Key('message_reply_$messageId'),

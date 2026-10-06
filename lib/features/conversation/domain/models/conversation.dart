@@ -5,6 +5,8 @@ abstract interface class Conversation {
   /// Assinar uma vez só: cada assinatura abre um stream novo no Rust.
   Stream<ConversationSnapshot> get updates;
 
+  Stream<List<String>> get typing;
+
   Future<Result<bool>> loadOlder();
 
   Future<Result<void>> send(String markdown);
@@ -17,6 +19,8 @@ abstract interface class Conversation {
   Future<Result<void>> cancel(String messageId);
 
   Future<void> markAsRead();
+
+  Future<void> setTyping(bool typing);
 
   Future<Result<Conversation>> openThread(String rootEventId);
 

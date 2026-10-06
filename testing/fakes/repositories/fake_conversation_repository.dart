@@ -13,6 +13,9 @@ class FakeConversation implements Conversation {
 
   int listens = 0;
 
+  final typingNames = StreamController<List<String>>.broadcast();
+  final typingSent = <bool>[];
+
   // Chega ao início por padrão, para a tela não pedir páginas sem fim.
   Result<bool> loadOlderResult = const Result.ok(true);
   Completer<void>? loadOlderCompleter;
@@ -70,6 +73,12 @@ class FakeConversation implements Conversation {
   Future<void> markAsRead() async => markAsReadCalls++;
 
   @override
+  Stream<List<String>> get typing => typingNames.stream;
+
+  @override
+  Future<void> setTyping(bool typing) async => typingSent.add(typing);
+
+  @override
   Future<Result<Conversation>> openThread(String rootEventId) async {
     openedThreads.add(rootEventId);
     return threadResult ?? Result.ok(FakeConversation());
@@ -79,6 +88,7 @@ class FakeConversation implements Conversation {
   void dispose() {
     isDisposed = true;
     snapshots.close();
+    typingNames.close();
   }
 }
 

@@ -190,6 +190,8 @@ class _Conversation extends StatelessWidget {
             enabled: state.status == ConversationStatus.ready,
             covered: state.openThreadId != null,
             onSend: viewModel.send,
+            onChanged: viewModel.onDraftChanged,
+            status: const _TypingLine(),
           ),
         ),
       ],
@@ -253,6 +255,46 @@ class _Conversation extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+// Altura fixa: aparecer e sumir não empurra a timeline.
+class _TypingLine extends StatelessWidget {
+  const _TypingLine();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SizedBox(
+      height: 24,
+      child: BlocSelector<ConversationViewModel, ConversationState, String>(
+        selector: (state) => typingLabel(state.typing),
+        builder: (context, label) => AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          layoutBuilder: (current, previous) => Stack(
+            alignment: Alignment.centerLeft,
+            children: [...previous, ?current],
+          ),
+          child: label.isEmpty
+              ? const SizedBox.shrink()
+              : Padding(
+                  key: const Key('typing_indicator'),
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppFonts.serif,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 14,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ),
+        ),
       ),
     );
   }

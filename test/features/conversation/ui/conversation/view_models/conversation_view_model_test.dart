@@ -586,6 +586,32 @@ void main() {
       await viewModel.close();
     });
 
+    test(
+      'eventos de sala antes da primeira mensagem não ficam escondidos',
+      () async {
+        RoomEventItem event(String id, RoomEventKind kind) => RoomEventItem(
+          id: id,
+          senderName: 'Bob',
+          isOwn: false,
+          timestamp: kDay,
+          kind: kind,
+        );
+        final viewModel = await openWith([
+          DateDividerItem(kDay),
+          event('\$created', RoomEventKind.created),
+          event('\$joined', RoomEventKind.joined),
+          ...history(25),
+        ], reachedStart: true);
+
+        expect(await viewModel.loadOlder(), isTrue);
+        expect(viewModel.state.hiddenOlder, 0);
+        expect(viewModel.state.items.first, isA<DateDividerItem>());
+        expect(viewModel.state.reachedStart, isTrue);
+        expect(await viewModel.loadOlder(), isFalse);
+        await viewModel.close();
+      },
+    );
+
     test('mensagem nova não tira a mais antiga visível', () async {
       final viewModel = await openWith(history(45));
 
@@ -639,6 +665,95 @@ void main() {
       expect(viewModel.state.focusRequest?.messageId, '\$m3');
       expect(conversation.loadOlderCalls, 0);
       await viewModel.close();
+    });
+  });
+
+  group('digitação', () {
+    test('o estado acompanha quem está digitando', () async {
+      final viewModel = build();
+      await viewModel.open();
+
+      conversation.typingNames.add(['Bob']);
+      await flush();
+      expect(viewModel.state.typing, ['Bob']);
+
+      conversation.typingNames.add(['Bob', 'Ana']);
+      await flush();
+      expect(viewModel.state.typing, ['Bob', 'Ana']);
+
+      conversation.typingNames.add([]);
+      await flush();
+      expect(viewModel.state.typing, isEmpty);
+      await viewModel.close();
+    });
+
+    test('onDraftChanged só avisa nas transições', () async {
+      final viewModel = build();
+      await viewModel.open();
+
+      viewModel
+        ..onDraftChanged('o')
+        ..onDraftChanged('ol')
+        ..onDraftChanged('olá')
+        ..onDraftChanged('   ')
+        ..onDraftChanged('')
+        ..onDraftChanged('x');
+
+      expect(conversation.typingSent, [true, false, true]);
+      await viewModel.close();
+    });
+
+    test('rascunho antes de abrir não avisa', () {
+      build().onDraftChanged('olá');
+
+      expect(conversation.typingSent, isEmpty);
+    });
+
+    test('enviar avisa que parou de digitar', () async {
+      final viewModel = build();
+      await viewModel.open();
+      viewModel.onDraftChanged('olá');
+
+      await viewModel.send('olá');
+
+      expect(conversation.typingSent, [true, false]);
+      expect(conversation.sent, ['olá']);
+      await viewModel.close();
+    });
+
+    test('enviar resposta avisa que parou de digitar', () async {
+      final viewModel = build();
+      await viewModel.open();
+      viewModel
+        ..startReply(kOtherMessage)
+        ..onDraftChanged('ok');
+
+      await viewModel.send('ok');
+
+      expect(conversation.typingSent, [true, false]);
+      expect(conversation.sentReplies, hasLength(1));
+      await viewModel.close();
+    });
+
+    test('fechar avisa que parou e cancela a assinatura', () async {
+      final viewModel = build();
+      await viewModel.open();
+      viewModel.onDraftChanged('olá');
+      expect(conversation.typingNames.hasListener, isTrue);
+
+      await viewModel.close();
+
+      expect(conversation.typingSent, [true, false]);
+      expect(conversation.typingNames.hasListener, isFalse);
+    });
+
+    test('fechar sem rascunho não avisa', () async {
+      final viewModel = build();
+      await viewModel.open();
+
+      await viewModel.close();
+
+      expect(conversation.typingSent, isEmpty);
     });
   });
 }

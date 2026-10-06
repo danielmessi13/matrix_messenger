@@ -180,4 +180,19 @@ void main() {
       'Mensagem de um tipo não suportado',
     );
   });
+
+  test('quem está digitando', () {
+    expect(typingLabel([]), '');
+    expect(typingLabel(['Bob']), 'Bob está digitando…');
+    expect(typingLabel(['Bob', 'Ana']), 'Bob e Ana estão digitando…');
+    expect(
+      typingLabel(['Bob', 'Ana', 'Carlos']),
+      'Bob, Ana e Carlos estão digitando…',
+    );
+    expect(
+      typingLabel(['Bob', 'Ana', 'Carlos', 'Diego']),
+      'Várias pessoas estão digitando…',
+    );
+    expect(typingLabel(['Diego Alves']), 'Diego está digitando…');
+  });
 }

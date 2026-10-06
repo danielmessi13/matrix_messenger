@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `from_sdk`, `new`, `new`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RoomTimeline>>
 abstract class RoomTimeline implements RustOpaqueInterface {
@@ -26,7 +26,11 @@ abstract class RoomTimeline implements RustOpaqueInterface {
 
   Future<void> sendReply({required String body, required String inReplyTo});
 
+  Future<void> setTyping({required bool typing});
+
   Stream<TimelineSnapshot> watch();
+
+  Stream<List<String>> watchTyping();
 }
 
 enum MessageKind {
@@ -85,6 +89,69 @@ enum ReplyState {
   unavailable,
 }
 
+class RoomEvent {
+  final String id;
+  final String senderName;
+  final bool isOwn;
+  final PlatformInt64 timestampMs;
+  final RoomEventKind kind;
+  final String? targetName;
+  final bool targetIsOwn;
+  final String? value;
+
+  const RoomEvent({
+    required this.id,
+    required this.senderName,
+    required this.isOwn,
+    required this.timestampMs,
+    required this.kind,
+    this.targetName,
+    required this.targetIsOwn,
+    this.value,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      senderName.hashCode ^
+      isOwn.hashCode ^
+      timestampMs.hashCode ^
+      kind.hashCode ^
+      targetName.hashCode ^
+      targetIsOwn.hashCode ^
+      value.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoomEvent &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          senderName == other.senderName &&
+          isOwn == other.isOwn &&
+          timestampMs == other.timestampMs &&
+          kind == other.kind &&
+          targetName == other.targetName &&
+          targetIsOwn == other.targetIsOwn &&
+          value == other.value;
+}
+
+enum RoomEventKind {
+  created,
+  joined,
+  left,
+  invited,
+  inviteDeclined,
+  kicked,
+  banned,
+  unbanned,
+  nameChanged,
+  topicChanged,
+  avatarChanged,
+  encryptionEnabled,
+  displayNameChanged,
+}
+
 enum SendState {
   sent,
   sending,
@@ -130,14 +197,17 @@ class ThreadInfo {
 class TimelineEntry {
   final PlatformInt64? dateDividerMs;
   final TimelineMessage? message;
+  final RoomEvent? roomEvent;
 
   const TimelineEntry({
     this.dateDividerMs,
     this.message,
+    this.roomEvent,
   });
 
   @override
-  int get hashCode => dateDividerMs.hashCode ^ message.hashCode;
+  int get hashCode =>
+      dateDividerMs.hashCode ^ message.hashCode ^ roomEvent.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -145,7 +215,8 @@ class TimelineEntry {
       other is TimelineEntry &&
           runtimeType == other.runtimeType &&
           dateDividerMs == other.dateDividerMs &&
-          message == other.message;
+          message == other.message &&
+          roomEvent == other.roomEvent;
 }
 
 class TimelineError implements FrbException {

@@ -66,6 +66,7 @@ class MessageHighlight extends StatelessWidget {
     super.key,
     required this.flashing,
     this.open = false,
+    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     required this.child,
   });
 
@@ -74,6 +75,8 @@ class MessageHighlight extends StatelessWidget {
   // Raiz da thread aberta no painel.
   final bool open;
 
+  final EdgeInsets padding;
+
   final Widget child;
 
   @override
@@ -81,7 +84,7 @@ class MessageHighlight extends StatelessWidget {
     final colors = context.colors;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: padding,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: flashing

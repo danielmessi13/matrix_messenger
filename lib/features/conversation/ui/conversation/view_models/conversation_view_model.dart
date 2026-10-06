@@ -28,6 +28,11 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   StreamSubscription<ConversationSnapshot>? _updates;
 
+  StreamSubscription<List<String>>? _typing;
+
+  // Último aviso enviado, para não repetir a cada tecla.
+  bool _typingSent = false;
+
   String? _latestMessageId;
 
   List<TimelineItem> _loaded = const [];
@@ -76,6 +81,11 @@ class ConversationViewModel extends Cubit<ConversationState> {
           onError: (Object error) => _onUpdatesFailed('erro', error),
           onDone: () => _onUpdatesFailed('fim', null),
         );
+        _typing = value.typing.listen(
+          _onTyping,
+          onError: (Object error) =>
+              log('Digitação da conversa', name: 'conversation', error: error),
+        );
       case Error(:final error):
         log('Falha ao abrir a conversa', name: 'conversation', error: error);
         emit(state.copyWith(status: ConversationStatus.failed));
@@ -121,6 +131,7 @@ class ConversationViewModel extends Cubit<ConversationState> {
   Future<bool> send(String text) async {
     final conversation = _conversation;
     if (text.trim().isEmpty || conversation == null) return false;
+    unawaited(_setTyping(false));
     final target = state.replyTo;
     final eventId = target?.eventId;
     final result = eventId == null
@@ -139,6 +150,16 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   Future<bool> cancel(String messageId) async =>
       await _conversation?.cancel(messageId) is Ok;
+
+  void onDraftChanged(String text) =>
+      unawaited(_setTyping(text.trim().isNotEmpty));
+
+  Future<void> _setTyping(bool typing) async {
+    final conversation = _conversation;
+    if (conversation == null || typing == _typingSent) return;
+    _typingSent = typing;
+    await conversation.setTyping(typing);
+  }
 
   void openThread(String rootEventId) {
     if (state.openThreadId == rootEventId) return;
@@ -247,7 +268,7 @@ class ConversationViewModel extends Cubit<ConversationState> {
   }
 
   void _emitWindow(ConversationState base) {
-    final start = _windowStart();
+    final start = _firstVisibleIndex();
     emit(
       base.copyWith(
         items: start == 0 ? _loaded : _loaded.sublist(start),
@@ -257,21 +278,26 @@ class ConversationViewModel extends Cubit<ConversationState> {
     );
   }
 
-  int _windowStart() {
+  int _firstVisibleIndex() {
     final messages = _loaded.whereType<MessageItem>().toList();
     if (messages.isEmpty) return 0;
     final anchor = _oldestVisibleId ??=
         messages[max(0, messages.length - _windowStep)].id;
-    var start = _loaded.indexWhere(
+    if (anchor == messages.first.id) return 0;
+    final anchorIndex = _loaded.indexWhere(
       (item) => item is MessageItem && item.id == anchor,
     );
-    // Sem a âncora (envio cancelado, por exemplo), mostrar tudo não esconde nada que o usuário já via.
-    if (start < 0) {
+    if (anchorIndex < 0) {
       _oldestVisibleId = messages.first.id;
       return 0;
     }
-    if (start > 0 && _loaded[start - 1] is DateDividerItem) start--;
-    return start;
+    final dividerAbove = _loaded[anchorIndex - 1] is DateDividerItem;
+    return dividerAbove ? anchorIndex - 1 : anchorIndex;
+  }
+
+  void _onTyping(List<String> names) {
+    if (_closing || isClosed) return;
+    emit(state.copyWith(typing: names));
   }
 
   void _onUpdatesFailed(String reason, Object? error) {
@@ -285,6 +311,9 @@ class ConversationViewModel extends Cubit<ConversationState> {
     }
     _updates?.cancel();
     _updates = null;
+    _typing?.cancel();
+    _typing = null;
+    _typingSent = false;
     _conversation?.dispose();
     _conversation = null;
     emit(state.copyWith(status: ConversationStatus.failed));
@@ -293,7 +322,9 @@ class ConversationViewModel extends Cubit<ConversationState> {
   @override
   Future<void> close() async {
     _closing = true;
+    await _setTyping(false);
     await _updates?.cancel();
+    await _typing?.cancel();
     await _thread?.close();
     _conversation?.dispose();
     return super.close();

@@ -16,6 +16,8 @@ class MessageInput extends StatefulWidget {
     this.compact = false,
     this.autofocus = false,
     this.covered = false,
+    this.onChanged,
+    this.status,
   });
 
   final String placeholder;
@@ -36,6 +38,10 @@ class MessageInput extends StatefulWidget {
   // Painel da thread aberto por cima; ao fechar, o campo retoma o foco.
   final bool covered;
 
+  final ValueChanged<String>? onChanged;
+
+  final Widget? status;
+
   @override
   State<MessageInput> createState() => _MessageInputState();
 }
@@ -47,10 +53,13 @@ class _MessageInputState extends State<MessageInput> {
 
   bool _sending = false;
 
+  String _lastText = '';
+
   @override
   void initState() {
     super.initState();
     _focus.onKeyEvent = _onKey;
+    _controller.addListener(_onText);
     // O autofocus do campo não tira o foco de outro campo já focado.
     if (widget.autofocus) _focusAfterFrame();
   }
@@ -76,6 +85,14 @@ class _MessageInputState extends State<MessageInput> {
     _controller.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  // O listener do controller também dispara em seleção; só repassa quando o texto muda.
+  void _onText() {
+    final text = _controller.text;
+    if (text == _lastText) return;
+    _lastText = text;
+    widget.onChanged?.call(text);
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -185,66 +202,76 @@ class _MessageInputState extends State<MessageInput> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 880),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colors.surfaceRaised,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colors.borderStrong),
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (widget.replyTo case final target?)
-                      _ReplyBar(target: target, onCancel: widget.onCancelReply),
-                    TextField(
-                      key: const Key('message_field'),
-                      controller: _controller,
-                      focusNode: _focus,
-                      enabled: enabled,
-                      autofocus: widget.autofocus,
-                      minLines: 2,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      cursorColor: colors.accent,
-                      style: TextStyle(
-                        fontFamily: AppFonts.serif,
-                        fontSize: widget.compact ? 17 : 19,
-                        color: colors.textPrimary,
-                      ),
-                      decoration: InputDecoration(
-                        isCollapsed: true,
-                        border: InputBorder.none,
-                        hintText: widget.placeholder,
-                        hintStyle: TextStyle(
-                          fontFamily: AppFonts.serif,
-                          fontSize: widget.compact ? 17 : 19,
-                          color: colors.textMuted,
-                        ),
-                      ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ?widget.status,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: colors.surfaceRaised,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: colors.borderStrong),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (!widget.compact)
-                          _FormatTools(
-                            enabled: enabled,
-                            dense: narrow,
-                            onWrap: _wrap,
-                            onBullet: _bullet,
+                        if (widget.replyTo case final target?)
+                          _ReplyBar(
+                            target: target,
+                            onCancel: widget.onCancelReply,
                           ),
-                        const SizedBox(width: 12),
-                        Expanded(child: narrow ? const SizedBox() : hint),
-                        const SizedBox(width: 12),
-                        send,
+                        TextField(
+                          key: const Key('message_field'),
+                          controller: _controller,
+                          focusNode: _focus,
+                          enabled: enabled,
+                          autofocus: widget.autofocus,
+                          minLines: 2,
+                          maxLines: 6,
+                          keyboardType: TextInputType.multiline,
+                          cursorColor: colors.accent,
+                          style: TextStyle(
+                            fontFamily: AppFonts.serif,
+                            fontSize: widget.compact ? 17 : 19,
+                            color: colors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            isCollapsed: true,
+                            border: InputBorder.none,
+                            hintText: widget.placeholder,
+                            hintStyle: TextStyle(
+                              fontFamily: AppFonts.serif,
+                              fontSize: widget.compact ? 17 : 19,
+                              color: colors.textMuted,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            if (!widget.compact)
+                              _FormatTools(
+                                enabled: enabled,
+                                dense: narrow,
+                                onWrap: _wrap,
+                                onBullet: _bullet,
+                              ),
+                            const SizedBox(width: 12),
+                            Expanded(child: narrow ? const SizedBox() : hint),
+                            const SizedBox(width: 12),
+                            send,
+                          ],
+                        ),
+                        if (narrow && !widget.compact) ...[
+                          const SizedBox(height: 4),
+                          hint,
+                        ],
                       ],
                     ),
-                    if (narrow && !widget.compact) ...[
-                      const SizedBox(height: 4),
-                      hint,
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

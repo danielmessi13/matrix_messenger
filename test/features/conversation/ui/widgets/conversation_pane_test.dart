@@ -416,7 +416,7 @@ void main() {
   testWidgets('pede mais a duas alturas da área visível do topo', (
     tester,
   ) async {
-    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await pump(tester, kTeamRoom, size: const Size(1440, 524));
     await show(tester, page([for (var i = 0; i < 60; i++) msg(i)]));
     final position = tester
         .state<ScrollableState>(
@@ -1139,4 +1139,71 @@ void main() {
       expect(find.byKey(const Key('timeline_load_older')), findsNothing);
     },
   );
+
+  testWidgets('mensagens seguidas do mesmo autor mostram o nome uma vez', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        DateDividerItem(kDay),
+        msg(0),
+        msg(1),
+        msg(10),
+      ], reachedStart: true),
+    );
+
+    expect(find.text('Bob'), findsNWidgets(2));
+    final first = tester.getRect(find.text('mensagem 0'));
+    final second = tester.getRect(find.text('mensagem 1'));
+    expect(second.top - first.bottom, lessThan(12));
+  });
+
+  testWidgets('evento de sala aparece numa linha e quebra o grupo', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        DateDividerItem(kDay),
+        msg(0),
+        RoomEventItem(
+          id: '\$join',
+          senderName: 'Ana',
+          isOwn: false,
+          timestamp: kDay.add(const Duration(minutes: 1)),
+          kind: RoomEventKind.joined,
+        ),
+        msg(2),
+      ], reachedStart: true),
+    );
+
+    expect(find.byKey(const Key('room_event_\$join')), findsOneWidget);
+    expect(find.text('Ana entrou na sala'), findsOneWidget);
+    expect(find.text('Bob'), findsNWidgets(2));
+  });
+
+  testWidgets('sala só com eventos mostra as linhas, não o estado vazio', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        RoomEventItem(
+          id: '\$create',
+          senderName: 'Bob',
+          isOwn: true,
+          timestamp: kDay,
+          kind: RoomEventKind.created,
+        ),
+      ], reachedStart: true),
+    );
+
+    expect(find.byKey(const Key('room_event_\$create')), findsOneWidget);
+    expect(find.text('Você criou a sala'), findsOneWidget);
+    expect(find.text('Nenhuma mensagem ainda.'), findsNothing);
+  });
 }

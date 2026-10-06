@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/message_labels.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/message_tile.dart';
 
 import '../../../../../testing/desktop_size.dart';
@@ -14,6 +15,7 @@ void main() {
     MessageItem message, {
     bool succeeds = true,
     bool compact = false,
+    bool continuation = false,
     VoidCallback? onReply,
     VoidCallback? onStartThread,
     ValueChanged<String>? onQuoteTap,
@@ -31,6 +33,7 @@ void main() {
             child: MessageTile(
               message: message,
               compact: compact,
+              continuation: continuation,
               onReply: onReply,
               onStartThread: onStartThread,
               onQuoteTap: onQuoteTap,
@@ -535,5 +538,61 @@ void main() {
     await pump(tester, kOtherMessage);
 
     expect(find.byKey(const Key('message_reply_quote')), findsNothing);
+  });
+
+  testWidgets('continuação de outra pessoa esconde nome e hora', (
+    tester,
+  ) async {
+    await pump(tester, kOtherMessage, continuation: true);
+
+    expect(find.text('Diego Alves'), findsNothing);
+    expect(find.text('10:05'), findsNothing);
+    expect(find.textContaining('A integração'), findsOneWidget);
+  });
+
+  testWidgets('continuação própria esconde hora e VOCÊ, mas não o status', (
+    tester,
+  ) async {
+    await pump(tester, kOwnMessage, continuation: true);
+
+    expect(find.text('VOCÊ'), findsNothing);
+    expect(find.text('10:21'), findsNothing);
+    expect(find.text(readByLabel(kOwnMessage.readBy)), findsOneWidget);
+  });
+
+  testWidgets('continuação mostra a hora no hover', (tester) async {
+    await pump(tester, kOtherMessage, continuation: true, onReply: () {});
+
+    await hover(tester, find.textContaining('A integração'));
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('message_time_\$other')),
+        matching: find.text('10:05'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Responder'), findsOneWidget);
+  });
+
+  testWidgets('continuação sem menu ainda mostra a hora no hover', (
+    tester,
+  ) async {
+    await pump(tester, own(SendState.sending), continuation: true);
+
+    await hover(tester, find.text('oi'));
+
+    expect(find.byKey(const Key('message_time_txn')), findsOneWidget);
+    expect(find.text('Responder'), findsNothing);
+  });
+
+  testWidgets('mensagem com cabeçalho não repete a hora no hover', (
+    tester,
+  ) async {
+    await pump(tester, kOtherMessage, onReply: () {});
+
+    await hover(tester, find.textContaining('A integração'));
+
+    expect(find.byKey(const Key('message_time_\$other')), findsNothing);
   });
 }

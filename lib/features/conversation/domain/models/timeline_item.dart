@@ -148,6 +148,63 @@ final class MessageItem extends TimelineItem {
   ];
 }
 
+enum RoomEventKind {
+  created,
+  joined,
+  left,
+  invited,
+  inviteDeclined,
+  kicked,
+  banned,
+  unbanned,
+  nameChanged,
+  topicChanged,
+  avatarChanged,
+  encryptionEnabled,
+  displayNameChanged,
+}
+
+final class RoomEventItem extends TimelineItem {
+  const RoomEventItem({
+    required this.id,
+    required this.senderName,
+    required this.isOwn,
+    required this.timestamp,
+    required this.kind,
+    this.targetName,
+    this.targetIsOwn = false,
+    this.value,
+  });
+
+  final String id;
+
+  final String senderName;
+
+  final bool isOwn;
+
+  final DateTime timestamp;
+
+  final RoomEventKind kind;
+
+  final String? targetName;
+
+  final bool targetIsOwn;
+
+  final String? value;
+
+  @override
+  List<Object?> get props => [
+    id,
+    senderName,
+    isOwn,
+    timestamp,
+    kind,
+    targetName,
+    targetIsOwn,
+    value,
+  ];
+}
+
 class ConversationSnapshot extends Equatable {
   const ConversationSnapshot({
     required this.items,

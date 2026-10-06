@@ -10,6 +10,36 @@ pub struct TimelineSnapshot {
 pub struct TimelineEntry {
     pub date_divider_ms: Option<i64>,
     pub message: Option<TimelineMessage>,
+    pub room_event: Option<RoomEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoomEvent {
+    pub id: String,
+    pub sender_name: String,
+    pub is_own: bool,
+    pub timestamp_ms: i64,
+    pub kind: RoomEventKind,
+    pub target_name: Option<String>,
+    pub target_is_own: bool,
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RoomEventKind {
+    Created,
+    Joined,
+    Left,
+    Invited,
+    InviteDeclined,
+    Kicked,
+    Banned,
+    Unbanned,
+    NameChanged,
+    TopicChanged,
+    AvatarChanged,
+    EncryptionEnabled,
+    DisplayNameChanged,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -181,6 +211,14 @@ impl RoomTimeline {
 
     pub async fn mark_as_read(&self) -> Result<(), TimelineError> {
         self.handle.mark_as_read().await
+    }
+
+    pub fn watch_typing(&self, sink: StreamSink<Vec<String>>) {
+        self.handle.watch_typing(move |names| sink.add(names).is_ok());
+    }
+
+    pub async fn set_typing(&self, typing: bool) -> Result<(), TimelineError> {
+        self.handle.set_typing(typing).await
     }
 
     pub async fn open_thread(&self, root_event_id: String) -> Result<RoomTimeline, TimelineError> {

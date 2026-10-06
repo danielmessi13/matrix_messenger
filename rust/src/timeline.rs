@@ -10,8 +10,11 @@ use matrix_sdk::{
     event_cache::PaginationStatus,
     ruma::{
         api::client::receipt::create_receipt::v3::ReceiptType,
-        events::room::message::{
-            MessageType, RoomMessageEventContent, RoomMessageEventContentWithoutRelation,
+        events::{
+            room::message::{
+                MessageType, RoomMessageEventContent, RoomMessageEventContentWithoutRelation,
+            },
+            StateEventContentChange,
         },
         EventId, OwnedEventId, OwnedUserId, UserId,
     },
@@ -19,19 +22,20 @@ use matrix_sdk::{
     Room,
 };
 use matrix_sdk_ui::timeline::{
-    EventSendState, EventTimelineItem, MsgLikeKind, Profile, Timeline, TimelineBuilder,
-    TimelineDetails, TimelineFocus, TimelineItem, TimelineItemContent, TimelineReadReceiptTracking,
-    TimelineUniqueId, VirtualTimelineItem,
+    AnyOtherStateEventContentChange, EventSendState, EventTimelineItem, MembershipChange,
+    MsgLikeKind, Profile, Timeline, TimelineBuilder, TimelineDetails, TimelineFocus, TimelineItem,
+    TimelineItemContent, TimelineReadReceiptTracking, TimelineUniqueId, VirtualTimelineItem,
 };
 use tokio::{runtime::Handle, task::AbortHandle};
 
 use crate::{
     api::timeline::{
-        MessageKind, ReplyPreview, ReplyState, SendState, ThreadInfo, TimelineEntry, TimelineError,
-        TimelineErrorKind, TimelineMessage, TimelineSnapshot,
+        MessageKind, ReplyPreview, ReplyState, RoomEvent, RoomEventKind, SendState, ThreadInfo,
+        TimelineEntry, TimelineError, TimelineErrorKind, TimelineMessage, TimelineSnapshot,
     },
     diff_window::next_batch_or,
     threads::{changed_in, unread_by_thread, ThreadReads},
+    typing,
 };
 
 const PAGE_EVENTS: u16 = 20;
@@ -261,6 +265,15 @@ impl TimelineHandle {
         Ok(())
     }
 
+    pub(crate) fn watch_typing(&self, emit: impl FnMut(Vec<String>) -> bool + Send + 'static) {
+        let task = self.runtime.spawn(typing::watch(self.room.clone(), emit));
+        self.tasks.lock().unwrap().push(task.abort_handle());
+    }
+
+    pub(crate) async fn set_typing(&self, typing: bool) -> Result<(), TimelineError> {
+        typing::set(&self.room, typing).await
+    }
+
     pub(crate) async fn open_thread(&self, root_event_id: &str) -> Result<Self, TimelineError> {
         let root = OwnedEventId::try_from(root_event_id).map_err(|error| {
             TimelineError::new(TimelineErrorKind::MessageNotFound, error.to_string())
@@ -467,6 +480,84 @@ fn message(
     })
 }
 
+fn non_empty(text: &str) -> Option<String> {
+    (!text.is_empty()).then(|| text.to_owned())
+}
+
+fn room_event(
+    id: &TimelineUniqueId,
+    item: &EventTimelineItem,
+    own_user: &UserId,
+) -> Option<RoomEvent> {
+    let mut target_name = None;
+    let mut target_is_own = false;
+    let mut value = None;
+    let kind = match item.content() {
+        TimelineItemContent::MembershipChange(change) => {
+            let kind = match change.change()? {
+                MembershipChange::Joined | MembershipChange::InvitationAccepted => {
+                    RoomEventKind::Joined
+                }
+                MembershipChange::Left => RoomEventKind::Left,
+                MembershipChange::Invited => RoomEventKind::Invited,
+                MembershipChange::InvitationRejected => RoomEventKind::InviteDeclined,
+                MembershipChange::Kicked => RoomEventKind::Kicked,
+                MembershipChange::Banned | MembershipChange::KickedAndBanned => {
+                    RoomEventKind::Banned
+                }
+                MembershipChange::Unbanned => RoomEventKind::Unbanned,
+                _ => return None,
+            };
+            let user = change.user_id();
+            if user != item.sender() {
+                target_name = Some(
+                    change
+                        .display_name()
+                        .filter(|name| !name.is_empty())
+                        .unwrap_or_else(|| user.localpart().to_owned()),
+                );
+                target_is_own = user == own_user;
+            }
+            kind
+        }
+        TimelineItemContent::ProfileChange(profile) => {
+            let change = profile.displayname_change()?;
+            target_name = change.old.as_deref().and_then(non_empty);
+            value = change.new.as_deref().and_then(non_empty);
+            RoomEventKind::DisplayNameChanged
+        }
+        TimelineItemContent::OtherState(state) => match state.content() {
+            AnyOtherStateEventContentChange::RoomCreate(_) => RoomEventKind::Created,
+            AnyOtherStateEventContentChange::RoomName(change) => {
+                if let StateEventContentChange::Original { content, .. } = change {
+                    value = non_empty(&content.name);
+                }
+                RoomEventKind::NameChanged
+            }
+            AnyOtherStateEventContentChange::RoomTopic(change) => {
+                if let StateEventContentChange::Original { content, .. } = change {
+                    value = non_empty(&content.topic);
+                }
+                RoomEventKind::TopicChanged
+            }
+            AnyOtherStateEventContentChange::RoomAvatar(_) => RoomEventKind::AvatarChanged,
+            AnyOtherStateEventContentChange::RoomEncryption(_) => RoomEventKind::EncryptionEnabled,
+            _ => return None,
+        },
+        _ => return None,
+    };
+    Some(RoomEvent {
+        id: id.0.clone(),
+        sender_name: profile_name(item.sender(), item.sender_profile()),
+        is_own: item.is_own(),
+        timestamp_ms: i64::from(item.timestamp().0),
+        kind,
+        target_name,
+        target_is_own,
+        value,
+    })
+}
+
 // Ao chegar ao início, a timeline de thread inclui a raiz, que já aparece na conversa principal.
 pub(crate) fn snapshot(
     items: &Vector<Arc<TimelineItem>>,
@@ -501,11 +592,21 @@ pub(crate) fn snapshot(
                 }
             }
             let Some(message) = message else {
+                if thread_root.is_none() {
+                    if let Some(room_event) = room_event(item.unique_id(), event, own_user) {
+                        entries.push(TimelineEntry {
+                            date_divider_ms: None,
+                            message: None,
+                            room_event: Some(room_event),
+                        });
+                    }
+                }
                 continue;
             };
             entries.push(TimelineEntry {
                 date_divider_ms: None,
                 message: Some(message),
+                room_event: None,
             });
         } else if let Some(virtual_item) = item.as_virtual() {
             match virtual_item {
@@ -514,6 +615,7 @@ pub(crate) fn snapshot(
                     entries.push(TimelineEntry {
                         date_divider_ms: Some(i64::from(day.0)),
                         message: None,
+                        room_event: None,
                     });
                 }
                 VirtualTimelineItem::TimelineStart => reached_start = true,
@@ -542,9 +644,12 @@ pub(crate) fn snapshot(
     }
 }
 
-// O SDK põe divisor de dia também antes de eventos que não viram mensagem; sozinho, ele impede o estado vazio.
+// O SDK põe divisor de dia também antes de eventos que não mostramos; sozinho, ele impede o estado vazio.
 fn drop_trailing_divider(entries: &mut Vec<TimelineEntry>) {
-    if entries.last().is_some_and(|entry| entry.message.is_none()) {
+    if entries
+        .last()
+        .is_some_and(|entry| entry.date_divider_ms.is_some())
+    {
         entries.pop();
     }
 }
@@ -1532,10 +1637,10 @@ mod tests {
         assert!(!echo.can_reply);
     }
 
-    fn topics(f: &EventFactory, prefix: &str, count: usize) -> Vec<Raw<AnyTimelineEvent>> {
+    fn hidden_events(f: &EventFactory, count: usize) -> Vec<Raw<AnyTimelineEvent>> {
         (0..count)
-            .map(|i| {
-                f.room_topic(format!("{prefix}{i}"))
+            .map(|_| {
+                f.default_power_levels()
                     .sender(user_id!("@bob:b.c"))
                     .into_raw_timeline()
             })
@@ -1661,7 +1766,7 @@ mod tests {
             .mock_room_messages()
             .match_from("p0")
             .ok(RoomMessagesResponseTemplate::default()
-                .events(topics(&f, "t", 5))
+                .events(hidden_events(&f, 5))
                 .end_token("p1"))
             .mount()
             .await;
@@ -1693,7 +1798,7 @@ mod tests {
             .sync_room(
                 &client,
                 JoinedRoomBuilder::new(room_id)
-                    .add_timeline_event(f.room_topic("tópico").sender(bob).server_ts(day))
+                    .add_timeline_event(f.default_power_levels().sender(bob).server_ts(day))
                     .add_timeline_event(f.text_msg("oi").sender(bob).server_ts(3 * day)),
             )
             .await;
@@ -1711,5 +1816,118 @@ mod tests {
         assert_eq!(dividers.len(), 1);
         assert!(current.items[0].date_divider_ms.is_some());
         assert!(current.items[1].message.is_some());
+    }
+
+    fn room_events(snapshot: &TimelineSnapshot) -> Vec<&RoomEvent> {
+        snapshot
+            .items
+            .iter()
+            .filter_map(|entry| entry.room_event.as_ref())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn snapshot_shows_room_events_in_order() {
+        use matrix_sdk::ruma::{events::room::member::MembershipState, RoomVersionId};
+        use matrix_sdk_test::event_factory::PreviousMembership;
+
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let own = client.user_id().unwrap().to_owned();
+        let room_id = room_id!("!a:b.c");
+        let bob = user_id!("@bob:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.create(&own, RoomVersionId::V11))
+                    .add_timeline_event(f.member(&own))
+                    .add_timeline_event(f.default_power_levels().sender(&own))
+                    .add_timeline_event(f.member(bob).sender(&own).invited(bob).display_name("Bob"))
+                    .add_timeline_event(
+                        f.member(bob)
+                            .display_name("Bob")
+                            .previous(MembershipState::Invite),
+                    )
+                    .add_timeline_event(f.room_name("Sala").sender(&own))
+                    .add_timeline_event(f.room_topic("").sender(bob))
+                    .add_timeline_event(f.room_encryption().sender(&own))
+                    .add_timeline_event(f.member(bob).display_name("Roberto").previous(
+                        PreviousMembership::new(MembershipState::Join).display_name("Bob"),
+                    )),
+            )
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+
+        let current = wait_for(&handle, |s| room_events(s).len() >= 8).await;
+
+        let events: Vec<_> = room_events(&current)
+            .iter()
+            .map(|e| {
+                (
+                    e.kind,
+                    e.is_own,
+                    e.target_name.as_deref(),
+                    e.target_is_own,
+                    e.value.as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            events,
+            vec![
+                (RoomEventKind::Created, true, None, false, None),
+                (RoomEventKind::Joined, true, None, false, None),
+                (RoomEventKind::Invited, true, Some("Bob"), false, None),
+                (RoomEventKind::Joined, false, None, false, None),
+                (RoomEventKind::NameChanged, true, None, false, Some("Sala")),
+                (RoomEventKind::TopicChanged, false, None, false, None),
+                (RoomEventKind::EncryptionEnabled, true, None, false, None),
+                (
+                    RoomEventKind::DisplayNameChanged,
+                    false,
+                    Some("Bob"),
+                    false,
+                    Some("Roberto")
+                ),
+            ]
+        );
+        assert!(room_events(&current)
+            .iter()
+            .filter(|e| !e.is_own)
+            .all(|e| e.sender_name == "Roberto"));
+    }
+
+    #[tokio::test]
+    async fn day_with_only_ignored_room_events_has_no_divider() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let bob = user_id!("@bob:b.c");
+        let f = EventFactory::new().room(room_id);
+        let day = 86_400_000_u64;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.default_power_levels().sender(bob).server_ts(day))
+                    .add_timeline_event(f.room_name("Sala").sender(bob).server_ts(3 * day)),
+            )
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+
+        let current = wait_for(&handle, |s| !room_events(s).is_empty()).await;
+
+        assert_eq!(current.items.len(), 2, "{current:#?}");
+        assert!(current.items[0].date_divider_ms.is_some());
+        assert_eq!(
+            current.items[1].room_event.as_ref().map(|e| e.kind),
+            Some(RoomEventKind::NameChanged)
+        );
     }
 }

@@ -47,6 +47,17 @@ String readByLabel(List<String> names) {
   return '✓✓ Lida por $joined';
 }
 
+String typingLabel(List<String> names) {
+  final first = names.map(_firstName).toList();
+  return switch (first) {
+    [] => '',
+    [final one] => '$one está digitando…',
+    [final a, final b] => '$a e $b estão digitando…',
+    [final a, final b, final c] => '$a, $b e $c estão digitando…',
+    _ => 'Várias pessoas estão digitando…',
+  };
+}
+
 String repliesLabel(int count) =>
     '$count ${count == 1 ? 'resposta' : 'respostas'}';
 

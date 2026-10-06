@@ -55,6 +55,13 @@ class _MatrixConversation implements Conversation {
   Future<void> markAsRead() => _run(_timeline.markAsRead);
 
   @override
+  Stream<List<String>> get typing => _timeline.watchTyping();
+
+  @override
+  Future<void> setTyping(bool typing) =>
+      _run(() => _timeline.setTyping(typing: typing));
+
+  @override
   Future<Result<Conversation>> openThread(String rootEventId) => _run(
     () async => _MatrixConversation(
       await _timeline.openThread(rootEventId: rootEventId),
@@ -96,11 +103,38 @@ ConversationSnapshot _toSnapshot(bridge.TimelineSnapshot snapshot) =>
           if (entry.dateDividerMs case final ms?)
             DateDividerItem(DateTime.fromMillisecondsSinceEpoch(ms))
           else if (entry.message case final message?)
-            _toMessage(message),
+            _toMessage(message)
+          else if (entry.roomEvent case final event?)
+            _toRoomEvent(event),
       ],
       reachedStart: snapshot.reachedStart,
       paginating: snapshot.paginating,
     );
+
+RoomEventItem _toRoomEvent(bridge.RoomEvent event) => RoomEventItem(
+  id: event.id,
+  senderName: event.senderName,
+  isOwn: event.isOwn,
+  timestamp: DateTime.fromMillisecondsSinceEpoch(event.timestampMs),
+  kind: switch (event.kind) {
+    bridge.RoomEventKind.created => RoomEventKind.created,
+    bridge.RoomEventKind.joined => RoomEventKind.joined,
+    bridge.RoomEventKind.left => RoomEventKind.left,
+    bridge.RoomEventKind.invited => RoomEventKind.invited,
+    bridge.RoomEventKind.inviteDeclined => RoomEventKind.inviteDeclined,
+    bridge.RoomEventKind.kicked => RoomEventKind.kicked,
+    bridge.RoomEventKind.banned => RoomEventKind.banned,
+    bridge.RoomEventKind.unbanned => RoomEventKind.unbanned,
+    bridge.RoomEventKind.nameChanged => RoomEventKind.nameChanged,
+    bridge.RoomEventKind.topicChanged => RoomEventKind.topicChanged,
+    bridge.RoomEventKind.avatarChanged => RoomEventKind.avatarChanged,
+    bridge.RoomEventKind.encryptionEnabled => RoomEventKind.encryptionEnabled,
+    bridge.RoomEventKind.displayNameChanged => RoomEventKind.displayNameChanged,
+  },
+  targetName: event.targetName,
+  targetIsOwn: event.targetIsOwn,
+  value: event.value,
+);
 
 MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
   id: message.id,
