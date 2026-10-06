@@ -149,12 +149,18 @@ final class MessageItem extends TimelineItem {
 }
 
 class ConversationSnapshot extends Equatable {
-  const ConversationSnapshot({required this.items, required this.reachedStart});
+  const ConversationSnapshot({
+    required this.items,
+    required this.reachedStart,
+    this.paginating = false,
+  });
 
   final List<TimelineItem> items;
 
   final bool reachedStart;
 
+  final bool paginating;
+
   @override
-  List<Object?> get props => [items, reachedStart];
+  List<Object?> get props => [items, reachedStart, paginating];
 }

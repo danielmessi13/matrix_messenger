@@ -2,6 +2,8 @@
 pub struct TimelineSnapshot {
     pub items: Vec<TimelineEntry>,
     pub reached_start: bool,
+    // Vem do status de paginação do SDK; sempre false na thread.
+    pub paginating: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -146,11 +148,15 @@ impl Drop for RoomTimeline {
 
 impl RoomTimeline {
     pub(crate) fn new(handle: TimelineHandle) -> Self {
-        Self { handle: ManuallyDrop::new(handle), runtime: Handle::current() }
+        Self {
+            handle: ManuallyDrop::new(handle),
+            runtime: Handle::current(),
+        }
     }
 
     pub fn watch(&self, sink: StreamSink<TimelineSnapshot>) {
-        self.handle.watch(move |snapshot| sink.add(snapshot).is_ok());
+        self.handle
+            .watch(move |snapshot| sink.add(snapshot).is_ok());
     }
 
     pub async fn paginate_backwards(&self) -> Result<bool, TimelineError> {
@@ -187,7 +193,9 @@ impl MatrixClient {
         let room = self
             .find_room(&room_id)
             .ok_or_else(|| TimelineError::new(TimelineErrorKind::RoomNotFound, room_id))?;
-        let handle = TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone()).await?;
+        let handle =
+            TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone())
+                .await?;
         Ok(RoomTimeline::new(handle))
     }
 }
@@ -209,7 +217,11 @@ mod tests {
         );
 
         for room_id in ["!naoexiste:b.c", "isto não é um id"] {
-            let error = client.open_timeline(room_id.to_owned()).await.err().unwrap();
+            let error = client
+                .open_timeline(room_id.to_owned())
+                .await
+                .err()
+                .unwrap();
             assert_eq!(error.kind, TimelineErrorKind::RoomNotFound, "{room_id}");
         }
     }
@@ -227,12 +239,17 @@ mod tests {
         .await
         .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
         let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
-        client.room_sync().watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
+        client
+            .room_sync()
+            .watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
         let rooms = tokio::time::timeout(Duration::from_secs(60), rooms_rx.recv())
             .await
             .expect("lista em até 60 s")
             .expect("sync encerrado");
-        let room = rooms.iter().find(|room| !room.is_invite).expect("uma sala na conta");
+        let room = rooms
+            .iter()
+            .find(|room| !room.is_invite)
+            .expect("uma sala na conta");
 
         let timeline = client.open_timeline(room.id.clone()).await.unwrap();
         timeline
@@ -241,21 +258,32 @@ mod tests {
             .await
             .unwrap();
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        timeline.handle.watch(move |snapshot| tx.send(snapshot).is_ok());
+        timeline
+            .handle
+            .watch(move |snapshot| tx.send(snapshot).is_ok());
         loop {
             let snapshot = tokio::time::timeout(Duration::from_secs(30), rx.recv())
                 .await
                 .expect("snapshot em até 30 s")
                 .expect("timeline encerrada");
-            let sent = snapshot.items.iter().filter_map(|entry| entry.message.as_ref()).any(|m| {
-                m.is_own && m.send_state == SendState::Sent && m.body.as_deref() == Some("teste do **matrix_messenger**")
-            });
+            let sent = snapshot
+                .items
+                .iter()
+                .filter_map(|entry| entry.message.as_ref())
+                .any(|m| {
+                    m.is_own
+                        && m.send_state == SendState::Sent
+                        && m.body.as_deref() == Some("teste do **matrix_messenger**")
+                });
             if sent {
                 break;
             }
         }
 
         drop(timeline);
-        client.logout().await.unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
+        client
+            .logout()
+            .await
+            .unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
     }
 }

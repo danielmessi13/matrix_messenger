@@ -26,6 +26,9 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   String? _latestMessageId;
 
+  // Repetições da rolagem antes de o snapshot dizer que está paginando.
+  bool _loadingOlder = false;
+
   // isClosed só vira true no fim do close(); durante os awaits dele, um open() em andamento ainda passaria na checagem.
   bool _closing = false;
 
@@ -65,24 +68,36 @@ class ConversationViewModel extends Cubit<ConversationState> {
     }
   }
 
-  Future<void> loadOlder() async {
+  // True quando a busca rodou sem chegar ao início: uma página só de eventos ocultos não muda o estado, então quem chamou reavalia.
+  Future<bool> loadOlder() async {
     final conversation = _conversation;
     if (conversation == null ||
-        state.loadingOlder ||
+        _loadingOlder ||
+        state.paginating ||
         state.reachedStart ||
         state.status != ConversationStatus.ready) {
-      return;
+      return false;
     }
-    emit(state.copyWith(loadingOlder: true));
-    final result = await conversation.loadOlder();
-    if (isClosed) return;
-    final reached = result is Ok<bool> && result.value;
-    emit(
-      state.copyWith(
-        loadingOlder: false,
-        reachedStart: state.reachedStart || reached,
-      ),
-    );
+    _loadingOlder = true;
+    try {
+      final result = await conversation.loadOlder();
+      if (_closing || isClosed) return false;
+      switch (result) {
+        case Ok(:final value):
+          emit(
+            state.copyWith(
+              olderFailed: false,
+              reachedStart: state.reachedStart || value,
+            ),
+          );
+          return !value;
+        case Error():
+          emit(state.copyWith(olderFailed: true));
+          return false;
+      }
+    } finally {
+      _loadingOlder = false;
+    }
   }
 
   Future<bool> send(String text) async {
@@ -129,13 +144,32 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   void cancelReply() => emit(state.copyWith(replyTo: null));
 
+  // Cada rodada do goTo só termina com a página no estado (paginação parada).
+  Future<void> _loadOlderSettled() async {
+    // Se esperou a busca em andamento, o searchMessage reconfere antes de pedir mais.
+    if (state.paginating) return _untilIdle((_) => true);
+    final before = state.items;
+    await loadOlder();
+    if (state.reachedStart) return;
+    await _untilIdle((s) => !identical(s.items, before));
+  }
+
+  Future<void> _untilIdle(bool Function(ConversationState s) accept) async {
+    bool ready(ConversationState s) => !s.paginating && accept(s);
+    if (ready(state)) return;
+    await stream
+        .firstWhere(ready)
+        .timeout(kSnapshotWait, onTimeout: () => state)
+        .then((_) {}, onError: (Object _) {});
+  }
+
   Future<void> goTo(String eventId) async {
     final id = await searchMessage(
       this,
       eventId: eventId,
       items: (s) => s.items,
       reachedStart: (s) => s.reachedStart,
-      loadOlder: loadOlder,
+      loadOlder: _loadOlderSettled,
     );
     if (_closing || isClosed) return;
     emit(state.copyWith(focusRequest: FocusRequest(id, ++_focusSeq)));
@@ -167,6 +201,7 @@ class ConversationViewModel extends Cubit<ConversationState> {
         status: ConversationStatus.ready,
         items: snapshot.items,
         reachedStart: snapshot.reachedStart,
+        paginating: snapshot.paginating,
       ),
     );
     final latest = snapshot.items.whereType<MessageItem>().lastOrNull;

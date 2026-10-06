@@ -99,6 +99,7 @@ ConversationSnapshot _toSnapshot(bridge.TimelineSnapshot snapshot) =>
             _toMessage(message),
       ],
       reachedStart: snapshot.reachedStart,
+      paginating: snapshot.paginating,
     );
 
 MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(

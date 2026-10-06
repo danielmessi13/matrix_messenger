@@ -13,7 +13,8 @@ class FakeConversation implements Conversation {
 
   int listens = 0;
 
-  Result<bool> loadOlderResult = const Result.ok(false);
+  // Chega ao início por padrão, para a tela não pedir páginas sem fim.
+  Result<bool> loadOlderResult = const Result.ok(true);
   Completer<void>? loadOlderCompleter;
   int loadOlderCalls = 0;
   Result<void> sendResult = const Result.ok(null);

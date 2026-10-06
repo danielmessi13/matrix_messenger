@@ -108,18 +108,56 @@ void main() {
 
     final first = viewModel.loadOlder();
     final second = viewModel.loadOlder();
-    expect(viewModel.state.loadingOlder, isTrue);
     completer.complete();
     await Future.wait([first, second]);
     await viewModel.loadOlder();
 
     expect(conversation.loadOlderCalls, 1);
-    expect(viewModel.state.loadingOlder, isFalse);
     expect(viewModel.state.reachedStart, isTrue);
     await viewModel.close();
   });
 
-  test('loadOlder com falha desliga o indicador', () async {
+  test('loadOlder diz se vale pedir de novo', () async {
+    final viewModel = build();
+    expect(await viewModel.loadOlder(), isFalse);
+    await viewModel.open();
+    conversation.snapshots.add(kSnapshot);
+    await flush();
+
+    conversation.loadOlderResult = const Result.ok(false);
+    expect(await viewModel.loadOlder(), isTrue);
+    conversation.loadOlderResult = const Result.error(
+      FakeConversationRepository.notFound,
+    );
+    expect(await viewModel.loadOlder(), isFalse);
+    conversation.loadOlderResult = const Result.ok(true);
+    expect(await viewModel.loadOlder(), isFalse);
+    expect(await viewModel.loadOlder(), isFalse);
+
+    expect(conversation.loadOlderCalls, 3);
+    await viewModel.close();
+  });
+
+  test('loadOlder durante a paginação é ignorado', () async {
+    final viewModel = build();
+    await viewModel.open();
+    conversation.snapshots.add(
+      ConversationSnapshot(
+        items: kSnapshot.items,
+        reachedStart: false,
+        paginating: true,
+      ),
+    );
+    await flush();
+
+    await viewModel.loadOlder();
+
+    expect(conversation.loadOlderCalls, 0);
+    expect(viewModel.state.paginating, isTrue);
+    await viewModel.close();
+  });
+
+  test('falha no loadOlder liga olderFailed e o sucesso desliga', () async {
     final viewModel = build();
     await viewModel.open();
     conversation.snapshots.add(kSnapshot);
@@ -130,8 +168,12 @@ void main() {
 
     await viewModel.loadOlder();
 
-    expect(viewModel.state.loadingOlder, isFalse);
+    expect(viewModel.state.olderFailed, isTrue);
     expect(viewModel.state.reachedStart, isFalse);
+    conversation.loadOlderResult = const Result.ok(false);
+    await viewModel.loadOlder();
+    expect(viewModel.state.olderFailed, isFalse);
+    expect(conversation.loadOlderCalls, 2);
     await viewModel.close();
   });
 
@@ -300,6 +342,101 @@ void main() {
 
     expect(conversation.loadOlderCalls, greaterThanOrEqualTo(1));
     expect(viewModel.state.focusRequest?.messageId, isNull);
+  });
+
+  MessageItem messageWith(String id) => MessageItem(
+    id: id,
+    eventId: id,
+    senderId: '@diego:matrix.org',
+    senderName: 'Diego Alves',
+    isOwn: false,
+    timestamp: DateTime(2026, 10, 3),
+    kind: MessageKind.text,
+    body: id,
+  );
+
+  test(
+    'goTo acha citação 2 páginas atrás com a página depois da busca',
+    () async {
+      final viewModel = await ready();
+      conversation.loadOlderResult = const Result.ok(false);
+      final loaded = <TimelineItem>[...kSnapshot.items];
+      void push(bool paginating, List<TimelineItem> items) =>
+          conversation.snapshots.add(
+            ConversationSnapshot(
+              items: List.of(items),
+              reachedStart: false,
+              paginating: paginating,
+            ),
+          );
+      conversation.onLoadOlder = () {
+        push(true, loaded);
+        final page = conversation.loadOlderCalls == 1
+            ? messageWith('\$p1')
+            : messageWith('\$alvo');
+        loaded.insert(0, page);
+        Future<void>.delayed(
+          Duration.zero,
+          () => push(false, loaded),
+        );
+      };
+
+      await viewModel.goTo('\$alvo');
+
+      expect(viewModel.state.focusRequest?.messageId, isNotNull);
+      expect(conversation.loadOlderCalls, 2);
+      await viewModel.close();
+    },
+  );
+
+  test(
+    'goTo durante a paginação espera ela parar sem chamar loadOlder',
+    () async {
+      final viewModel = build();
+      await viewModel.open();
+      conversation.snapshots.add(
+        ConversationSnapshot(
+          items: kSnapshot.items,
+          reachedStart: false,
+          paginating: true,
+        ),
+      );
+      await flush();
+      Timer(const Duration(milliseconds: 50), () {
+        conversation.snapshots.add(
+          ConversationSnapshot(
+            items: [messageWith('\$alvo'), ...kSnapshot.items],
+            reachedStart: false,
+          ),
+        );
+      });
+
+      await viewModel.goTo('\$alvo');
+
+      expect(viewModel.state.focusRequest?.messageId, isNotNull);
+      expect(conversation.loadOlderCalls, 0);
+      await viewModel.close();
+    },
+  );
+
+  test('o estado copia paginating de cada snapshot', () async {
+    final viewModel = await ready();
+    conversation.snapshots.add(
+      ConversationSnapshot(
+        items: kSnapshot.items,
+        reachedStart: false,
+        paginating: true,
+      ),
+    );
+    await flush();
+    expect(viewModel.state.paginating, isTrue);
+
+    conversation.snapshots.add(
+      ConversationSnapshot(items: kSnapshot.items, reachedStart: false),
+    );
+    await flush();
+    expect(viewModel.state.paginating, isFalse);
+    await viewModel.close();
   });
 
   test(

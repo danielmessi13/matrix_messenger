@@ -12,7 +12,8 @@ final class ConversationState extends Equatable {
     this.status = ConversationStatus.opening,
     this.items = const [],
     this.reachedStart = false,
-    this.loadingOlder = false,
+    this.paginating = false,
+    this.olderFailed = false,
     this.openThreadId,
     this.replyTo,
     this.focusRequest,
@@ -24,7 +25,10 @@ final class ConversationState extends Equatable {
 
   final bool reachedStart;
 
-  final bool loadingOlder;
+  final bool paginating;
+
+  // Falha não se repete sozinha; só o botão pede de novo.
+  final bool olderFailed;
 
   final String? openThreadId;
 
@@ -37,7 +41,8 @@ final class ConversationState extends Equatable {
     ConversationStatus? status,
     List<TimelineItem>? items,
     bool? reachedStart,
-    bool? loadingOlder,
+    bool? paginating,
+    bool? olderFailed,
     Object? openThreadId = _unset,
     Object? replyTo = _unset,
     FocusRequest? focusRequest,
@@ -45,7 +50,8 @@ final class ConversationState extends Equatable {
     status: status ?? this.status,
     items: items ?? this.items,
     reachedStart: reachedStart ?? this.reachedStart,
-    loadingOlder: loadingOlder ?? this.loadingOlder,
+    paginating: paginating ?? this.paginating,
+    olderFailed: olderFailed ?? this.olderFailed,
     openThreadId: identical(openThreadId, _unset)
         ? this.openThreadId
         : openThreadId as String?,
@@ -60,7 +66,8 @@ final class ConversationState extends Equatable {
     status,
     items,
     reachedStart,
-    loadingOlder,
+    paginating,
+    olderFailed,
     openThreadId,
     replyTo,
     focusRequest,

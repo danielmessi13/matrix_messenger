@@ -250,14 +250,17 @@ class TimelineMessage {
 class TimelineSnapshot {
   final List<TimelineEntry> items;
   final bool reachedStart;
+  final bool paginating;
 
   const TimelineSnapshot({
     required this.items,
     required this.reachedStart,
+    required this.paginating,
   });
 
   @override
-  int get hashCode => items.hashCode ^ reachedStart.hashCode;
+  int get hashCode =>
+      items.hashCode ^ reachedStart.hashCode ^ paginating.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -265,5 +268,6 @@ class TimelineSnapshot {
       other is TimelineSnapshot &&
           runtimeType == other.runtimeType &&
           items == other.items &&
-          reachedStart == other.reachedStart;
+          reachedStart == other.reachedStart &&
+          paginating == other.paginating;
 }

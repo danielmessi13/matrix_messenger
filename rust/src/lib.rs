@@ -7,7 +7,7 @@ mod frb_generated;
 mod oidc_callback;
 mod room_list;
 mod session_store;
-mod threads;
-mod timeline;
 #[cfg(test)]
 mod test_support;
+mod threads;
+mod timeline;

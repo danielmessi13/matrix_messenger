@@ -78,6 +78,7 @@ void main() {
           ),
         ],
         reachedStart: true,
+        paginating: false,
       ),
     );
 
@@ -135,6 +136,7 @@ void main() {
             ),
         ],
         reachedStart: false,
+        paginating: false,
       ),
     );
 
@@ -162,6 +164,7 @@ void main() {
             ),
         ],
         reachedStart: false,
+        paginating: false,
       ),
     );
 
@@ -210,6 +213,22 @@ void main() {
         ConversationFailureType.network,
       ),
     );
+  });
+
+  test('converte o estado da paginação', () async {
+    final conversation = await open();
+    final received = conversation.updates.take(2).toList();
+    for (final paginating in [false, true]) {
+      timeline.snapshots.add(
+        bridge.TimelineSnapshot(
+          items: const [],
+          reachedStart: false,
+          paginating: paginating,
+        ),
+      );
+    }
+
+    expect((await received).map((s) => s.paginating), [false, true]);
   });
 
   test('falha ao abrir vira ConversationFailure', () async {

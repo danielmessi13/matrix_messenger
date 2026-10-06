@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme.dart';
@@ -12,6 +10,7 @@ import 'message_labels.dart';
 import 'message_tile.dart';
 import 'thread_section.dart';
 
+// Distância do topo (em px) a partir da qual já pede mensagens antigas, antes de o usuário chegar lá.
 const _loadOlderThreshold = 400.0;
 
 // Distância do fim (em px) a partir da qual o usuário está lendo mensagens antigas.
@@ -43,55 +42,38 @@ class _TimelineViewState extends State<TimelineView>
 
   bool _unseenNewer = false;
 
-  bool _itemsChangedWhileLoading = false;
-
-  // Enquanto o app completa a tela sozinho, o topo não mostra botão nem spinner.
-  bool _autoFilling = true;
-
-  Timer? _settleTimer;
-
   MessageItem? _replyNotice;
 
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fillShortHistory());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadOlderIfNeeded());
   }
 
   @override
   void didUpdateWidget(TimelineView old) {
     super.didUpdateWidget(old);
+    final state = widget.state;
+    if (state.items != old.state.items ||
+        state.paginating != old.state.paginating ||
+        state.reachedStart != old.state.reachedStart) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _loadOlderIfNeeded(),
+      );
+    }
     final request = widget.state.focusRequest;
     if (request != null && request != old.state.focusRequest) focusOn(request);
     pruneKeys(widget.state.items.whereType<MessageItem>().map((m) => m.id));
-    final items = widget.state.items;
     // A lista some no estado vazio; quando volta, recomeça no fim.
     if (!_scroll.hasClients) {
       _awayFromLatest = false;
       _unseenNewer = false;
       _replyNotice = null;
     }
-    if (_awayFromLatest && items.lastOrNull != old.state.items.lastOrNull) {
+    if (_awayFromLatest &&
+        widget.state.items.lastOrNull != old.state.items.lastOrNull) {
       _onNewerItems(old);
-    }
-    final state = widget.state;
-    var fill = false;
-    if (items != old.state.items) {
-      if (state.loadingOlder) {
-        _itemsChangedWhileLoading = true;
-      } else {
-        fill = true;
-      }
-    }
-    if (old.state.loadingOlder &&
-        !state.loadingOlder &&
-        _itemsChangedWhileLoading) {
-      fill = true;
-    }
-    if (!state.loadingOlder) _itemsChangedWhileLoading = false;
-    if (fill) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _fillShortHistory());
     }
   }
 
@@ -126,47 +108,29 @@ class _TimelineViewState extends State<TimelineView>
     });
   }
 
-  void _fillShortHistory() {
-    final state = widget.state;
-    if (!mounted || !_scroll.hasClients || state.loadingOlder) return;
-    if (!state.reachedStart &&
-        _scroll.position.maxScrollExtent < _loadOlderThreshold) {
-      _settleTimer?.cancel();
-      _autoFilling = true;
-      widget.viewModel.loadOlder().whenComplete(_settleAutoFill);
-    } else {
-      _settleTimer?.cancel();
-      if (_autoFilling) setState(() => _autoFilling = false);
-    }
-  }
-
-  // A página nova chega depois da busca, pela janela da ponte; se nada chegar (ou a busca falhar), o botão volta.
-  void _settleAutoFill() {
-    _settleTimer?.cancel();
-    _settleTimer = Timer(kLoadingIndicatorDelay, () {
-      if (mounted && _autoFilling && !widget.state.loadingOlder) {
-        setState(() => _autoFilling = false);
-      }
-    });
-  }
-
-  void _loadOlderByUser() {
-    _autoFilling = false;
-    widget.viewModel.loadOlder();
-  }
-
   @override
   void dispose() {
-    _settleTimer?.cancel();
     _scroll.dispose();
     super.dispose();
   }
 
-  void _onScroll() {
-    final position = _scroll.position;
-    if (position.maxScrollExtent - position.pixels < _loadOlderThreshold) {
-      _loadOlderByUser();
+  // Reavaliado a cada mudança: enche a tela e atravessa páginas só de eventos escondidos, como no Element X.
+  Future<void> _loadOlderIfNeeded() async {
+    if (!mounted) return;
+    final state = widget.state;
+    if (state.paginating || state.reachedStart || state.olderFailed) return;
+    final nearTop = _scroll.hasClients
+        ? _scroll.position.maxScrollExtent - _scroll.position.pixels <
+              _loadOlderThreshold
+        : state.items.isEmpty;
+    if (nearTop && await widget.viewModel.loadOlder() && mounted) {
+      await _loadOlderIfNeeded();
     }
+  }
+
+  void _onScroll() {
+    _loadOlderIfNeeded();
+    final position = _scroll.position;
     final away = position.pixels > _awayFromLatestOffset;
     if (away != _awayFromLatest) {
       setState(() {
@@ -211,8 +175,9 @@ class _TimelineViewState extends State<TimelineView>
             children: [
               _TimelineTop(
                 state: widget.state,
-                autoFilling: _autoFilling,
-                onLoadOlder: _loadOlderByUser,
+                scrollable:
+                    _scroll.hasClients && _scroll.position.maxScrollExtent > 0,
+                onLoadOlder: widget.viewModel.loadOlder,
               ),
               for (final item in items)
                 Center(
@@ -237,15 +202,15 @@ class _TimelineViewState extends State<TimelineView>
             ],
           ),
         ),
-        if (items.isEmpty &&
-            !widget.state.reachedStart &&
-            (widget.state.loadingOlder || _autoFilling))
-          const Center(
-            child: DelayedIndicator(
-              child: CircularProgressIndicator(
-                key: Key('timeline_loading_center'),
-              ),
-            ),
+        if (items.isEmpty && !widget.state.reachedStart)
+          Center(
+            child: widget.state.olderFailed
+                ? _LoadOlderButton(onPressed: widget.viewModel.loadOlder)
+                : const DelayedIndicator(
+                    child: CircularProgressIndicator(
+                      key: Key('timeline_loading_center'),
+                    ),
+                  ),
           ),
         if (_unseenNewer)
           Positioned(
@@ -283,43 +248,26 @@ class _TimelineViewState extends State<TimelineView>
 class _TimelineTop extends StatelessWidget {
   const _TimelineTop({
     required this.state,
-    required this.autoFilling,
+    required this.scrollable,
     required this.onLoadOlder,
   });
 
   final ConversationState state;
 
-  final bool autoFilling;
+  // Enquanto a lista não rola, a busca está só enchendo a tela ao abrir.
+  final bool scrollable;
 
   final VoidCallback onLoadOlder;
 
   @override
-  Widget build(BuildContext context) {
-    if (state.reachedStart) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Center(
-          child: Text(
-            'Início da conversa',
-            style: _italic(context.colors, 15),
-          ),
-        ),
-      );
-    }
-    if (autoFilling) return const SizedBox.shrink();
-    if (!state.loadingOlder) {
-      return Padding(
-        padding: const EdgeInsets.all(4),
-        child: Center(
-          child: TextButton(
-            key: const Key('timeline_load_older'),
-            onPressed: onLoadOlder,
-            child: const Text('Carregar anteriores'),
-          ),
-        ),
-      );
-    }
-    return const Padding(
+  Widget build(BuildContext context) => switch (state) {
+    ConversationState(reachedStart: true) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Center(
+        child: Text('Início da conversa', style: _italic(context.colors, 15)),
+      ),
+    ),
+    ConversationState(paginating: true) when scrollable => const Padding(
       padding: EdgeInsets.all(12),
       child: Center(
         child: DelayedIndicator(
@@ -330,8 +278,27 @@ class _TimelineTop extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+    // Com a lista vazia, o botão fica no centro.
+    ConversationState(olderFailed: true) when state.items.isNotEmpty => Padding(
+      padding: const EdgeInsets.all(4),
+      child: Center(child: _LoadOlderButton(onPressed: onLoadOlder)),
+    ),
+    _ => const SizedBox.shrink(),
+  };
+}
+
+class _LoadOlderButton extends StatelessWidget {
+  const _LoadOlderButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    key: const Key('timeline_load_older'),
+    onPressed: onPressed,
+    child: const Text('Carregar anteriores'),
+  );
 }
 
 class _TimelineEntry extends StatelessWidget {
