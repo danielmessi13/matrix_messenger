@@ -23,6 +23,16 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.icon,
     required this.accent,
     required this.accentHover,
+    required this.accentPressed,
+    required this.accentHighlight,
+    required this.onAccent,
+    required this.dialogBorder,
+    required this.chip,
+    required this.danger,
+    required this.dangerSurface,
+    required this.dangerText,
+    required this.warning,
+    required this.warningText,
     required this.selectedRow,
     required this.hoverRow,
     required this.activeFilter,
@@ -43,7 +53,17 @@ class AppColors extends ThemeExtension<AppColors> {
     textMuted: Color(0xFF857F73),
     icon: Color(0xFFB3AC9F),
     accent: Color(0xFFE4896A),
-    accentHover: Color(0xFFF99C7C),
+    accentHover: Color(0xFFF59979),
+    accentPressed: Color(0xFFD37A5B),
+    accentHighlight: Color(0xFFFCAE93),
+    onAccent: Color(0xFF16110B),
+    dialogBorder: Color(0xFF3A3730),
+    chip: Color(0xFF2E2B25),
+    danger: Color(0xFFCA5551),
+    dangerSurface: Color(0xFF4F1A18),
+    dangerText: Color(0xFFF3C9BD),
+    warning: Color(0xFFD49648),
+    warningText: Color(0xFFE8AA4E),
     selectedRow: Color(0xFF201E1A),
     hoverRow: Color(0xFF1C1A17),
     activeFilter: Color(0xFF24221D),
@@ -64,6 +84,16 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color icon;
   final Color accent;
   final Color accentHover;
+  final Color accentPressed;
+  final Color accentHighlight;
+  final Color onAccent;
+  final Color dialogBorder;
+  final Color chip;
+  final Color danger;
+  final Color dangerSurface;
+  final Color dangerText;
+  final Color warning;
+  final Color warningText;
   final Color selectedRow;
   final Color hoverRow;
   final Color activeFilter;

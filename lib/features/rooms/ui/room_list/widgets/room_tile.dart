@@ -9,6 +9,7 @@ class RoomTile extends StatelessWidget {
     super.key,
     required this.room,
     required this.selected,
+    required this.unread,
     required this.now,
     required this.onTap,
   });
@@ -17,6 +18,8 @@ class RoomTile extends StatelessWidget {
 
   final bool selected;
 
+  final int unread;
+
   final DateTime now;
 
   final VoidCallback onTap;
@@ -24,7 +27,8 @@ class RoomTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final latest = room.latest;
+    final preview = latestPreview(room);
+    final title = _TitleRow(room: room, unread: unread, now: now);
     return Material(
       color: selected ? colors.selectedRow : Colors.transparent,
       child: InkWell(
@@ -42,57 +46,120 @@ class RoomTile extends StatelessWidget {
               bottom: BorderSide(color: colors.rowDivider),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Expanded(
-                    child: Text(
-                      roomListLabel(room),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppFonts.serif,
-                        fontSize: 21,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (room.unreadMessages > 0) ...[
-                    Text(
-                      unreadLabel(room.unreadMessages),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colors.accent,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
+          child: preview.isNotEmpty
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    title,
+                    const SizedBox(height: 4),
+                    _PreviewLine(preview: preview),
                   ],
-                  if (room.isInvite)
-                    const _InviteTag()
-                  else if (latest != null)
-                    Text(
-                      formatRoomTime(latest.timestamp, now),
-                      style: TextStyle(fontSize: 12.5, color: colors.textMuted),
+                )
+              : Stack(
+                  alignment: AlignmentDirectional.centerStart,
+                  children: [
+                    // Reserva a altura das duas linhas para igualar o tile com prévia.
+                    const Visibility(
+                      visible: false,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _RoomName(label: ' '),
+                          SizedBox(height: 4),
+                          _PreviewLine(preview: ' '),
+                        ],
+                      ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                latestPreview(room),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, color: colors.textSecondary),
-              ),
-            ],
-          ),
+                    title,
+                  ],
+                ),
         ),
       ),
+    );
+  }
+}
+
+class _RoomName extends StatelessWidget {
+  const _RoomName({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontFamily: AppFonts.serif,
+        fontSize: 21,
+        color: context.colors.textPrimary,
+      ),
+    );
+  }
+}
+
+class _TitleRow extends StatelessWidget {
+  const _TitleRow({
+    required this.room,
+    required this.unread,
+    required this.now,
+  });
+
+  final Room room;
+
+  final int unread;
+
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final latest = room.latest;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(child: _RoomName(label: roomListLabel(room))),
+        const SizedBox(width: 10),
+        if (unread > 0) ...[
+          Text(
+            unreadLabel(unread),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.accent,
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+        if (room.isInvite)
+          const _InviteTag()
+        else if (latest != null)
+          Text(
+            formatRoomTime(latest.timestamp, now),
+            style: TextStyle(fontSize: 12.5, color: colors.textMuted),
+          ),
+      ],
+    );
+  }
+}
+
+class _PreviewLine extends StatelessWidget {
+  const _PreviewLine({required this.preview});
+
+  final String preview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      preview,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
     );
   }
 }

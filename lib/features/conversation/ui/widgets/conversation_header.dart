@@ -2,16 +2,27 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme.dart';
 import '../../../rooms/domain/models/room.dart';
+import '../../../rooms/ui/invite_room/widgets/invite_room_button.dart';
+import '../../../rooms/ui/leave_room/widgets/leave_room_button.dart';
+import '../../../rooms/ui/room_link/widgets/copy_room_link_button.dart';
 import '../../../rooms/ui/room_list/widgets/room_labels.dart';
 
 class ConversationHeader extends StatelessWidget {
-  const ConversationHeader({super.key, required this.room});
+  const ConversationHeader({
+    super.key,
+    required this.room,
+    required this.ownUserId,
+  });
 
   final Room room;
+
+  final String ownUserId;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final canCopyLink = room.isPublic && !room.isDirect;
+    final isJoinedRoom = !room.isInvite && !room.isDirect;
     return Container(
       padding: const EdgeInsets.fromLTRB(40, 32, 40, 20),
       decoration: BoxDecoration(
@@ -52,6 +63,33 @@ class ConversationHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 24),
+              if (canCopyLink || isJoinedRoom) ...[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: 4,
+                  children: [
+                    if (canCopyLink)
+                      CopyRoomLinkButton(
+                        key: ValueKey(room.id),
+                        roomId: room.id,
+                      ),
+                    if (isJoinedRoom) ...[
+                      InviteRoomButton(
+                        key: ValueKey('invite_${room.id}'),
+                        roomId: room.id,
+                        roomName: roomTitle(room),
+                        ownUserId: ownUserId,
+                      ),
+                      LeaveRoomButton(
+                        key: ValueKey('leave_${room.id}'),
+                        roomId: room.id,
+                        roomName: roomTitle(room),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(width: 12),
+              ],
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

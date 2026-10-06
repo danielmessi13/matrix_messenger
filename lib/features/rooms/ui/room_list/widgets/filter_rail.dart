@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../app/theme.dart';
+import '../../../../../core/ui/animated_pane.dart';
 import '../../../../../core/ui/pane_toggle_button.dart';
 import '../../../domain/models/room_filter.dart';
 import 'room_labels.dart';
+
+const kFilterRailWidth = 250.0;
+
+const kFilterRailCompactWidth = 88.0;
 
 class FilterRail extends StatelessWidget {
   const FilterRail({
@@ -26,16 +31,56 @@ class FilterRail extends StatelessWidget {
   final VoidCallback onToggle;
 
   @override
+  Widget build(BuildContext context) => AnimatedPane(
+    expanded: expanded,
+    expandedWidth: kFilterRailWidth,
+    compactWidth: kFilterRailCompactWidth,
+    decoration: BoxDecoration(
+      border: Border(right: BorderSide(color: context.colors.border)),
+    ),
+    expandedChild: _RailContent(
+      expanded: true,
+      selected: selected,
+      unreadByFilter: unreadByFilter,
+      onSelect: onSelect,
+      onToggle: onToggle,
+    ),
+    compactChild: _RailContent(
+      expanded: false,
+      selected: selected,
+      unreadByFilter: unreadByFilter,
+      onSelect: onSelect,
+      onToggle: onToggle,
+    ),
+  );
+}
+
+class _RailContent extends StatelessWidget {
+  const _RailContent({
+    required this.expanded,
+    required this.selected,
+    required this.unreadByFilter,
+    required this.onSelect,
+    required this.onToggle,
+  });
+
+  final bool expanded;
+
+  final RoomFilter selected;
+
+  final Map<RoomFilter, int> unreadByFilter;
+
+  final ValueChanged<RoomFilter> onSelect;
+
+  final VoidCallback onToggle;
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
-      width: expanded ? 250 : 88,
+    return Padding(
       padding: expanded
           ? const EdgeInsets.all(20)
           : const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: colors.border)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -70,7 +115,7 @@ class FilterRail extends StatelessWidget {
               expanded: expanded,
               selected: filter == selected,
               unread: unreadByFilter[filter] ?? 0,
-              onTap: filter.enabled ? () => onSelect(filter) : null,
+              onTap: () => onSelect(filter),
             ),
           const Spacer(),
           if (!expanded)
@@ -105,32 +150,28 @@ class _FilterItem extends StatelessWidget {
 
   final int unread;
 
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final item = Opacity(
-      opacity: onTap == null ? 0.4 : 1,
-      child: Material(
-        color: selected ? colors.activeFilter : Colors.transparent,
+    final item = Material(
+      color: selected ? colors.activeFilter : Colors.transparent,
+      borderRadius: BorderRadius.circular(expanded ? 6 : 10),
+      child: InkWell(
+        key: Key('filter_${filter.name}'),
+        onTap: onTap,
+        hoverColor: colors.surface,
         borderRadius: BorderRadius.circular(expanded ? 6 : 10),
-        child: InkWell(
-          key: Key('filter_${filter.name}'),
-          onTap: onTap,
-          hoverColor: colors.surface,
-          borderRadius: BorderRadius.circular(expanded ? 6 : 10),
-          child: expanded
-              ? _WideFilterItem(filter: filter, unread: unread)
-              : _CompactFilterItem(filter: filter, unread: unread),
-        ),
+        child: expanded
+            ? _WideFilterItem(filter: filter, unread: unread)
+            : _CompactFilterItem(filter: filter, unread: unread),
       ),
     );
-    final padded = Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 2, horizontal: expanded ? 0 : 8),
       child: item,
     );
-    return onTap == null ? Tooltip(message: 'Em breve', child: padded) : padded;
   }
 }
 

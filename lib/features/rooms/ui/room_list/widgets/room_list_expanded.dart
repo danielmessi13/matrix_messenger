@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../../app/theme.dart';
 import '../../../../../core/ui/pane_toggle_button.dart';
+import '../../../domain/models/message_hit.dart';
 import '../../../domain/models/sync_state.dart';
+import '../view_models/message_search_state.dart';
 import '../view_models/room_list_state.dart';
+import 'message_results.dart';
 import 'room_labels.dart';
 import 'room_tile.dart';
 
@@ -14,6 +17,10 @@ class RoomListExpanded extends StatelessWidget {
     required this.now,
     required this.onSelect,
     required this.onToggle,
+    required this.onOpenMessage,
+    required this.onLoadMoreMessages,
+    required this.onRetryMessages,
+    this.header,
   });
 
   final RoomListState state;
@@ -24,14 +31,32 @@ class RoomListExpanded extends StatelessWidget {
 
   final VoidCallback onToggle;
 
+  final ValueChanged<MessageHit> onOpenMessage;
+
+  final VoidCallback onLoadMoreMessages;
+
+  final VoidCallback onRetryMessages;
+
+  final Widget? header;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _Header(state: state, onToggle: onToggle),
       if (_bannerText() case final text?) _SyncBanner(text: text),
+      ?header,
       Expanded(
-        child: _Body(state: state, now: now, onSelect: onSelect),
+        child: state.searching
+            ? MessageResults(
+                search: state.messages,
+                query: state.query,
+                now: now,
+                onOpen: onOpenMessage,
+                onLoadMore: onLoadMoreMessages,
+                onRetry: onRetryMessages,
+              )
+            : _Body(state: state, now: now, onSelect: onSelect),
       ),
     ],
   );
@@ -72,7 +97,7 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          if (state.loaded)
+          if (state.loaded || state.searching)
             Text(
               _subtitle(),
               style: TextStyle(fontSize: 13, color: colors.textMuted),
@@ -92,8 +117,11 @@ class _Header extends StatelessWidget {
 
   String _subtitle() {
     if (state.searching) {
-      final count = state.visibleRooms.length;
-      return '$count ${count == 1 ? 'conversa' : 'conversas'}';
+      final messages = state.messages;
+      if (messages.status != MessageSearchStatus.ready) return '';
+      final count = messages.hits.length;
+      final more = messages.hasMore ? '+' : '';
+      return '$count$more ${count == 1 && more.isEmpty ? 'mensagem' : 'mensagens'}';
     }
     final unread = state.visibleUnread;
     if (unread == 0) return 'Tudo em dia';
@@ -154,6 +182,7 @@ class _Body extends StatelessWidget {
         return RoomTile(
           room: room,
           selected: room.id == state.selectedRoomId,
+          unread: state.filter.unreadOf(room),
           now: now,
           onTap: () => onSelect(room.id),
         );

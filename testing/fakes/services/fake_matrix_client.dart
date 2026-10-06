@@ -1,8 +1,15 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
-import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/client.dart';
+import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/search.dart';
+import 'package:matrix_messenger/src/rust/api/threads.dart';
+import 'package:matrix_messenger/src/rust/api/timeline.dart';
+
+import 'fake_room_timeline.dart';
 
 class FakeMatrixClient implements MatrixClient {
   FakeMatrixClient({
@@ -48,11 +55,183 @@ class FakeMatrixClient implements MatrixClient {
   @override
   Stream<SyncStatus> watchSyncStatus() => syncStatusController.stream;
 
+  final recoveryController = StreamController<RecoveryStatus>.broadcast();
+
+  @override
+  Stream<RecoveryStatus> watchRecovery() => recoveryController.stream;
+
+  final recentThreadsController =
+      StreamController<RecentThreadsSnapshot>.broadcast();
+
+  var recentThreadsRetries = 0;
+
+  @override
+  Stream<RecentThreadsSnapshot> watchRecentThreads() =>
+      recentThreadsController.stream;
+
+  @override
+  Future<void> retryRecentThreads() async => recentThreadsRetries++;
+
+  Object? recoverError;
+
+  final recoveredWith = <String>[];
+
+  @override
+  Future<void> recover({required String recoveryKey}) async {
+    recoveredWith.add(recoveryKey);
+    if (recoverError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  String setupRecoveryKey =
+      'EsTx 1234 5678 9abc defg hijk mnop qrst uvwx yzAB CDEF GHJK';
+
+  Object? setupRecoveryError;
+
+  int setupRecoveryCalls = 0;
+
+  @override
+  Future<String> setupRecovery() async {
+    setupRecoveryCalls++;
+    if (setupRecoveryError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+    return setupRecoveryKey;
+  }
+
+  RoomTimeline? openTimelineResult;
+
+  Object? openTimelineError;
+
+  final openedRooms = <String>[];
+
+  @override
+  Future<RoomTimeline> openTimeline({required String roomId}) async {
+    openedRooms.add(roomId);
+    if (openTimelineError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+    return openTimelineResult ?? FakeRoomTimeline();
+  }
+
+  Object? inviteError;
+
+  final accepted = <String>[];
+
+  final declined = <String>[];
+
+  @override
+  Future<void> acceptInvite({required String roomId}) async {
+    accepted.add(roomId);
+    if (inviteError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  @override
+  Future<void> declineInvite({required String roomId}) async {
+    declined.add(roomId);
+    if (inviteError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  Object? roomActionError;
+
+  bool canInviteValue = false;
+
+  final leftRooms = <String>[];
+
+  final invitedUsers = <(String, String)>[];
+
+  @override
+  Future<void> leaveRoom({required String roomId}) async {
+    leftRooms.add(roomId);
+    if (roomActionError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  @override
+  Future<void> inviteUser({
+    required String roomId,
+    required String userId,
+  }) async {
+    invitedUsers.add((roomId, userId));
+    if (roomActionError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  @override
+  Future<bool> canInvite({required String roomId}) async => canInviteValue;
+
+  CreatedRoom createdRoom = const CreatedRoom(
+    roomId: '!nova:b.c',
+    failedInvites: [],
+  );
+
+  final createdRooms = <NewRoom>[];
+
+  @override
+  Future<CreatedRoom> createRoom({required NewRoom room}) async {
+    createdRooms.add(room);
+    return createdRoom;
+  }
+
+  String? roomLinkValue = 'https://matrix.to/#/!a:b.c?via=b.c';
+
+  @override
+  Future<String?> roomLink({required String roomId}) async => roomLinkValue;
+
+  final joinedTargets = <String>[];
+
+  @override
+  Future<String> joinRoom({required String target}) async {
+    joinedTargets.add(target);
+    return '!entrou:b.c';
+  }
+
+  UserCheck userCheck = const UserCheck(
+    status: UserCheckStatus.found,
+    displayName: null,
+  );
+
+  @override
+  Future<UserCheck> checkUser({required String userId}) async => userCheck;
+
+  MessageSearchPage searchPage = const MessageSearchPage(hits: []);
+
+  @override
+  Future<MessageSearchPage> searchMessages({
+    required String term,
+    String? nextBatch,
+  }) async => searchPage;
+
+  final loadedMedia = <(String, bool)>[];
+
+  Object? loadMediaError;
+
+  @override
+  Future<Uint8List> loadMedia({
+    required String media,
+    required bool thumbnail,
+  }) async {
+    loadedMedia.add((media, thumbnail));
+    if (loadMediaError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+    return Uint8List.fromList(media.codeUnits);
+  }
+
   @override
   void dispose() {
     isDisposed = true;
     sessionEventsController.close();
     roomsController.close();
     syncStatusController.close();
+    recoveryController.close();
+    recentThreadsController.close();
   }
 }
