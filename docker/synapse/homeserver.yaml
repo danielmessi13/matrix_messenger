@@ -1,0 +1,54 @@
+# Configuração APENAS para desenvolvimento local. Não use em produção.
+server_name: localhost
+pid_file: /data/homeserver.pid
+public_baseurl: http://localhost:8008/
+
+listeners:
+  - port: 8008
+    type: http
+    tls: false
+    x_forwarded: false
+    bind_addresses: ["0.0.0.0"]
+    resources:
+      - names: [client]
+        compress: false
+
+database:
+  name: sqlite3
+  args:
+    database: /data/homeserver.db
+
+media_store_path: /data/media_store
+signing_key_path: /data/localhost.signing.key
+report_stats: false
+trusted_key_servers: []
+suppress_key_server_warning: true
+
+# Permite criar contas livremente e via `register_new_matrix_user`.
+enable_registration: true
+enable_registration_without_verification: true
+registration_shared_secret: "dev-only-shared-secret"
+
+# Limites de taxa folgados para não atrapalhar testes automatizados.
+rc_message:
+  per_second: 1000
+  burst_count: 1000
+rc_registration:
+  per_second: 1000
+  burst_count: 1000
+rc_login:
+  address: { per_second: 1000, burst_count: 1000 }
+  account: { per_second: 1000, burst_count: 1000 }
+  failed_attempts: { per_second: 1000, burst_count: 1000 }
+rc_joins:
+  local: { per_second: 1000, burst_count: 1000 }
+  remote: { per_second: 1000, burst_count: 1000 }
+rc_invites:
+  per_room: { per_second: 1000, burst_count: 1000 }
+  per_user: { per_second: 1000, burst_count: 1000 }
+
+macaroon_secret_key: "dev-only-macaroon-secret"
+form_secret: "dev-only-form-secret"
+
+app_service_config_files:
+  - /config/appservice-seed.yaml

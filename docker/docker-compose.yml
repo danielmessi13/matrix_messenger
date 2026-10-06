@@ -1,0 +1,41 @@
+# Homeserver Matrix local para desenvolvimento e testes.
+# Uso: docker compose -f docker/docker-compose.yml up -d
+name: matrix-messenger
+
+services:
+  synapse:
+    image: matrixdotorg/synapse:v1.139.0
+    restart: unless-stopped
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    # O volume nasce com dono root; o Synapse roda como 991:991.
+    entrypoint: ["sh", "-c", "chown -R 991:991 /data && exec /start.py"]
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./synapse/homeserver.yaml:/config/homeserver.yaml:ro
+      - ./synapse/appservice-seed.yaml:/config/appservice-seed.yaml:ro
+      - synapse-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8008/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Popula usuários, salas e mensagens de docker/seed/seed.json.
+  # Roda a cada `up`, mas não faz nada se o seed já foi aplicado.
+  seed:
+    image: matrixdotorg/synapse:v1.139.0
+    restart: "no"
+    depends_on:
+      synapse:
+        condition: service_healthy
+    entrypoint: ["python", "/seed/seed.py"]
+    environment:
+      HOMESERVER_URL: http://synapse:8008
+      AS_TOKEN: dev-only-seed-as-token
+    volumes:
+      - ./seed:/seed:ro
+
+volumes:
+  synapse-data:

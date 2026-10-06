@@ -32,8 +32,8 @@ import 'package:matrix_messenger/features/threads/ui/view_models/recent_threads_
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
-import '../../../../../testing/fakes/repositories/fake_recent_threads_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_notification_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_recent_threads_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../testing/fakes/services/fake_system_notifications.dart';

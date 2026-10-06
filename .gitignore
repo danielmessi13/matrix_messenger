@@ -50,7 +50,9 @@ app.*.map.json
 # Notas locais de desenvolvimento
 NOTES.md
 backup-key.txt
-docs/
+docs/*
+!docs/decisoes-tecnicas.md
+!docs/limitacoes.md
 .env
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
