@@ -209,7 +209,7 @@ void main() {
     expect(find.text('Nenhuma conversa encontrada.'), findsOneWidget);
   });
 
-  testWidgets('recolhida com busca sem resultado, a barra fica', (
+  testWidgets('recolhida com busca sem resultado, a barra some', (
     tester,
   ) async {
     await pump(
@@ -217,7 +217,8 @@ void main() {
       const RoomListState(rooms: [lonely], loaded: true, query: 'xyz'),
       expanded: false,
     );
+    await tester.pumpAndSettle();
 
-    expect(paneWidth(tester), kRoomListCompactWidth);
+    expect(paneWidth(tester), 0);
   });
 }
