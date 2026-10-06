@@ -1,9 +1,11 @@
 use futures_util::StreamExt;
 use matrix_sdk::{
     encryption::{
+        backups::BackupState,
         recovery::{RecoveryError as SdkRecoveryError, RecoveryState},
         secret_storage::SecretStorageError,
     },
+    ruma::{events::GlobalAccountDataEventType, serde::Raw},
     Client,
 };
 use tokio::runtime::Handle;
@@ -70,13 +72,63 @@ impl From<SdkRecoveryError> for RecoveryError {
     }
 }
 
+// Sem as chaves privadas de cross-signing o SDK diz Incomplete mesmo com o backup aberto aqui.
+fn effective_status(state: RecoveryState, backup: BackupState) -> RecoveryStatus {
+    match (state, backup) {
+        (RecoveryState::Incomplete, BackupState::Enabled | BackupState::Downloading) => {
+            RecoveryStatus::Enabled
+        }
+        (state, _) => state.into(),
+    }
+}
+
+const CROSS_SIGNING_SECRETS: [&str; 3] = [
+    "m.cross_signing.master",
+    "m.cross_signing.self_signing",
+    "m.cross_signing.user_signing",
+];
+
+// Outro cliente pode apagar um segredo gravando `{}`, que o recover() do SDK não consegue ler.
+async fn repair_deleted_secrets(client: &Client) -> Result<bool, matrix_sdk::Error> {
+    let mut repaired = false;
+    for name in CROSS_SIGNING_SECRETS {
+        let event_type = GlobalAccountDataEventType::from(name);
+        let Some(content) = client
+            .account()
+            .fetch_account_data(event_type.clone())
+            .await?
+        else {
+            continue;
+        };
+        if content
+            .get_field::<serde_json::Value>("encrypted")?
+            .is_none()
+        {
+            // Continua "apagado", agora num formato que o SDK aceita.
+            let deleted = Raw::from_json_string(r#"{"encrypted":{}}"#.to_owned())?;
+            client
+                .account()
+                .set_account_data_raw(event_type, deleted)
+                .await?;
+            repaired = true;
+        }
+    }
+    Ok(repaired)
+}
+
 pub(crate) async fn recover(client: &Client, recovery_key: &str) -> Result<(), RecoveryError> {
-    client
-        .encryption()
-        .recovery()
-        .recover(recovery_key.trim())
-        .await
-        .map_err(Into::into)
+    let recovery_key = recovery_key.trim();
+    let recovery = client.encryption().recovery();
+    let result = recovery.recover(recovery_key).await;
+    if let Err(SdkRecoveryError::SecretStorage(SecretStorageError::ImportError { .. })) = &result {
+        if repair_deleted_secrets(client)
+            .await
+            .map_err(SdkRecoveryError::from)?
+        {
+            return recovery.recover(recovery_key).await.map_err(Into::into);
+        }
+    }
+    result.map_err(Into::into)
 }
 
 // Cada enable() cria um secret storage novo e invalida a chave anterior.
@@ -100,10 +152,23 @@ pub(crate) fn watch(
     runtime: &Handle,
     mut emit: impl FnMut(RecoveryStatus) -> bool + Send + 'static,
 ) {
-    let mut states = client.encryption().recovery().state_stream();
+    let encryption = client.encryption();
+    let mut states = encryption.recovery().state_stream();
+    let mut backups = encryption.backups().state_stream();
+    let mut state = encryption.recovery().state();
+    let mut backup = encryption.backups().state();
     runtime.spawn(async move {
-        while let Some(state) = states.next().await {
-            if !emit(state.into()) {
+        loop {
+            tokio::select! {
+                Some(next) = states.next() => state = next,
+                Some(next) = backups.next() => {
+                    // Um atraso no canal só perde estados intermediários; o próximo traz o atual.
+                    let Ok(next) = next else { continue };
+                    backup = next;
+                }
+                else => return,
+            }
+            if !emit(effective_status(state, backup)) {
                 return;
             }
         }
@@ -142,7 +207,7 @@ mod tests {
     use serde_json::json;
     use tokio::sync::mpsc;
     use wiremock::{
-        matchers::{method, path_regex},
+        matchers::{body_json, method, path_regex},
         Mock, ResponseTemplate,
     };
 
@@ -197,6 +262,90 @@ mod tests {
             receiver.recv().await,
             Some(RecoveryStatus::from(client.encryption().recovery().state()))
         );
+    }
+
+    #[test]
+    fn incomplete_with_backup_open_here_is_enabled() {
+        assert_eq!(
+            effective_status(RecoveryState::Incomplete, BackupState::Enabled),
+            RecoveryStatus::Enabled
+        );
+        assert_eq!(
+            effective_status(RecoveryState::Incomplete, BackupState::Downloading),
+            RecoveryStatus::Enabled
+        );
+        assert_eq!(
+            effective_status(RecoveryState::Incomplete, BackupState::Unknown),
+            RecoveryStatus::Incomplete
+        );
+        assert_eq!(
+            effective_status(RecoveryState::Disabled, BackupState::Enabled),
+            RecoveryStatus::Disabled
+        );
+    }
+
+    #[tokio::test]
+    async fn deleted_secrets_are_rewritten_in_a_readable_form() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let account_data = |name: &str| format!(r"/account_data/{name}$");
+        Mock::given(method("GET"))
+            .and(path_regex(account_data("m.cross_signing.master")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(account_data("m.cross_signing.self_signing")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "encrypted": { "abc": {} } })),
+            )
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(account_data("m.cross_signing.user_signing")))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({ "errcode": "M_NOT_FOUND", "error": "not found" })),
+            )
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .and(path_regex(account_data("m.cross_signing.master")))
+            .and(body_json(json!({ "encrypted": {} })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .and(path_regex(
+                r"/account_data/m\.cross_signing\.(self|user)_signing$",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(0)
+            .mount(server.server())
+            .await;
+
+        assert!(repair_deleted_secrets(&client).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn healthy_secrets_are_left_alone() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        Mock::given(method("GET"))
+            .and(path_regex(r"/account_data/m\.cross_signing\."))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "encrypted": { "abc": {} } })),
+            )
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(0)
+            .mount(server.server())
+            .await;
+
+        assert!(!repair_deleted_secrets(&client).await.unwrap());
     }
 
     #[test]
