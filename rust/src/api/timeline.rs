@@ -13,6 +13,8 @@ pub struct TimelineEntry {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimelineMessage {
     pub id: String,
+    // O `id` é o da timeline; responder, abrir thread e ir até a citação usam o do evento, que o eco local ainda não tem.
+    pub event_id: Option<String>,
     pub sender_id: String,
     pub sender_name: String,
     pub is_own: bool,
@@ -21,6 +23,7 @@ pub struct TimelineMessage {
     pub body: Option<String>,
     pub edited: bool,
     pub send_state: SendState,
+    pub can_reply: bool,
     pub thread: Option<ThreadInfo>,
     pub reply_to: Option<ReplyPreview>,
     pub read_by: Vec<String>,
@@ -29,7 +32,9 @@ pub struct TimelineMessage {
 // Remetente, tipo e texto só vêm em `Ready`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReplyPreview {
+    pub event_id: String,
     pub state: ReplyState,
+    pub is_own: bool,
     pub sender_name: Option<String>,
     pub kind: Option<MessageKind>,
     pub body: Option<String>,
@@ -154,6 +159,10 @@ impl RoomTimeline {
 
     pub async fn send_markdown(&self, body: String) -> Result<(), TimelineError> {
         self.handle.send_markdown(body).await
+    }
+
+    pub async fn send_reply(&self, body: String, in_reply_to: String) -> Result<(), TimelineError> {
+        self.handle.send_reply(body, &in_reply_to).await
     }
 
     pub async fn retry(&self, item_id: String) -> Result<(), TimelineError> {

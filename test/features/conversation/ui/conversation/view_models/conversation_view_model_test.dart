@@ -7,6 +7,7 @@ import 'package:matrix_messenger/features/conversation/domain/models/conversatio
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_state.dart';
 import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_view_model.dart';
+import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/message_search.dart';
 
 import '../../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
 import '../../../../../../testing/models/message.dart';
@@ -221,59 +222,108 @@ void main() {
     await viewModel.close();
   });
 
-  blocTest<ConversationViewModel, ConversationState>(
-    'expandir e recolher thread',
-    build: build,
-    act: (viewModel) => viewModel
-      ..toggleThread('\$root')
-      ..toggleThread('\$root'),
-    expect: () => const [
-      ConversationState(expandedThreads: {'\$root'}),
-      ConversationState(),
-    ],
+  Future<ConversationViewModel> ready() async {
+    final viewModel = build();
+    await viewModel.open();
+    conversation.snapshots.add(kSnapshot);
+    await flush();
+    return viewModel;
+  }
+
+  test('openThread abre uma thread só e trocar libera a anterior', () async {
+    final first = FakeConversation();
+    final viewModel = await ready();
+    conversation.threadResult = Result.ok(first);
+
+    viewModel.openThread('\$root');
+    await flush();
+    expect(viewModel.state.openThreadId, '\$root');
+    expect(viewModel.thread, isNotNull);
+    conversation.threadResult = Result.ok(FakeConversation());
+    viewModel.openThread('\$other');
+    await flush();
+
+    expect(viewModel.state.openThreadId, '\$other');
+    expect(first.isDisposed, isTrue);
+    expect(conversation.openedThreads, ['\$root', '\$other']);
+  });
+
+  test('toggleThread fecha a thread aberta', () async {
+    final opened = FakeConversation();
+    final viewModel = await ready();
+    conversation.threadResult = Result.ok(opened);
+
+    viewModel.toggleThread('\$root');
+    await flush();
+    viewModel.toggleThread('\$root');
+    await flush();
+
+    expect(viewModel.state.openThreadId, isNull);
+    expect(viewModel.thread, isNull);
+    expect(opened.isDisposed, isTrue);
+  });
+
+  test('fechar a conversa libera a thread aberta', () async {
+    final opened = FakeConversation();
+    final viewModel = await ready();
+    conversation.threadResult = Result.ok(opened);
+    viewModel.openThread('\$root');
+    await flush();
+
+    await viewModel.close();
+
+    expect(opened.isDisposed, isTrue);
+  });
+
+  test('send com resposta usa sendReply e limpa', () async {
+    final viewModel = await ready();
+    viewModel.startReply(kOtherMessage);
+
+    expect(await viewModel.send('re'), isTrue);
+    expect(conversation.sentReplies, [('re', '\$other')]);
+    expect(viewModel.state.replyTo, isNull);
+  });
+
+  test('goTo acha a mensagem carregada', () async {
+    final viewModel = await ready();
+
+    await viewModel.goTo('\$own');
+
+    expect(viewModel.state.focusRequest, const FocusRequest('\$own', 1));
+  });
+
+  test('goTo pagina e avisa quando não acha', () async {
+    final viewModel = await ready();
+    conversation.loadOlderResult = const Result.ok(true);
+
+    await viewModel.goTo('\$antiga');
+
+    expect(conversation.loadOlderCalls, greaterThanOrEqualTo(1));
+    expect(viewModel.state.focusRequest?.messageId, isNull);
+  });
+
+  test(
+    'escape cancela a resposta da thread, depois a da conversa, depois fecha',
+    () async {
+      final opened = FakeConversation();
+      final viewModel = await ready();
+      conversation.threadResult = Result.ok(opened);
+      viewModel
+        ..startReply(kOtherMessage)
+        ..openThread('\$root');
+      await flush();
+      viewModel.thread!.startReply(kOwnMessage);
+
+      expect(viewModel.escape(), isTrue);
+      expect(viewModel.thread!.state.replyTo, isNull);
+      expect(viewModel.state.replyTo, kOtherMessage);
+      expect(viewModel.escape(), isTrue);
+      expect(viewModel.state.replyTo, isNull);
+      expect(viewModel.escape(), isTrue);
+      expect(viewModel.state.openThreadId, isNull);
+      expect(viewModel.escape(), isFalse);
+    },
   );
-
-  test('expandir abre a thread e recolher a libera', () async {
-    final thread = FakeConversation();
-    conversation.threadResult = Result.ok(thread);
-    final viewModel = build();
-    await viewModel.open();
-
-    viewModel.toggleThread('\$root');
-    await Future<void>.delayed(Duration.zero);
-    expect(viewModel.thread('\$root'), isNotNull);
-    expect(conversation.openedThreads, ['\$root']);
-
-    viewModel.toggleThread('\$root');
-    await Future<void>.delayed(Duration.zero);
-    expect(viewModel.thread('\$root'), isNull);
-    expect(thread.isDisposed, isTrue);
-    await viewModel.close();
-  });
-
-  test('fechar a conversa libera as threads abertas', () async {
-    final thread = FakeConversation();
-    conversation.threadResult = Result.ok(thread);
-    final viewModel = build();
-    await viewModel.open();
-    viewModel.toggleThread('\$root');
-    await Future<void>.delayed(Duration.zero);
-
-    await viewModel.close();
-
-    expect(thread.isDisposed, isTrue);
-  });
-
-  test('openThread repassa para a conversa aberta', () async {
-    final viewModel = build();
-    await viewModel.open();
-
-    final thread = await viewModel.openThread('\$root');
-
-    expect(thread, isA<Ok>());
-    expect(conversation.openedThreads, ['\$root']);
-    await viewModel.close();
-  });
 
   test('fechar cancela e libera a conversa', () async {
     final viewModel = build();

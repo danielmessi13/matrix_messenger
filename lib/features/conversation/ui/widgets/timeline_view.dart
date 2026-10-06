@@ -4,6 +4,7 @@ import '../../../../app/theme.dart';
 import '../../domain/models/timeline_item.dart';
 import '../conversation/view_models/conversation_state.dart';
 import '../conversation/view_models/conversation_view_model.dart';
+import 'focus_flash.dart';
 import 'message_labels.dart';
 import 'message_tile.dart';
 import 'thread_section.dart';
@@ -31,7 +32,8 @@ class TimelineView extends StatefulWidget {
   State<TimelineView> createState() => _TimelineViewState();
 }
 
-class _TimelineViewState extends State<TimelineView> {
+class _TimelineViewState extends State<TimelineView>
+    with FocusFlash<TimelineView> {
   final _scroll = ScrollController();
 
   bool _awayFromLatest = false;
@@ -39,6 +41,8 @@ class _TimelineViewState extends State<TimelineView> {
   bool _unseenNewer = false;
 
   bool _itemsChangedWhileLoading = false;
+
+  MessageItem? _replyNotice;
 
   @override
   void initState() {
@@ -50,11 +54,15 @@ class _TimelineViewState extends State<TimelineView> {
   @override
   void didUpdateWidget(TimelineView old) {
     super.didUpdateWidget(old);
+    final request = widget.state.focusRequest;
+    if (request != null && request != old.state.focusRequest) focusOn(request);
+    pruneKeys(widget.state.items.whereType<MessageItem>().map((m) => m.id));
     final items = widget.state.items;
     // A lista some no estado vazio; quando volta, recomeça no fim.
     if (!_scroll.hasClients) {
       _awayFromLatest = false;
       _unseenNewer = false;
+      _replyNotice = null;
     }
     if (_awayFromLatest && items.lastOrNull != old.state.items.lastOrNull) {
       _onNewerItems(old);
@@ -95,7 +103,19 @@ class _TimelineViewState extends State<TimelineView> {
       final position = _scroll.position;
       _scroll.jumpTo(position.pixels + position.maxScrollExtent - oldMax);
     });
-    if (newMessage) setState(() => _unseenNewer = true);
+    // A citação pode carregar depois da mensagem e só então revelar que é minha.
+    final quoteBecameMine =
+        latest != null &&
+        latest.id == oldLatest?.id &&
+        _unseenNewer &&
+        !(oldLatest?.replyTo?.isOwn ?? false);
+    if (!newMessage && !quoteBecameMine) return;
+    setState(() {
+      _unseenNewer = true;
+      if (!latest.isOwn && (latest.replyTo?.isOwn ?? false)) {
+        _replyNotice = latest;
+      }
+    });
   }
 
   void _fillShortHistory() {
@@ -122,7 +142,10 @@ class _TimelineViewState extends State<TimelineView> {
     if (away != _awayFromLatest) {
       setState(() {
         _awayFromLatest = away;
-        if (!away) _unseenNewer = false;
+        if (!away) {
+          _unseenNewer = false;
+          _replyNotice = null;
+        }
       });
     }
   }
@@ -162,7 +185,7 @@ class _TimelineViewState extends State<TimelineView> {
               for (final item in items)
                 Center(
                   key: switch (item) {
-                    MessageItem(:final id) => ValueKey(id),
+                    MessageItem(:final id) => keyFor(id),
                     DateDividerItem(:final day) => ValueKey(day),
                   },
                   child: SizedBox(
@@ -173,6 +196,8 @@ class _TimelineViewState extends State<TimelineView> {
                         item: item,
                         now: widget.now,
                         viewModel: widget.viewModel,
+                        openThreadId: widget.state.openThreadId,
+                        flashing: item is MessageItem && item.id == flashing,
                       ),
                     ),
                   ),
@@ -186,11 +211,26 @@ class _TimelineViewState extends State<TimelineView> {
             left: 0,
             right: 0,
             child: Center(
-              child: FilledButton.tonal(
-                key: const Key('jump_to_latest'),
-                onPressed: _jumpToLatest,
-                child: const Text('↓ Mensagens recentes'),
-              ),
+              child: switch (_replyNotice) {
+                final notice? => _ReplyNotice(
+                  senderName: notice.senderName,
+                  onView: () {
+                    setState(() => _replyNotice = null);
+                    switch (notice.eventId) {
+                      case final eventId?:
+                        widget.viewModel.goTo(eventId);
+                      case null:
+                        _jumpToLatest();
+                    }
+                  },
+                  onDismiss: () => setState(() => _replyNotice = null),
+                ),
+                null => FilledButton.tonal(
+                  key: const Key('jump_to_latest'),
+                  onPressed: _jumpToLatest,
+                  child: const Text('↓ Mensagens recentes'),
+                ),
+              },
             ),
           ),
       ],
@@ -248,6 +288,8 @@ class _TimelineEntry extends StatelessWidget {
     required this.item,
     required this.now,
     required this.viewModel,
+    required this.openThreadId,
+    required this.flashing,
   });
 
   final TimelineItem item;
@@ -255,6 +297,10 @@ class _TimelineEntry extends StatelessWidget {
   final DateTime now;
 
   final ConversationViewModel viewModel;
+
+  final String? openThreadId;
+
+  final bool flashing;
 
   @override
   Widget build(BuildContext context) => switch (item) {
@@ -264,20 +310,94 @@ class _TimelineEntry extends StatelessWidget {
         style: _italic(context.colors, 17),
       ),
     ),
-    final MessageItem message => MessageTile(
-      message: message,
-      onRetry: () => viewModel.retry(message.id),
-      onCancel: () => viewModel.cancel(message.id),
-      thread: switch (message.thread) {
-        null => null,
-        final thread => ThreadSection(
-          summary: thread,
-          viewModel: viewModel.thread(thread.rootEventId),
-          onToggle: () => viewModel.toggleThread(thread.rootEventId),
-        ),
-      },
+    final MessageItem message => MessageHighlight(
+      flashing: flashing,
+      open: message.eventId != null && message.eventId == openThreadId,
+      child: MessageTile(
+        message: message,
+        onRetry: () => viewModel.retry(message.id),
+        onCancel: () => viewModel.cancel(message.id),
+        onReply: () => viewModel.startReply(message),
+        // "Thread" só para quem ainda não tem uma e não está aberta.
+        onStartThread: switch (message.eventId) {
+          final eventId?
+              when message.thread == null && openThreadId != eventId =>
+            () => viewModel.openThread(eventId),
+          _ => null,
+        },
+        onQuoteTap: viewModel.goTo,
+        thread: switch ((message.thread, message.eventId)) {
+          (final summary?, _) => ThreadSection(
+            rootEventId: summary.rootEventId,
+            summary: summary,
+            open: openThreadId == summary.rootEventId,
+            onTap: () => viewModel.toggleThread(summary.rootEventId),
+          ),
+          (null, final eventId?) when openThreadId == eventId => ThreadSection(
+            rootEventId: eventId,
+            open: true,
+            onTap: viewModel.closeThread,
+          ),
+          _ => null,
+        },
+      ),
     ),
   };
+}
+
+class _ReplyNotice extends StatelessWidget {
+  const _ReplyNotice({
+    required this.senderName,
+    required this.onView,
+    required this.onDismiss,
+  });
+
+  final String senderName;
+
+  final VoidCallback onView;
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final style = TextStyle(
+      fontSize: 13.5,
+      fontWeight: FontWeight.w600,
+      color: colors.background,
+    );
+    return Material(
+      key: const Key('reply_notice'),
+      color: colors.accent,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            key: const Key('reply_notice_view'),
+            onTap: onView,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 6, 8),
+              child: Text(
+                '↩ ${repliedToYouLabel(senderName)} · Ver',
+                style: style,
+              ),
+            ),
+          ),
+          InkWell(
+            key: const Key('reply_notice_dismiss'),
+            onTap: onDismiss,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 14, 8),
+              child: Text('×', style: style.copyWith(fontSize: 15)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 TextStyle _italic(AppColors colors, double size) => TextStyle(

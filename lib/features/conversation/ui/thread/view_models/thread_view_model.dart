@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../core/utils/result.dart';
 import '../../../domain/models/conversation.dart';
 import '../../../domain/models/timeline_item.dart';
+import '../../conversation/view_models/message_search.dart';
 import 'thread_state.dart';
 
 class ThreadViewModel extends Cubit<ThreadState> {
@@ -23,6 +24,8 @@ class ThreadViewModel extends Cubit<ThreadState> {
   Future<void>? _opening;
 
   String? _latestReplyId;
+
+  int _focusSeq = 0;
 
   Future<void> open() =>
       _opening ??= _open().whenComplete(() => _opening = null);
@@ -85,6 +88,39 @@ class ThreadViewModel extends Cubit<ThreadState> {
         reachedStart: state.reachedStart || reached,
       ),
     );
+  }
+
+  void startReply(MessageItem message) =>
+      emit(state.copyWith(replyTo: message));
+
+  void cancelReply() => emit(state.copyWith(replyTo: null));
+
+  Future<bool> send(String text) async {
+    final thread = _thread;
+    if (text.trim().isEmpty || thread == null) return false;
+    final target = state.replyTo;
+    final eventId = target?.eventId;
+    final result = eventId == null
+        ? await thread.send(text)
+        : await thread.sendReply(text, eventId);
+    if (result is! Ok) return false;
+    // Se a resposta mudou durante o envio, a nova fica.
+    if (!_closing && !isClosed && state.replyTo == target) {
+      emit(state.copyWith(replyTo: null));
+    }
+    return true;
+  }
+
+  Future<void> goTo(String eventId) async {
+    final id = await searchMessage(
+      this,
+      eventId: eventId,
+      items: (s) => s.replies,
+      reachedStart: (s) => s.reachedStart,
+      loadOlder: loadOlder,
+    );
+    if (_closing || isClosed) return;
+    emit(state.copyWith(focusRequest: FocusRequest(id, ++_focusSeq)));
   }
 
   Future<bool> retry(String messageId) async =>

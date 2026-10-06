@@ -10,6 +10,7 @@ import '../../../domain/models/conversation_failure.dart';
 import '../../../domain/models/timeline_item.dart';
 import '../../thread/view_models/thread_view_model.dart';
 import 'conversation_state.dart';
+import 'message_search.dart';
 
 class ConversationViewModel extends Cubit<ConversationState> {
   ConversationViewModel(this._repository, this.roomId)
@@ -30,8 +31,12 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   Future<void>? _opening;
 
-  // Fora da lista, que é lazy: a thread aberta sobrevive a sair da tela na rolagem.
-  final _threads = <String, ThreadViewModel>{};
+  // Uma thread por vez, no painel; fica aqui para sobreviver aos rebuilds da conversa.
+  ThreadViewModel? _thread;
+
+  ThreadViewModel? get thread => _thread;
+
+  int _focusSeq = 0;
 
   Future<void> open() =>
       _opening ??= _open().whenComplete(() => _opening = null);
@@ -83,8 +88,17 @@ class ConversationViewModel extends Cubit<ConversationState> {
   Future<bool> send(String text) async {
     final conversation = _conversation;
     if (text.trim().isEmpty || conversation == null) return false;
-    final result = await conversation.send(text);
-    return result is Ok;
+    final target = state.replyTo;
+    final eventId = target?.eventId;
+    final result = eventId == null
+        ? await conversation.send(text)
+        : await conversation.sendReply(text, eventId);
+    if (result is! Ok) return false;
+    // Se a resposta mudou durante o envio, a nova fica.
+    if (!_closing && !isClosed && state.replyTo == target) {
+      emit(state.copyWith(replyTo: null));
+    }
+    return true;
   }
 
   Future<bool> retry(String messageId) async =>
@@ -93,21 +107,56 @@ class ConversationViewModel extends Cubit<ConversationState> {
   Future<bool> cancel(String messageId) async =>
       await _conversation?.cancel(messageId) is Ok;
 
-  void toggleThread(String rootEventId) {
-    final expanded = {...state.expandedThreads};
-    if (expanded.remove(rootEventId)) {
-      _threads.remove(rootEventId)?.close();
-    } else {
-      expanded.add(rootEventId);
-      _threads[rootEventId] = ThreadViewModel(() => openThread(rootEventId))
-        ..open();
-    }
-    emit(state.copyWith(expandedThreads: expanded));
+  void openThread(String rootEventId) {
+    if (state.openThreadId == rootEventId) return;
+    _thread?.close();
+    _thread = ThreadViewModel(() => _openThreadTimeline(rootEventId))..open();
+    emit(state.copyWith(openThreadId: rootEventId));
   }
 
-  ThreadViewModel? thread(String rootEventId) => _threads[rootEventId];
+  void closeThread() {
+    _thread?.close();
+    _thread = null;
+    emit(state.copyWith(openThreadId: null));
+  }
 
-  Future<Result<Conversation>> openThread(String rootEventId) async =>
+  void toggleThread(String rootEventId) => state.openThreadId == rootEventId
+      ? closeThread()
+      : openThread(rootEventId);
+
+  void startReply(MessageItem message) =>
+      emit(state.copyWith(replyTo: message));
+
+  void cancelReply() => emit(state.copyWith(replyTo: null));
+
+  Future<void> goTo(String eventId) async {
+    final id = await searchMessage(
+      this,
+      eventId: eventId,
+      items: (s) => s.items,
+      reachedStart: (s) => s.reachedStart,
+      loadOlder: loadOlder,
+    );
+    if (_closing || isClosed) return;
+    emit(state.copyWith(focusRequest: FocusRequest(id, ++_focusSeq)));
+  }
+
+  // Esc: resposta na thread, depois resposta na conversa, depois o painel.
+  bool escape() {
+    final thread = _thread;
+    if (thread != null && thread.state.replyTo != null) {
+      thread.cancelReply();
+    } else if (state.replyTo != null) {
+      cancelReply();
+    } else if (thread != null) {
+      closeThread();
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  Future<Result<Conversation>> _openThreadTimeline(String rootEventId) async =>
       await _conversation?.openThread(rootEventId) ??
       const Result.error(ConversationFailure(ConversationFailureType.unknown));
 
@@ -147,7 +196,7 @@ class ConversationViewModel extends Cubit<ConversationState> {
   Future<void> close() async {
     _closing = true;
     await _updates?.cancel();
-    await Future.wait(_threads.values.map((thread) => thread.close()));
+    await _thread?.close();
     _conversation?.dispose();
     return super.close();
   }

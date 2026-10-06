@@ -8,6 +8,7 @@ class FakeRoomTimeline implements RoomTimeline {
   bool reachedStartOnPaginate = false;
   int paginateCalls = 0;
   final sentBodies = <String>[];
+  final replies = <(String, String)>[];
   final retried = <String>[];
   final cancelled = <String>[];
   int markAsReadCalls = 0;
@@ -32,6 +33,15 @@ class FakeRoomTimeline implements RoomTimeline {
   Future<void> sendMarkdown({required String body}) async {
     _throwIfError();
     sentBodies.add(body);
+  }
+
+  @override
+  Future<void> sendReply({
+    required String body,
+    required String inReplyTo,
+  }) async {
+    _throwIfError();
+    replies.add((body, inReplyTo));
   }
 
   @override

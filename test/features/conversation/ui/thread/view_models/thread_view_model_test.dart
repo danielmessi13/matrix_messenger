@@ -4,7 +4,9 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/conversation.dart';
+import 'package:matrix_messenger/features/conversation/domain/models/conversation_failure.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
+import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/message_search.dart';
 import 'package:matrix_messenger/features/conversation/ui/thread/view_models/thread_state.dart';
 import 'package:matrix_messenger/features/conversation/ui/thread/view_models/thread_view_model.dart';
 
@@ -28,6 +30,77 @@ void main() {
   }
 
   setUp(() => thread = FakeConversation());
+
+  final reply = MessageItem(
+    id: 'u1',
+    eventId: '\$r1',
+    senderId: '@diego:b.c',
+    senderName: 'Diego Alves',
+    isOwn: false,
+    timestamp: DateTime(2026, 10, 4, 10, 5),
+    kind: MessageKind.text,
+    body: 'resposta',
+    canReply: true,
+  );
+
+  test('send sem resposta envia na thread', () async {
+    final viewModel = await opened();
+    await push([reply]);
+
+    expect(await viewModel.send('oi'), isTrue);
+    expect(thread.sent, ['oi']);
+    expect(thread.sentReplies, isEmpty);
+  });
+
+  test('send com resposta cita e limpa a resposta', () async {
+    final viewModel = await opened();
+    await push([reply]);
+    viewModel.startReply(reply);
+
+    expect(viewModel.state.replyTo, reply);
+    expect(await viewModel.send('re'), isTrue);
+    expect(thread.sentReplies, [('re', '\$r1')]);
+    expect(viewModel.state.replyTo, isNull);
+  });
+
+  test('falha ao enviar mantém a resposta', () async {
+    final viewModel = await opened();
+    await push([reply]);
+    viewModel.startReply(reply);
+    thread.sendResult = const Result.error(
+      ConversationFailure(ConversationFailureType.network),
+    );
+
+    expect(await viewModel.send('re'), isFalse);
+    expect(viewModel.state.replyTo, reply);
+  });
+
+  test('cancelReply limpa', () async {
+    final viewModel = await opened();
+    viewModel
+      ..startReply(reply)
+      ..cancelReply();
+
+    expect(viewModel.state.replyTo, isNull);
+  });
+
+  test('goTo acha a resposta e pede o foco', () async {
+    final viewModel = await opened();
+    await push([reply]);
+
+    await viewModel.goTo('\$r1');
+
+    expect(viewModel.state.focusRequest, const FocusRequest('u1', 1));
+  });
+
+  test('goTo sem a mensagem pede foco nulo', () async {
+    final viewModel = await opened();
+    await push([reply]);
+
+    await viewModel.goTo('\$nada');
+
+    expect(viewModel.state.focusRequest, const FocusRequest(null, 1));
+  });
 
   blocTest<ThreadViewModel, ThreadState>(
     'abre e mostra só as mensagens',

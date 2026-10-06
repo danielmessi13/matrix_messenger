@@ -17,13 +17,19 @@ enum ReplyState { loading, ready, unavailable }
 
 class ReplyPreview extends Equatable {
   const ReplyPreview({
+    required this.eventId,
     required this.state,
+    this.isOwn = false,
     this.senderName,
     this.kind,
     this.body,
   });
 
+  final String eventId;
+
   final ReplyState state;
+
+  final bool isOwn;
 
   final String? senderName;
 
@@ -32,7 +38,7 @@ class ReplyPreview extends Equatable {
   final String? body;
 
   @override
-  List<Object?> get props => [state, senderName, kind, body];
+  List<Object?> get props => [eventId, state, isOwn, senderName, kind, body];
 }
 
 class ThreadSummary extends Equatable {
@@ -80,6 +86,7 @@ final class DateDividerItem extends TimelineItem {
 final class MessageItem extends TimelineItem {
   const MessageItem({
     required this.id,
+    this.eventId,
     required this.senderId,
     required this.senderName,
     required this.isOwn,
@@ -88,12 +95,15 @@ final class MessageItem extends TimelineItem {
     this.body,
     this.edited = false,
     this.sendState = SendState.sent,
+    this.canReply = false,
     this.thread,
     this.replyTo,
     this.readBy = const [],
   });
 
   final String id;
+
+  final String? eventId;
 
   final String senderId;
 
@@ -111,6 +121,8 @@ final class MessageItem extends TimelineItem {
 
   final SendState sendState;
 
+  final bool canReply;
+
   final ThreadSummary? thread;
 
   final ReplyPreview? replyTo;
@@ -120,6 +132,7 @@ final class MessageItem extends TimelineItem {
   @override
   List<Object?> get props => [
     id,
+    eventId,
     senderId,
     senderName,
     isOwn,
@@ -128,6 +141,7 @@ final class MessageItem extends TimelineItem {
     body,
     edited,
     sendState,
+    canReply,
     thread,
     replyTo,
     readBy,

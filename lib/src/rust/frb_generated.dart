@@ -78,7 +78,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1683633248;
+  int get rustContentHash => -1734407596;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -182,6 +182,12 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiTimelineRoomTimelineSendMarkdown({
     required RoomTimeline that,
     required String body,
+  });
+
+  Future<void> crateApiTimelineRoomTimelineSendReply({
+    required RoomTimeline that,
+    required String body,
+    required String inReplyTo,
   });
 
   Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
@@ -1096,6 +1102,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiTimelineRoomTimelineSendReply({
+    required RoomTimeline that,
+    required String body,
+    required String inReplyTo,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_String(body, serializer);
+          sse_encode_String(inReplyTo, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineSendReplyConstMeta,
+        argValues: [that, body, inReplyTo],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineSendReplyConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_send_reply",
+        argNames: ["that", "body", "inReplyTo"],
+      );
+
+  @override
   Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
     required RoomTimeline that,
   }) {
@@ -1113,7 +1159,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 25,
+              funcId: 26,
               port: port_,
             );
           },
@@ -1145,7 +1191,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1557,13 +1603,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ReplyPreview dco_decode_reply_preview(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return ReplyPreview(
-      state: dco_decode_reply_state(arr[0]),
-      senderName: dco_decode_opt_String(arr[1]),
-      kind: dco_decode_opt_box_autoadd_message_kind(arr[2]),
-      body: dco_decode_opt_String(arr[3]),
+      eventId: dco_decode_String(arr[0]),
+      state: dco_decode_reply_state(arr[1]),
+      isOwn: dco_decode_bool(arr[2]),
+      senderName: dco_decode_opt_String(arr[3]),
+      kind: dco_decode_opt_box_autoadd_message_kind(arr[4]),
+      body: dco_decode_opt_String(arr[5]),
     );
   }
 
@@ -1660,21 +1708,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TimelineMessage dco_decode_timeline_message(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return TimelineMessage(
       id: dco_decode_String(arr[0]),
-      senderId: dco_decode_String(arr[1]),
-      senderName: dco_decode_String(arr[2]),
-      isOwn: dco_decode_bool(arr[3]),
-      timestampMs: dco_decode_i_64(arr[4]),
-      kind: dco_decode_message_kind(arr[5]),
-      body: dco_decode_opt_String(arr[6]),
-      edited: dco_decode_bool(arr[7]),
-      sendState: dco_decode_send_state(arr[8]),
-      thread: dco_decode_opt_box_autoadd_thread_info(arr[9]),
-      replyTo: dco_decode_opt_box_autoadd_reply_preview(arr[10]),
-      readBy: dco_decode_list_String(arr[11]),
+      eventId: dco_decode_opt_String(arr[1]),
+      senderId: dco_decode_String(arr[2]),
+      senderName: dco_decode_String(arr[3]),
+      isOwn: dco_decode_bool(arr[4]),
+      timestampMs: dco_decode_i_64(arr[5]),
+      kind: dco_decode_message_kind(arr[6]),
+      body: dco_decode_opt_String(arr[7]),
+      edited: dco_decode_bool(arr[8]),
+      sendState: dco_decode_send_state(arr[9]),
+      canReply: dco_decode_bool(arr[10]),
+      thread: dco_decode_opt_box_autoadd_thread_info(arr[11]),
+      replyTo: dco_decode_opt_box_autoadd_reply_preview(arr[12]),
+      readBy: dco_decode_list_String(arr[13]),
     );
   }
 
@@ -2187,12 +2237,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   ReplyPreview sse_decode_reply_preview(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_eventId = sse_decode_String(deserializer);
     var var_state = sse_decode_reply_state(deserializer);
+    var var_isOwn = sse_decode_bool(deserializer);
     var var_senderName = sse_decode_opt_String(deserializer);
     var var_kind = sse_decode_opt_box_autoadd_message_kind(deserializer);
     var var_body = sse_decode_opt_String(deserializer);
     return ReplyPreview(
+      eventId: var_eventId,
       state: var_state,
+      isOwn: var_isOwn,
       senderName: var_senderName,
       kind: var_kind,
       body: var_body,
@@ -2303,6 +2357,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TimelineMessage sse_decode_timeline_message(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
+    var var_eventId = sse_decode_opt_String(deserializer);
     var var_senderId = sse_decode_String(deserializer);
     var var_senderName = sse_decode_String(deserializer);
     var var_isOwn = sse_decode_bool(deserializer);
@@ -2311,11 +2366,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_body = sse_decode_opt_String(deserializer);
     var var_edited = sse_decode_bool(deserializer);
     var var_sendState = sse_decode_send_state(deserializer);
+    var var_canReply = sse_decode_bool(deserializer);
     var var_thread = sse_decode_opt_box_autoadd_thread_info(deserializer);
     var var_replyTo = sse_decode_opt_box_autoadd_reply_preview(deserializer);
     var var_readBy = sse_decode_list_String(deserializer);
     return TimelineMessage(
       id: var_id,
+      eventId: var_eventId,
       senderId: var_senderId,
       senderName: var_senderName,
       isOwn: var_isOwn,
@@ -2324,6 +2381,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       body: var_body,
       edited: var_edited,
       sendState: var_sendState,
+      canReply: var_canReply,
       thread: var_thread,
       replyTo: var_replyTo,
       readBy: var_readBy,
@@ -2896,7 +2954,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_encode_reply_preview(ReplyPreview self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.eventId, serializer);
     sse_encode_reply_state(self.state, serializer);
+    sse_encode_bool(self.isOwn, serializer);
     sse_encode_opt_String(self.senderName, serializer);
     sse_encode_opt_box_autoadd_message_kind(self.kind, serializer);
     sse_encode_opt_String(self.body, serializer);
@@ -2981,6 +3041,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
+    sse_encode_opt_String(self.eventId, serializer);
     sse_encode_String(self.senderId, serializer);
     sse_encode_String(self.senderName, serializer);
     sse_encode_bool(self.isOwn, serializer);
@@ -2989,6 +3050,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.body, serializer);
     sse_encode_bool(self.edited, serializer);
     sse_encode_send_state(self.sendState, serializer);
+    sse_encode_bool(self.canReply, serializer);
     sse_encode_opt_box_autoadd_thread_info(self.thread, serializer);
     sse_encode_opt_box_autoadd_reply_preview(self.replyTo, serializer);
     sse_encode_list_String(self.readBy, serializer);
@@ -3178,6 +3240,13 @@ class RoomTimelineImpl extends RustOpaque implements RoomTimeline {
 
   Future<void> sendMarkdown({required String body}) => RustLib.instance.api
       .crateApiTimelineRoomTimelineSendMarkdown(that: this, body: body);
+
+  Future<void> sendReply({required String body, required String inReplyTo}) =>
+      RustLib.instance.api.crateApiTimelineRoomTimelineSendReply(
+        that: this,
+        body: body,
+        inReplyTo: inReplyTo,
+      );
 
   Stream<TimelineSnapshot> watch() =>
       RustLib.instance.api.crateApiTimelineRoomTimelineWatch(

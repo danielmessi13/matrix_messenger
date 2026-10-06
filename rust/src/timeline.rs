@@ -9,7 +9,9 @@ use futures_util::pin_mut;
 use matrix_sdk::{
     ruma::{
         api::client::receipt::create_receipt::v3::ReceiptType,
-        events::room::message::{MessageType, RoomMessageEventContent},
+        events::room::message::{
+            MessageType, RoomMessageEventContent, RoomMessageEventContentWithoutRelation,
+        },
         EventId, OwnedEventId, OwnedUserId, UserId,
     },
     send_queue::SendHandle,
@@ -34,6 +36,8 @@ use crate::{
 const PAGE_EVENTS: u16 = 20;
 
 const THREAD_PAGES: usize = 5;
+
+const HIDDEN_PAGES: usize = 5;
 
 const RECEIPT_ECHO_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -146,13 +150,44 @@ impl TimelineHandle {
         self.tasks.lock().unwrap().push(task.abort_handle());
     }
 
+    // Página só com eventos que não viram mensagem (estado, membros) não muda a tela; segue até achar uma ou chegar ao início.
     pub(crate) async fn paginate_backwards(&self) -> Result<bool, TimelineError> {
-        Ok(self.timeline.paginate_backwards(PAGE_EVENTS).await?)
+        let before = self.visible_messages().await;
+        for _ in 0..HIDDEN_PAGES {
+            if self.timeline.paginate_backwards(PAGE_EVENTS).await? {
+                return Ok(true);
+            }
+            if self.visible_messages().await > before {
+                return Ok(false);
+            }
+        }
+        Ok(false)
+    }
+
+    async fn visible_messages(&self) -> usize {
+        self.timeline
+            .items()
+            .await
+            .iter()
+            .filter_map(|item| item.as_event())
+            .filter(|event| kind_and_body(event.content()).is_some())
+            .count()
     }
 
     pub(crate) async fn send_markdown(&self, body: String) -> Result<(), TimelineError> {
         self.timeline
             .send(RoomMessageEventContent::text_markdown(body).into())
+            .await?;
+        Ok(())
+    }
+
+    // Na timeline de thread o SDK mantém a resposta dentro da thread.
+    pub(crate) async fn send_reply(&self, body: String, in_reply_to: &str) -> Result<(), TimelineError> {
+        let event_id = OwnedEventId::try_from(in_reply_to).map_err(|error| {
+            TimelineError::new(TimelineErrorKind::MessageNotFound, error.to_string())
+        })?;
+        self.timeline
+            .send_reply(RoomMessageEventContentWithoutRelation::text_markdown(body), event_id)
             .await?;
         Ok(())
     }
@@ -302,24 +337,37 @@ fn fetch_missing_replies(
     }
 }
 
-fn reply_preview(item: &EventTimelineItem) -> Option<ReplyPreview> {
+fn reply_preview(item: &EventTimelineItem, own_user: &UserId) -> Option<ReplyPreview> {
     let reply = item.content().in_reply_to()?;
+    let event_id = reply.event_id.to_string();
     Some(match &reply.event {
         TimelineDetails::Ready(event) => {
             let (kind, body) = kind_and_body(&event.content).unwrap_or((MessageKind::Other, None));
             ReplyPreview {
+                event_id,
                 state: ReplyState::Ready,
+                is_own: event.sender.as_str() == own_user.as_str(),
                 sender_name: Some(profile_name(&event.sender, &event.sender_profile)),
                 kind: Some(kind),
                 body,
             }
         }
-        TimelineDetails::Error(_) => {
-            ReplyPreview { state: ReplyState::Unavailable, sender_name: None, kind: None, body: None }
-        }
-        TimelineDetails::Unavailable | TimelineDetails::Pending => {
-            ReplyPreview { state: ReplyState::Loading, sender_name: None, kind: None, body: None }
-        }
+        TimelineDetails::Error(_) => ReplyPreview {
+            event_id,
+            state: ReplyState::Unavailable,
+            is_own: false,
+            sender_name: None,
+            kind: None,
+            body: None,
+        },
+        TimelineDetails::Unavailable | TimelineDetails::Pending => ReplyPreview {
+            event_id,
+            state: ReplyState::Loading,
+            is_own: false,
+            sender_name: None,
+            kind: None,
+            body: None,
+        },
     })
 }
 
@@ -345,11 +393,13 @@ fn thread_info(item: &EventTimelineItem, unread: &HashMap<OwnedEventId, u32>) ->
 fn message(
     id: &TimelineUniqueId,
     item: &EventTimelineItem,
+    own_user: &UserId,
     unread: &HashMap<OwnedEventId, u32>,
 ) -> Option<TimelineMessage> {
     let (kind, body) = kind_and_body(item.content())?;
     Some(TimelineMessage {
         id: id.0.clone(),
+        event_id: item.event_id().map(ToString::to_string),
         sender_id: item.sender().to_string(),
         sender_name: profile_name(item.sender(), item.sender_profile()),
         is_own: item.is_own(),
@@ -358,8 +408,9 @@ fn message(
         body,
         edited: item.content().as_message().is_some_and(|message| message.is_edited()),
         send_state: send_state(item),
+        can_reply: item.can_be_replied_to(),
         thread: thread_info(item, unread),
-        reply_to: reply_preview(item),
+        reply_to: reply_preview(item, own_user),
         read_by: Vec::new(),
     })
 }
@@ -384,7 +435,7 @@ pub(crate) fn snapshot(
                 event.sender().to_owned(),
                 profile_name(event.sender(), event.sender_profile()),
             );
-            let message = message(item.unique_id(), event, unread);
+            let message = message(item.unique_id(), event, own_user, unread);
             if message.is_some() && event.is_own() {
                 last_read = Some((entries.len(), Vec::new()));
             }
@@ -557,6 +608,43 @@ mod tests {
 
         let bodies: Vec<_> = messages(&current).iter().map(|m| m.body.clone()).collect();
         assert_eq!(bodies, vec![Some("resposta".to_owned())]);
+    }
+
+    #[tokio::test]
+    async fn paginate_backwards_skips_pages_without_messages() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).set_timeline_limited().set_timeline_prev_batch("prev"),
+            )
+            .await;
+        server
+            .mock_room_messages()
+            .match_from("prev")
+            .ok(RoomMessagesResponseTemplate::default()
+                .events(vec![
+                    f.room_topic("tópico").sender(user_id!("@bob:b.c")).into_raw_timeline(),
+                    f.room_name("sala").sender(user_id!("@bob:b.c")).into_raw_timeline(),
+                ])
+                .end_token("p2"))
+            .mount()
+            .await;
+        server
+            .mock_room_messages()
+            .match_from("p2")
+            .ok(RoomMessagesResponseTemplate::default())
+            .mount()
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+
+        let reached = handle.paginate_backwards().await.unwrap();
+
+        assert!(reached);
+        assert!(wait_for(&handle, |s| s.reached_start).await.items.iter().all(|entry| entry.message.is_none()));
     }
 
     #[tokio::test]
@@ -1001,7 +1089,9 @@ mod tests {
         assert_eq!(
             reply_of(&current, "resposta"),
             Some(&ReplyPreview {
+                event_id: "$1".to_owned(),
                 state: ReplyState::Ready,
+                is_own: false,
                 sender_name: Some("bob".to_owned()),
                 kind: Some(MessageKind::Text),
                 body: Some("original".to_owned()),
@@ -1077,5 +1167,159 @@ mod tests {
         assert_eq!(handle.live_tasks(), 1);
         drop(handle);
         assert!(tokio::time::timeout(Duration::from_secs(2), rx.recv()).await.unwrap().is_none());
+    }
+
+    async fn sent_relation(server: &MatrixMockServer) -> serde_json::Value {
+        for _ in 0..250 {
+            let requests = server.server().received_requests().await.unwrap_or_default();
+            let sent = requests
+                .iter()
+                .rev()
+                .find(|request| request.method.as_str() == "PUT" && request.url.path().contains("/send/"));
+            if let Some(request) = sent {
+                let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+                return body["m.relates_to"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("nenhum envio");
+    }
+
+    #[tokio::test]
+    async fn send_reply_in_main_quotes_without_thread() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("um").sender(user_id!("@bob:b.c")).event_id(event_id!("$1"))),
+            )
+            .await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server.mock_room_send().ok(event_id!("$sent")).mount().await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+
+        handle.send_reply("re".to_owned(), "$1").await.unwrap();
+
+        let relation = sent_relation(&server).await;
+        assert_eq!(relation["m.in_reply_to"]["event_id"], "$1");
+        assert!(relation.get("rel_type").is_none());
+    }
+
+    #[tokio::test]
+    async fn send_in_empty_thread_starts_it() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("raiz").sender(user_id!("@bob:b.c")).event_id(event_id!("$root"))),
+            )
+            .await;
+        server
+            .mock_room_relations()
+            .match_target_event(event_id!("$root").to_owned())
+            .ok(RoomRelationsResponseTemplate::default())
+            .mount()
+            .await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server.mock_room_send().ok(event_id!("$sent")).mount().await;
+        let main = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+        let thread = main.open_thread("$root").await.unwrap();
+
+        thread.send_markdown("oi".to_owned()).await.unwrap();
+
+        let relation = sent_relation(&server).await;
+        assert_eq!(relation["rel_type"], "m.thread");
+        assert_eq!(relation["event_id"], "$root");
+    }
+
+    #[tokio::test]
+    async fn send_reply_in_thread_stays_in_thread() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room = room_with_thread(&server, &client).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server.mock_room_send().ok(event_id!("$sent")).mount().await;
+        let main = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+        let thread = main.open_thread("$root").await.unwrap();
+
+        thread.send_reply("re".to_owned(), "$r1").await.unwrap();
+
+        let relation = sent_relation(&server).await;
+        assert_eq!(relation["rel_type"], "m.thread");
+        assert_eq!(relation["event_id"], "$root");
+        assert_eq!(relation["m.in_reply_to"]["event_id"], "$r1");
+        // O SDK omite o campo quando é falso.
+        assert!(relation.get("is_falling_back").is_none_or(|value| value == false));
+        let current = wait_for(&thread, |s| messages(s).iter().any(|m| m.is_own)).await;
+        let mine = messages(&current).into_iter().find(|m| m.is_own).unwrap();
+        assert_eq!(mine.reply_to.as_ref().map(|reply| reply.event_id.as_str()), Some("$r1"));
+    }
+
+    #[tokio::test]
+    async fn send_reply_with_invalid_id_is_message_not_found() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room = server.sync_joined_room(&client, room_id!("!a:b.c")).await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+
+        let error = handle.send_reply("re".to_owned(), "não é id").await.unwrap_err();
+
+        assert_eq!(error.kind, TimelineErrorKind::MessageNotFound);
+    }
+
+    #[tokio::test]
+    async fn reply_preview_carries_the_event_id_and_whether_it_is_mine() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let own = client.user_id().unwrap().to_owned();
+        let room_id = room_id!("!a:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("minha").sender(&own).event_id(event_id!("$m")))
+                    .add_timeline_event(
+                        f.text_msg("re").sender(user_id!("@bob:b.c")).event_id(event_id!("$re")).reply_to(event_id!("$m")),
+                    ),
+            )
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+
+        let current = wait_for(&handle, |s| {
+            reply_of(s, "re").is_some_and(|reply| reply.state == ReplyState::Ready)
+        })
+        .await;
+
+        let reply = reply_of(&current, "re").unwrap();
+        assert_eq!((reply.event_id.as_str(), reply.is_own), ("$m", true));
+        let answer = messages(&current).into_iter().find(|m| m.body.as_deref() == Some("re")).unwrap();
+        assert_eq!(answer.event_id.as_deref(), Some("$re"));
+        assert!(answer.can_reply);
+    }
+
+    #[tokio::test]
+    async fn local_echo_has_no_event_id_and_cannot_be_replied() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room = server.sync_joined_room(&client, room_id!("!a:b.c")).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server.mock_room_send().error500().mount().await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current()).await.unwrap();
+
+        handle.send_markdown("oi".to_owned()).await.unwrap();
+        let current = wait_for(&handle, |s| messages(s).len() == 1).await;
+
+        let echo = messages(&current)[0];
+        assert_eq!(echo.event_id, None);
+        assert!(!echo.can_reply);
     }
 }

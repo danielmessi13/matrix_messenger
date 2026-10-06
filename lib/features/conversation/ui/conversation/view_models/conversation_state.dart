@@ -1,8 +1,11 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../domain/models/timeline_item.dart';
+import 'message_search.dart';
 
 enum ConversationStatus { opening, ready, failed }
+
+const _unset = Object();
 
 final class ConversationState extends Equatable {
   const ConversationState({
@@ -10,7 +13,9 @@ final class ConversationState extends Equatable {
     this.items = const [],
     this.reachedStart = false,
     this.loadingOlder = false,
-    this.expandedThreads = const {},
+    this.openThreadId,
+    this.replyTo,
+    this.focusRequest,
   });
 
   final ConversationStatus status;
@@ -21,20 +26,33 @@ final class ConversationState extends Equatable {
 
   final bool loadingOlder;
 
-  final Set<String> expandedThreads;
+  final String? openThreadId;
 
+  final MessageItem? replyTo;
+
+  final FocusRequest? focusRequest;
+
+  // `openThreadId`/`replyTo: null` limpam; sem o argumento, mantêm.
   ConversationState copyWith({
     ConversationStatus? status,
     List<TimelineItem>? items,
     bool? reachedStart,
     bool? loadingOlder,
-    Set<String>? expandedThreads,
+    Object? openThreadId = _unset,
+    Object? replyTo = _unset,
+    FocusRequest? focusRequest,
   }) => ConversationState(
     status: status ?? this.status,
     items: items ?? this.items,
     reachedStart: reachedStart ?? this.reachedStart,
     loadingOlder: loadingOlder ?? this.loadingOlder,
-    expandedThreads: expandedThreads ?? this.expandedThreads,
+    openThreadId: identical(openThreadId, _unset)
+        ? this.openThreadId
+        : openThreadId as String?,
+    replyTo: identical(replyTo, _unset)
+        ? this.replyTo
+        : replyTo as MessageItem?,
+    focusRequest: focusRequest ?? this.focusRequest,
   );
 
   @override
@@ -43,6 +61,8 @@ final class ConversationState extends Equatable {
     items,
     reachedStart,
     loadingOlder,
-    expandedThreads,
+    openThreadId,
+    replyTo,
+    focusRequest,
   ];
 }

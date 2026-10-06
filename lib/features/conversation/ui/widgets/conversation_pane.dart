@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
@@ -6,12 +9,19 @@ import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/room.dart';
 import '../../../rooms/ui/invite/view_models/invite_view_model.dart';
 import '../../../rooms/ui/invite/widgets/invite_actions.dart';
+import '../../../rooms/ui/room_list/widgets/room_labels.dart';
 import '../../data/repositories/conversation_repository.dart';
+import '../../domain/models/timeline_item.dart';
 import '../conversation/view_models/conversation_state.dart';
 import '../conversation/view_models/conversation_view_model.dart';
 import 'conversation_header.dart';
 import 'message_input.dart';
+import 'message_labels.dart';
+import 'thread_panel.dart';
 import 'timeline_view.dart';
+
+// Abaixo disto o painel da thread fica por cima da conversa.
+const _sideBySideWidth = 1000.0;
 
 class ConversationPane extends StatelessWidget {
   const ConversationPane({super.key, required this.room, required this.now});
@@ -80,7 +90,7 @@ class _Conversation extends StatelessWidget {
   Widget build(BuildContext context) {
     final viewModel = context.read<ConversationViewModel>();
     final colors = context.colors;
-    return Column(
+    final conversation = Column(
       children: [
         ConversationHeader(room: room),
         Expanded(
@@ -116,12 +126,85 @@ class _Conversation extends StatelessWidget {
             },
           ),
         ),
-        BlocSelector<ConversationViewModel, ConversationState, bool>(
-          selector: (state) => state.status == ConversationStatus.ready,
-          builder: (context, ready) =>
-              MessageInput(room: room, enabled: ready, onSend: viewModel.send),
+        BlocBuilder<ConversationViewModel, ConversationState>(
+          buildWhen: (a, b) =>
+              a.status != b.status ||
+              a.replyTo != b.replyTo ||
+              (a.openThreadId == null) != (b.openThreadId == null),
+          builder: (context, state) => MessageInput(
+            placeholder: composerHint(
+              roomTitle: roomTitle(room),
+              replyTo: state.replyTo,
+            ),
+            replyTo: state.replyTo,
+            onCancelReply: viewModel.cancelReply,
+            enabled: state.status == ConversationStatus.ready,
+            covered: state.openThreadId != null,
+            onSend: viewModel.send,
+          ),
         ),
       ],
+    );
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): viewModel.escape,
+      },
+      child: BlocSelector<ConversationViewModel, ConversationState, String?>(
+        selector: (state) => state.openThreadId,
+        builder: (context, openThreadId) {
+          final thread = viewModel.thread;
+          final open = openThreadId != null && thread != null;
+          final panel = !open
+              ? null
+              : BlocSelector<
+                  ConversationViewModel,
+                  ConversationState,
+                  MessageItem?
+                >(
+                  selector: (state) => state.items
+                      .whereType<MessageItem>()
+                      .where((message) => message.eventId == openThreadId)
+                      .firstOrNull,
+                  builder: (context, root) => ThreadPanel(
+                    key: ValueKey(openThreadId),
+                    room: room,
+                    rootEventId: openThreadId,
+                    root: root,
+                    viewModel: thread,
+                    onClose: viewModel.closeThread,
+                    onGoToRoot: () => viewModel.goTo(openThreadId),
+                  ),
+                );
+          // Mesma posição na árvore nos três casos, para a conversa não perder rolagem nem rascunho.
+          return LayoutBuilder(
+            builder: (context, box) {
+              final sideBySide = box.maxWidth >= _sideBySideWidth;
+              return Stack(
+                children: [
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: open && sideBySide ? threadPanelWidth : 0,
+                    child: conversation,
+                  ),
+                  if (panel != null)
+                    Positioned(
+                      top: 0,
+                      bottom: 0,
+                      right: 0,
+                      width: min(threadPanelWidth, box.maxWidth),
+                      child: Material(
+                        elevation: sideBySide ? 0 : 8,
+                        child: panel,
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

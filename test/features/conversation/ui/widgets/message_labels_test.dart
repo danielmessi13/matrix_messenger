@@ -73,23 +73,78 @@ void main() {
     );
   });
 
-  test('unreadRepliesLabel no singular e no plural', () {
-    expect(unreadRepliesLabel(1), '1 nova');
-    expect(unreadRepliesLabel(3), '3 novas');
+  final diego = MessageItem(
+    id: 'a',
+    senderId: '@diego:b.c',
+    senderName: 'Diego Alves',
+    isOwn: false,
+    timestamp: DateTime(2026, 10, 4),
+    kind: MessageKind.text,
+    body: 'oi',
+  );
+  final mine = MessageItem(
+    id: 'b',
+    senderId: '@alice:b.c',
+    senderName: 'Alice',
+    isOwn: true,
+    timestamp: DateTime(2026, 10, 4),
+    kind: MessageKind.image,
+  );
+
+  test('barra de resposta', () {
+    expect(replyBarLabel(diego), 'Respondendo a Diego Alves');
+    expect(replyBarLabel(mine), 'Respondendo a você mesmo');
+    expect(messageExcerpt(diego), 'oi');
+    expect(messageExcerpt(mine), 'Imagem');
+  });
+
+  test('placeholder do composer', () {
+    expect(composerHint(roomTitle: '#geral'), 'Escrever para #geral…');
+    expect(
+      composerHint(roomTitle: '#geral', replyTo: diego),
+      'Responder a Diego…',
+    );
+    expect(
+      composerHint(roomTitle: '#geral', replyTo: mine),
+      'Responder a você mesmo…',
+    );
+    expect(
+      composerHint(roomTitle: '#geral', inThread: true),
+      'Responder na thread…',
+    );
+    expect(
+      composerHint(roomTitle: '#geral', replyTo: diego, inThread: true),
+      'Responder a Diego na thread…',
+    );
+  });
+
+  test('painel da thread', () {
+    expect(threadTitle(diego), 'Thread de Diego');
+    expect(threadTitle(mine), 'Sua thread');
+    expect(threadCountLabel(0), 'Nenhuma resposta ainda. Escreva a primeira.');
+    expect(threadCountLabel(1), '1 resposta');
+    expect(newRepliesLabel(1), '1 nova resposta');
+    expect(newRepliesLabel(3), '3 novas respostas');
+    expect(repliedToYouLabel('Diego Alves'), 'Diego Alves respondeu a você');
   });
 
   test('texto da citação em cada estado', () {
     expect(
-      replyQuoteLabel(const ReplyPreview(state: ReplyState.loading)),
+      replyQuoteLabel(
+        const ReplyPreview(eventId: '\$x', state: ReplyState.loading),
+      ),
       'Carregando mensagem…',
     );
     expect(
-      replyQuoteLabel(const ReplyPreview(state: ReplyState.unavailable)),
+      replyQuoteLabel(
+        const ReplyPreview(eventId: '\$x', state: ReplyState.unavailable),
+      ),
       'Mensagem original indisponível',
     );
     expect(
       replyQuoteLabel(
         const ReplyPreview(
+          eventId: '\$x',
           state: ReplyState.ready,
           kind: MessageKind.text,
           body: 'oi',
@@ -99,7 +154,11 @@ void main() {
     );
     expect(
       replyQuoteLabel(
-        const ReplyPreview(state: ReplyState.ready, kind: MessageKind.image),
+        const ReplyPreview(
+          eventId: '\$x',
+          state: ReplyState.ready,
+          kind: MessageKind.image,
+        ),
       ),
       'Imagem',
     );

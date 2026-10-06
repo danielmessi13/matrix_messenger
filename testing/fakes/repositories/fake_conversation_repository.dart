@@ -18,6 +18,9 @@ class FakeConversation implements Conversation {
   int loadOlderCalls = 0;
   Result<void> sendResult = const Result.ok(null);
   final sent = <String>[];
+  final sentReplies = <(String, String)>[];
+  // Simula o snapshot que a paginação traria.
+  void Function()? onLoadOlder;
   final retried = <String>[];
   final cancelled = <String>[];
   Result<void> retryResult = const Result.ok(null);
@@ -34,12 +37,19 @@ class FakeConversation implements Conversation {
   Future<Result<bool>> loadOlder() async {
     loadOlderCalls++;
     await loadOlderCompleter?.future;
+    onLoadOlder?.call();
     return loadOlderResult;
   }
 
   @override
   Future<Result<void>> send(String markdown) async {
     sent.add(markdown);
+    return sendResult;
+  }
+
+  @override
+  Future<Result<void>> sendReply(String markdown, String inReplyTo) async {
+    sentReplies.add((markdown, inReplyTo));
     return sendResult;
   }
 

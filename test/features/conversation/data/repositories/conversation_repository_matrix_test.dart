@@ -26,13 +26,16 @@ void main() {
 
   bridge.TimelineMessage bridgeMessage({
     String id = '\$1',
+    String? eventId = '\$1',
     bridge.MessageKind kind = bridge.MessageKind.text,
     bridge.SendState sendState = bridge.SendState.sent,
+    bool canReply = true,
     bridge.ThreadInfo? thread,
     bridge.ReplyPreview? replyTo,
     List<String> readBy = const [],
   }) => bridge.TimelineMessage(
     id: id,
+    eventId: eventId,
     senderId: '@bob:b.c',
     senderName: 'Bob',
     isOwn: false,
@@ -41,6 +44,7 @@ void main() {
     body: 'oi',
     edited: true,
     sendState: sendState,
+    canReply: canReply,
     thread: thread,
     replyTo: replyTo,
     readBy: readBy,
@@ -63,7 +67,9 @@ void main() {
                 unread: 2,
               ),
               replyTo: const bridge.ReplyPreview(
+                eventId: '\$0',
                 state: bridge.ReplyState.ready,
+                isOwn: true,
                 senderName: 'Ana',
                 kind: bridge.MessageKind.image,
               ),
@@ -82,6 +88,7 @@ void main() {
           DateDividerItem(DateTime.fromMillisecondsSinceEpoch(0)),
           MessageItem(
             id: '\$1',
+            eventId: '\$1',
             senderId: '@bob:b.c',
             senderName: 'Bob',
             isOwn: false,
@@ -89,6 +96,7 @@ void main() {
             kind: MessageKind.text,
             body: 'oi',
             edited: true,
+            canReply: true,
             thread: ThreadSummary(
               rootEventId: '\$1',
               replies: 3,
@@ -97,7 +105,9 @@ void main() {
               unread: 2,
             ),
             replyTo: const ReplyPreview(
+              eventId: '\$0',
               state: ReplyState.ready,
+              isOwn: true,
               senderName: 'Ana',
               kind: MessageKind.image,
             ),
@@ -143,7 +153,11 @@ void main() {
             bridge.TimelineEntry(
               message: bridgeMessage(
                 id: '\$r$i',
-                replyTo: bridge.ReplyPreview(state: state),
+                replyTo: bridge.ReplyPreview(
+                  eventId: '\$0',
+                  state: state,
+                  isOwn: false,
+                ),
               ),
             ),
         ],
@@ -162,6 +176,7 @@ void main() {
     final older = await conversation.loadOlder();
     expect((older as Ok<bool>).value, isTrue);
     await conversation.send('**oi**');
+    await conversation.sendReply('re', '\$1');
     await conversation.retry('txn1');
     await conversation.cancel('txn2');
     await conversation.markAsRead();
@@ -169,6 +184,7 @@ void main() {
     conversation.dispose();
 
     expect(timeline.sentBodies, ['**oi**']);
+    expect(timeline.replies, [('re', '\$1')]);
     expect(timeline.retried, ['txn1']);
     expect(timeline.cancelled, ['txn2']);
     expect(timeline.markAsReadCalls, 1);

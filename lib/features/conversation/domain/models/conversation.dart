@@ -9,6 +9,9 @@ abstract interface class Conversation {
 
   Future<Result<void>> send(String markdown);
 
+  /// [inReplyTo] é o id do evento citado.
+  Future<Result<void>> sendReply(String markdown, String inReplyTo);
+
   Future<Result<void>> retry(String messageId);
 
   Future<Result<void>> cancel(String messageId);

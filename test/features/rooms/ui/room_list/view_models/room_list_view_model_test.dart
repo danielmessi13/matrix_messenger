@@ -62,7 +62,7 @@ void main() {
     );
     expect(state.unreadByFilter, {
       RoomFilter.inbox: 6,
-      RoomFilter.mentions: 4,
+      RoomFilter.mentions: 1,
       RoomFilter.threads: 3,
       RoomFilter.rooms: 4,
       RoomFilter.direct: 2,

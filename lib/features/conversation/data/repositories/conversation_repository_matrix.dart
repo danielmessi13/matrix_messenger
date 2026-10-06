@@ -39,6 +39,11 @@ class _MatrixConversation implements Conversation {
       _run(() => _timeline.sendMarkdown(body: markdown));
 
   @override
+  Future<Result<void>> sendReply(String markdown, String inReplyTo) => _run(
+    () => _timeline.sendReply(body: markdown, inReplyTo: inReplyTo),
+  );
+
+  @override
   Future<Result<void>> retry(String messageId) =>
       _run(() => _timeline.retry(itemId: messageId));
 
@@ -98,6 +103,7 @@ ConversationSnapshot _toSnapshot(bridge.TimelineSnapshot snapshot) =>
 
 MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
   id: message.id,
+  eventId: message.eventId,
   senderId: message.senderId,
   senderName: message.senderName,
   isOwn: message.isOwn,
@@ -111,6 +117,7 @@ MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
     bridge.SendState.failed => SendState.failed,
     bridge.SendState.rejected => SendState.rejected,
   },
+  canReply: message.canReply,
   thread: switch (message.thread) {
     null => null,
     final thread => ThreadSummary(
@@ -127,11 +134,13 @@ MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
   replyTo: switch (message.replyTo) {
     null => null,
     final reply => ReplyPreview(
+      eventId: reply.eventId,
       state: switch (reply.state) {
         bridge.ReplyState.loading => ReplyState.loading,
         bridge.ReplyState.ready => ReplyState.ready,
         bridge.ReplyState.unavailable => ReplyState.unavailable,
       },
+      isOwn: reply.isOwn,
       senderName: reply.senderName,
       kind: switch (reply.kind) {
         null => null,

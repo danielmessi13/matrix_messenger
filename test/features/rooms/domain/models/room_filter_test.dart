@@ -33,7 +33,8 @@ void main() {
     });
   }
 
-  test('Threads soma respostas de thread; os outros, mensagens', () {
+  test('Menções e Threads somam o próprio contador; os outros, mensagens', () {
+    expect(RoomFilter.mentions.unreadOf(mentioned), 2);
     expect(RoomFilter.threads.unreadOf(threaded), 3);
     expect(RoomFilter.inbox.unreadOf(threaded), 1);
   });

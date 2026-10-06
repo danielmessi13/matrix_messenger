@@ -24,6 +24,8 @@ abstract class RoomTimeline implements RustOpaqueInterface {
 
   Future<void> sendMarkdown({required String body});
 
+  Future<void> sendReply({required String body, required String inReplyTo});
+
   Stream<TimelineSnapshot> watch();
 }
 
@@ -39,13 +41,17 @@ enum MessageKind {
 }
 
 class ReplyPreview {
+  final String eventId;
   final ReplyState state;
+  final bool isOwn;
   final String? senderName;
   final MessageKind? kind;
   final String? body;
 
   const ReplyPreview({
+    required this.eventId,
     required this.state,
+    required this.isOwn,
     this.senderName,
     this.kind,
     this.body,
@@ -53,14 +59,21 @@ class ReplyPreview {
 
   @override
   int get hashCode =>
-      state.hashCode ^ senderName.hashCode ^ kind.hashCode ^ body.hashCode;
+      eventId.hashCode ^
+      state.hashCode ^
+      isOwn.hashCode ^
+      senderName.hashCode ^
+      kind.hashCode ^
+      body.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ReplyPreview &&
           runtimeType == other.runtimeType &&
+          eventId == other.eventId &&
           state == other.state &&
+          isOwn == other.isOwn &&
           senderName == other.senderName &&
           kind == other.kind &&
           body == other.body;
@@ -165,6 +178,7 @@ enum TimelineErrorKind {
 
 class TimelineMessage {
   final String id;
+  final String? eventId;
   final String senderId;
   final String senderName;
   final bool isOwn;
@@ -173,12 +187,14 @@ class TimelineMessage {
   final String? body;
   final bool edited;
   final SendState sendState;
+  final bool canReply;
   final ThreadInfo? thread;
   final ReplyPreview? replyTo;
   final List<String> readBy;
 
   const TimelineMessage({
     required this.id,
+    this.eventId,
     required this.senderId,
     required this.senderName,
     required this.isOwn,
@@ -187,6 +203,7 @@ class TimelineMessage {
     this.body,
     required this.edited,
     required this.sendState,
+    required this.canReply,
     this.thread,
     this.replyTo,
     required this.readBy,
@@ -195,6 +212,7 @@ class TimelineMessage {
   @override
   int get hashCode =>
       id.hashCode ^
+      eventId.hashCode ^
       senderId.hashCode ^
       senderName.hashCode ^
       isOwn.hashCode ^
@@ -203,6 +221,7 @@ class TimelineMessage {
       body.hashCode ^
       edited.hashCode ^
       sendState.hashCode ^
+      canReply.hashCode ^
       thread.hashCode ^
       replyTo.hashCode ^
       readBy.hashCode;
@@ -213,6 +232,7 @@ class TimelineMessage {
       other is TimelineMessage &&
           runtimeType == other.runtimeType &&
           id == other.id &&
+          eventId == other.eventId &&
           senderId == other.senderId &&
           senderName == other.senderName &&
           isOwn == other.isOwn &&
@@ -221,6 +241,7 @@ class TimelineMessage {
           body == other.body &&
           edited == other.edited &&
           sendState == other.sendState &&
+          canReply == other.canReply &&
           thread == other.thread &&
           replyTo == other.replyTo &&
           readBy == other.readBy;

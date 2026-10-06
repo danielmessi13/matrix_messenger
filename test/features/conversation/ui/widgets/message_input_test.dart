@@ -4,13 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
+import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/message_input.dart';
 
 import '../../../../../testing/desktop_size.dart';
-import '../../../../../testing/models/room.dart';
+import '../../../../../testing/models/message.dart';
 
 void main() {
-  Future<List<String>> pump(WidgetTester tester, {bool succeed = true}) async {
+  Future<List<String>> pump(
+    WidgetTester tester, {
+    bool succeed = true,
+    MessageItem? replyTo,
+    VoidCallback? onCancelReply,
+    bool compact = false,
+  }) async {
     useDesktopSize(tester);
     final sent = <String>[];
     await tester.pumpWidget(
@@ -20,7 +27,10 @@ void main() {
           body: Align(
             alignment: Alignment.bottomCenter,
             child: MessageInput(
-              room: kTeamRoom,
+              placeholder: 'Escrever para #lançamento-q4…',
+              replyTo: replyTo,
+              onCancelReply: onCancelReply,
+              compact: compact,
               onSend: (text) async {
                 sent.add(text);
                 return succeed;
@@ -134,7 +144,7 @@ void main() {
         theme: buildAppTheme(),
         home: Scaffold(
           body: MessageInput(
-            room: kTeamRoom,
+            placeholder: 'Escrever para #lançamento-q4…',
             enabled: false,
             onSend: (_) async => true,
           ),
@@ -176,7 +186,10 @@ void main() {
     double? width,
   }) async {
     useDesktopSize(tester);
-    Widget input = MessageInput(room: kTeamRoom, onSend: onSend);
+    Widget input = MessageInput(
+      placeholder: 'Escrever para #lançamento-q4…',
+      onSend: onSend,
+    );
     if (width != null) input = SizedBox(width: width, child: input);
     await tester.pumpWidget(
       MaterialApp(
@@ -306,5 +319,40 @@ void main() {
     await tester.tap(find.byKey(const Key('format_list')));
 
     expect(controller.text, '- \nfoo');
+  });
+
+  testWidgets('resposta mostra a barra e × cancela', (tester) async {
+    var cancels = 0;
+    await pump(tester, replyTo: kOtherMessage, onCancelReply: () => cancels++);
+
+    expect(find.text('Respondendo a Diego Alves'), findsOneWidget);
+    expect(find.textContaining('A integração com o gateway'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('reply_cancel')));
+
+    expect(cancels, 1);
+  });
+
+  testWidgets('começar uma resposta foca o campo', (tester) async {
+    await pump(tester);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      isNot('message_field'),
+    );
+
+    await pump(tester, replyTo: kOtherMessage);
+    await tester.pump();
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'message_field',
+    );
+  });
+
+  testWidgets('compacto esconde formatação e dica', (tester) async {
+    await pump(tester, compact: true);
+
+    expect(find.byKey(const Key('format_bold')), findsNothing);
+    expect(find.text('Enter envia · Shift + Enter nova linha'), findsNothing);
+    expect(find.byKey(const Key('message_send')), findsOneWidget);
   });
 }

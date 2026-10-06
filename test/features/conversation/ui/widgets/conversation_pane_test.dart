@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
+import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_view_model.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/conversation_pane.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
@@ -175,7 +178,7 @@ void main() {
     expect(repository.conversation.sent, ['olá']);
   });
 
-  testWidgets('expandir thread pelo chip', (tester) async {
+  testWidgets('clicar no resumo abre a thread', (tester) async {
     await pump(tester, kTeamRoom);
     await show(tester, kSnapshot);
 
@@ -183,7 +186,6 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Recolher thread'), findsOneWidget);
     expect(repository.conversation.openedThreads, ['\$root']);
   });
 
@@ -586,6 +588,418 @@ void main() {
       ),
     );
 
+    expect(tester.takeException(), isNull);
+  });
+
+  Future<void> hover(WidgetTester tester, Finder target) async {
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(target));
+    await tester.pump();
+  }
+
+  MessageItem bob(int i, {ReplyPreview? replyTo}) => MessageItem(
+    id: 'u$i',
+    eventId: '\$m$i',
+    senderId: '@bob:b.c',
+    senderName: 'Bob Souza',
+    isOwn: false,
+    timestamp: kDay.add(Duration(minutes: i)),
+    kind: MessageKind.text,
+    body: 'mensagem $i',
+    canReply: true,
+    replyTo: replyTo,
+  );
+
+  testWidgets('Responder pelo hover mostra a barra e envia citando', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+
+    await hover(tester, find.textContaining('A integração'));
+    await tester.tap(find.byKey(const Key('message_reply_\$other')));
+    await tester.pump();
+
+    expect(find.text('Respondendo a Diego Alves'), findsOneWidget);
+    expect(find.text('Responder a Diego…'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('message_field')), 're');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('message_send')));
+    await tester.pump();
+
+    expect(repository.conversation.sentReplies, [('re', '\$other')]);
+    expect(find.byKey(const Key('reply_bar')), findsNothing);
+  });
+
+  testWidgets('Thread pelo hover abre a thread da mensagem', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+
+    await hover(tester, find.textContaining('A integração'));
+    await tester.tap(find.byKey(const Key('message_thread_\$other')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(repository.conversation.openedThreads, ['\$other']);
+    expect(find.text('Vendo no painel'), findsOneWidget);
+  });
+
+  testWidgets('a raiz de uma thread não oferece Thread no hover', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+
+    await hover(tester, find.textContaining('Subi a versão'));
+
+    expect(find.byKey(const Key('message_reply_\$root')), findsOneWidget);
+    expect(find.byKey(const Key('message_thread_\$root')), findsNothing);
+  });
+
+  testWidgets('clicar na citação rola até a original', (tester) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          for (var i = 0; i < 29; i++) bob(i),
+          bob(
+            29,
+            replyTo: const ReplyPreview(
+              eventId: '\$m0',
+              state: ReplyState.ready,
+              senderName: 'Bob Souza',
+              body: 'mensagem 0',
+            ),
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+    final first = find.text('mensagem 0');
+    expect(tester.getRect(first).top, lessThan(0));
+
+    await tester.tap(find.byKey(const Key('reply_quote_header')));
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(first).top, greaterThanOrEqualTo(0));
+  });
+
+  testWidgets('citação fora do histórico avisa', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          bob(
+            1,
+            replyTo: const ReplyPreview(
+              eventId: '\$sumiu',
+              state: ReplyState.unavailable,
+            ),
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('reply_quote_header')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem fora do histórico carregado'), findsOneWidget);
+  });
+
+  testWidgets('resposta a mim lendo mais acima mostra o aviso', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    final items = [for (var i = 0; i < 30; i++) bob(i)];
+    await show(tester, ConversationSnapshot(items: items, reachedStart: true));
+    await tester.drag(
+      find.byKey(const Key('timeline_list')),
+      const Offset(0, 600),
+    );
+    await tester.pump();
+
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          ...items,
+          bob(
+            30,
+            replyTo: const ReplyPreview(
+              eventId: '\$own',
+              state: ReplyState.ready,
+              isOwn: true,
+            ),
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('↩ Bob Souza respondeu a você · Ver'), findsOneWidget);
+    expect(find.byKey(const Key('jump_to_latest')), findsNothing);
+    await tester.tap(find.byKey(const Key('reply_notice_dismiss')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('reply_notice')), findsNothing);
+    expect(find.byKey(const Key('jump_to_latest')), findsOneWidget);
+  });
+
+  testWidgets('citação que carrega depois e é minha mostra o aviso', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    final items = [for (var i = 0; i < 30; i++) bob(i)];
+    await show(tester, ConversationSnapshot(items: items, reachedStart: true));
+    await tester.drag(
+      find.byKey(const Key('timeline_list')),
+      const Offset(0, 600),
+    );
+    await tester.pump();
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          ...items,
+          bob(
+            30,
+            replyTo: const ReplyPreview(
+              eventId: '\$own',
+              state: ReplyState.loading,
+            ),
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+    expect(find.byKey(const Key('reply_notice')), findsNothing);
+
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          ...items,
+          bob(
+            30,
+            replyTo: const ReplyPreview(
+              eventId: '\$own',
+              state: ReplyState.ready,
+              isOwn: true,
+            ),
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('↩ Bob Souza respondeu a você · Ver'), findsOneWidget);
+  });
+
+  testWidgets('abrir a thread mostra o painel e × fecha', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('thread_panel')), findsOneWidget);
+    expect(find.text('Thread de Carla'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('thread_panel_close')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('thread_panel')), findsNothing);
+  });
+
+  testWidgets('Esc cancela a resposta e depois fecha o painel', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+    await hover(tester, find.textContaining('A integração'));
+    await tester.tap(find.byKey(const Key('message_reply_\$other')));
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.byKey(const Key('reply_bar')), findsNothing);
+    expect(find.byKey(const Key('thread_panel')), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+
+    expect(find.byKey(const Key('thread_panel')), findsNothing);
+  });
+
+  testWidgets('fechar o painel com Esc devolve o foco ao campo da conversa', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+    final threadConversation = FakeConversation();
+    repository.conversation.threadResult = Result.ok(threadConversation);
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+    threadConversation.snapshots.add(
+      const ConversationSnapshot(items: [], reachedStart: true),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('thread_panel')), findsNothing);
+    final editable = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const Key('message_field')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(editable.focusNode.hasPrimaryFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('painel com a janela a 1024 px não estoura', (tester) async {
+    await pump(tester, kTeamRoom, size: const Size(1024, 640));
+    await show(tester, kSnapshot);
+
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('thread_panel')), findsOneWidget);
+    expect(tester.getSize(find.byKey(const Key('thread_panel'))).width, 400);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('abrir e fechar a thread preserva o rascunho da conversa', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+    await tester.enterText(find.byKey(const Key('message_field')), 'rascunho');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('thread_panel_close')));
+    await tester.pump();
+
+    expect(find.text('rascunho'), findsOneWidget);
+  });
+
+  testWidgets('abrir a thread preserva a rolagem da conversa', (tester) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    final many = [
+      for (var i = 0; i < 30; i++)
+        MessageItem(
+          id: 'm$i',
+          eventId: '\$m$i',
+          senderId: '@bob:b.c',
+          senderName: 'Bob',
+          isOwn: false,
+          timestamp: kDay.add(Duration(minutes: i)),
+          kind: MessageKind.text,
+          body: 'mensagem $i',
+        ),
+      kThreadRoot,
+    ];
+    await show(tester, ConversationSnapshot(items: many, reachedStart: true));
+    await tester.drag(
+      find.byKey(const Key('timeline_list')),
+      const Offset(0, 800),
+    );
+    await tester.pump();
+    final scrollable = find.descendant(
+      of: find.byKey(const Key('timeline_list')),
+      matching: find.byType(Scrollable),
+    );
+    final before = tester
+        .state<ScrollableState>(scrollable.first)
+        .position
+        .pixels;
+    tester
+        .element(find.byKey(const Key('timeline_list')))
+        .read<ConversationViewModel>()
+        .openThread('\$root');
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('thread_panel')), findsOneWidget);
+    expect(
+      tester.state<ScrollableState>(scrollable.first).position.pixels,
+      before,
+    );
+  });
+
+  testWidgets('abrir a thread move o foco para o campo do painel', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, kSnapshot);
+    final threadConversation = FakeConversation();
+    repository.conversation.threadResult = Result.ok(threadConversation);
+    await tester.tap(find.byKey(const Key('message_field')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+    threadConversation.snapshots.add(
+      const ConversationSnapshot(items: [], reachedStart: true),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final field = find.descendant(
+      of: find.byKey(const Key('thread_panel')),
+      matching: find.byKey(const Key('message_field')),
+    );
+    final editable = tester.widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    );
+    expect(editable.focusNode.hasPrimaryFocus, isTrue);
+  });
+
+  testWidgets('a 900 px o painel fica por cima da conversa', (tester) async {
+    await pump(tester, kTeamRoom, size: const Size(900, 640));
+    await show(tester, kSnapshot);
+
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.getSize(find.byKey(const Key('thread_panel'))).width, 400);
+    expect(tester.getSize(find.byKey(const Key('timeline_list'))).width, 900);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a 380 px o painel ocupa a largura da janela', (tester) async {
+    await pump(tester, kTeamRoom, size: const Size(380, 640));
+    await show(tester, kSnapshot);
+    // O cabeçalho da conversa já estoura abaixo da largura mínima, sem relação com o painel.
+    tester.takeException();
+
+    await tester.tap(
+      find.byKey(const Key('thread_toggle_\$root')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.getSize(find.byKey(const Key('thread_panel'))).width, 380);
     expect(tester.takeException(), isNull);
   });
 }

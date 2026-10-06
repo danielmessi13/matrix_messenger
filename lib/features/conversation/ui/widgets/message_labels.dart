@@ -50,7 +50,36 @@ String readByLabel(List<String> names) {
 String repliesLabel(int count) =>
     '$count ${count == 1 ? 'resposta' : 'respostas'}';
 
-String unreadRepliesLabel(int count) => count == 1 ? '1 nova' : '$count novas';
+String replyBarLabel(MessageItem target) => target.isOwn
+    ? 'Respondendo a você mesmo'
+    : 'Respondendo a ${target.senderName}';
+
+String messageExcerpt(MessageItem message) =>
+    message.body ?? kindPlaceholder(message.kind) ?? '';
+
+String composerHint({
+  required String roomTitle,
+  MessageItem? replyTo,
+  bool inThread = false,
+}) {
+  if (replyTo != null) {
+    final who = replyTo.isOwn ? 'você mesmo' : _firstName(replyTo.senderName);
+    return 'Responder a $who${inThread ? ' na thread' : ''}…';
+  }
+  return inThread ? 'Responder na thread…' : 'Escrever para $roomTitle…';
+}
+
+String threadTitle(MessageItem root) =>
+    root.isOwn ? 'Sua thread' : 'Thread de ${_firstName(root.senderName)}';
+
+String threadCountLabel(int replies) => replies == 0
+    ? 'Nenhuma resposta ainda. Escreva a primeira.'
+    : repliesLabel(replies);
+
+String newRepliesLabel(int count) =>
+    count == 1 ? '1 nova resposta' : '$count novas respostas';
+
+String repliedToYouLabel(String senderName) => '$senderName respondeu a você';
 
 String threadSummaryLabel(ThreadSummary thread) {
   final at = thread.latestAt;

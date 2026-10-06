@@ -2,22 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../app/theme.dart';
-import '../../../rooms/domain/models/room.dart';
-import '../../../rooms/ui/room_list/widgets/room_labels.dart';
+import '../../domain/models/timeline_item.dart';
+import 'message_labels.dart';
 
 class MessageInput extends StatefulWidget {
   const MessageInput({
     super.key,
-    required this.room,
+    required this.placeholder,
     required this.onSend,
     this.enabled = true,
+    this.replyTo,
+    this.onCancelReply,
+    this.compact = false,
+    this.autofocus = false,
+    this.covered = false,
   });
 
-  final Room room;
+  final String placeholder;
 
   final bool enabled;
 
   final Future<bool> Function(String text) onSend;
+
+  final MessageItem? replyTo;
+
+  final VoidCallback? onCancelReply;
+
+  // Painel da thread: sem formatação nem dica.
+  final bool compact;
+
+  final bool autofocus;
+
+  // Painel da thread aberto por cima; ao fechar, o campo retoma o foco.
+  final bool covered;
 
   @override
   State<MessageInput> createState() => _MessageInputState();
@@ -34,6 +51,24 @@ class _MessageInputState extends State<MessageInput> {
   void initState() {
     super.initState();
     _focus.onKeyEvent = _onKey;
+    // O autofocus do campo não tira o foco de outro campo já focado.
+    if (widget.autofocus) _focusAfterFrame();
+  }
+
+  // Depois do quadro, para o campo já estar habilitado quando o foco for pedido.
+  void _focusAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void didUpdateWidget(MessageInput old) {
+    super.didUpdateWidget(old);
+    final target = widget.replyTo;
+    if (target != null && target.id != old.replyTo?.id) _focus.requestFocus();
+    if (widget.autofocus && widget.enabled && !old.enabled) _focusAfterFrame();
+    if (old.covered && !widget.covered) _focusAfterFrame();
   }
 
   @override
@@ -138,12 +173,13 @@ class _MessageInputState extends State<MessageInput> {
     );
     return LayoutBuilder(
       builder: (context, box) {
-        final narrow = box.maxWidth < 560;
+        final hPad = widget.compact ? 20.0 : (box.maxWidth < 560 ? 16.0 : 40.0);
+        final narrow = widget.compact || box.maxWidth < 560;
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            narrow ? 16 : 40,
+            hPad,
             0,
-            narrow ? 16 : 40,
+            hPad,
             28,
           ),
           child: Center(
@@ -159,27 +195,30 @@ class _MessageInputState extends State<MessageInput> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (widget.replyTo case final target?)
+                      _ReplyBar(target: target, onCancel: widget.onCancelReply),
                     TextField(
                       key: const Key('message_field'),
                       controller: _controller,
                       focusNode: _focus,
                       enabled: enabled,
+                      autofocus: widget.autofocus,
                       minLines: 2,
                       maxLines: 6,
                       keyboardType: TextInputType.multiline,
                       cursorColor: colors.accent,
                       style: TextStyle(
                         fontFamily: AppFonts.serif,
-                        fontSize: 19,
+                        fontSize: widget.compact ? 17 : 19,
                         color: colors.textPrimary,
                       ),
                       decoration: InputDecoration(
                         isCollapsed: true,
                         border: InputBorder.none,
-                        hintText: 'Escrever para ${roomTitle(widget.room)}…',
+                        hintText: widget.placeholder,
                         hintStyle: TextStyle(
                           fontFamily: AppFonts.serif,
-                          fontSize: 19,
+                          fontSize: widget.compact ? 17 : 19,
                           color: colors.textMuted,
                         ),
                       ),
@@ -187,19 +226,23 @@ class _MessageInputState extends State<MessageInput> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        _FormatTools(
-                          enabled: enabled,
-                          dense: narrow,
-                          onWrap: _wrap,
-                          onBullet: _bullet,
-                        ),
+                        if (!widget.compact)
+                          _FormatTools(
+                            enabled: enabled,
+                            dense: narrow,
+                            onWrap: _wrap,
+                            onBullet: _bullet,
+                          ),
                         const SizedBox(width: 12),
                         Expanded(child: narrow ? const SizedBox() : hint),
                         const SizedBox(width: 12),
                         send,
                       ],
                     ),
-                    if (narrow) ...[const SizedBox(height: 4), hint],
+                    if (narrow && !widget.compact) ...[
+                      const SizedBox(height: 4),
+                      hint,
+                    ],
                   ],
                 ),
               ),
@@ -317,4 +360,72 @@ class _Tool extends StatelessWidget {
     color: context.colors.icon,
     icon: Icon(icon),
   );
+}
+
+class _ReplyBar extends StatelessWidget {
+  const _ReplyBar({required this.target, required this.onCancel});
+
+  final MessageItem target;
+
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      key: const Key('reply_bar'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: colors.accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    replyBarLabel(target),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.accent,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    messageExcerpt(target),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              key: const Key('reply_cancel'),
+              tooltip: 'Cancelar resposta',
+              onPressed: onCancel,
+              icon: Icon(Icons.close, size: 16, color: colors.textMuted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
