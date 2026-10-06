@@ -2,27 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../domain/models/create_room_failure.dart';
 import '../../../domain/models/new_room.dart';
-
-enum InviteChipStatus { checking, found, unknown, invalidFormat, notFound }
-
-final class InviteChip extends Equatable {
-  const InviteChip(this.id, this.status, [this.displayName]);
-
-  final String id;
-
-  final InviteChipStatus status;
-
-  final String? displayName;
-
-  bool get isError =>
-      status == InviteChipStatus.invalidFormat ||
-      status == InviteChipStatus.notFound;
-
-  bool get blocksSubmit => isError || status == InviteChipStatus.checking;
-
-  @override
-  List<Object?> get props => [id, status, displayName];
-}
+import '../../invite_chips/view_models/invite_chips_state.dart';
 
 enum NewRoomTab { create, join }
 
@@ -33,8 +13,7 @@ final class NewRoomState extends Equatable {
     this.name = '',
     this.topic = '',
     this.isPublic = false,
-    this.invites = const [],
-    this.query = '',
+    this.shareHistory = true,
     this.tab = NewRoomTab.create,
     this.status = NewRoomStatus.idle,
     this.failure,
@@ -47,9 +26,7 @@ final class NewRoomState extends Equatable {
 
   final bool isPublic;
 
-  final List<InviteChip> invites;
-
-  final String query;
+  final bool shareHistory;
 
   final NewRoomTab tab;
 
@@ -61,26 +38,17 @@ final class NewRoomState extends Equatable {
 
   bool get creating => status == NewRoomStatus.creating;
 
-  bool get canSubmit =>
-      !creating &&
-      name.trim().isNotEmpty &&
-      !invites.any((chip) => chip.blocksSubmit);
+  // Só os campos da sala; os convites vêm de canSubmitWith.
+  bool get canSubmit => !creating && name.trim().isNotEmpty;
 
-  List<String> get invalidFormatIds => _idsWith(InviteChipStatus.invalidFormat);
-
-  List<String> get notFoundIds => _idsWith(InviteChipStatus.notFound);
-
-  List<String> _idsWith(InviteChipStatus status) => [
-    for (final chip in invites)
-      if (chip.status == status) chip.id,
-  ];
+  bool canSubmitWith(InviteChipsState invites) =>
+      canSubmit && !invites.blocksSubmit;
 
   NewRoomState copyWith({
     String? name,
     String? topic,
     bool? isPublic,
-    List<InviteChip>? invites,
-    String? query,
+    bool? shareHistory,
     NewRoomTab? tab,
     NewRoomStatus? status,
     CreateRoomFailureType? Function()? failure,
@@ -89,8 +57,7 @@ final class NewRoomState extends Equatable {
     name: name ?? this.name,
     topic: topic ?? this.topic,
     isPublic: isPublic ?? this.isPublic,
-    invites: invites ?? this.invites,
-    query: query ?? this.query,
+    shareHistory: shareHistory ?? this.shareHistory,
     tab: tab ?? this.tab,
     status: status ?? this.status,
     failure: failure == null ? this.failure : failure(),
@@ -102,8 +69,7 @@ final class NewRoomState extends Equatable {
     name,
     topic,
     isPublic,
-    invites,
-    query,
+    shareHistory,
     tab,
     status,
     failure,

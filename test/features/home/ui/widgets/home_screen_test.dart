@@ -16,9 +16,11 @@ import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/failed_invite.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room_action_failure.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/widgets/room_list_pane.dart';
 import 'package:matrix_messenger/features/threads/domain/models/recent_thread.dart';
@@ -360,7 +362,12 @@ void main() {
     tester,
   ) async {
     roomRepository.createRoomResult = const Result.ok(
-      CreatedRoom(roomId: '!nova:b.c', failedInvites: ['@joao:b.co']),
+      CreatedRoom(
+        roomId: '!nova:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
     );
     await pumpScreen(tester);
 
@@ -374,17 +381,54 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('@joao:b.co'), findsOneWidget);
+    expect(find.textContaining('chave de recuperação'), findsNothing);
 
     await tester.tap(find.byKey(const Key('failed_invites_dismiss')));
     await tester.pump();
     expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
   });
 
+  testWidgets(
+    'convite que falhou por sessão não verificada explica no banner',
+    (
+      tester,
+    ) async {
+      roomRepository.createRoomResult = const Result.ok(
+        CreatedRoom(
+          roomId: '!nova:b.c',
+          failedInvites: [
+            FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+            FailedInvite('@bia:b.co', RoomActionFailureType.unverifiedDevice),
+          ],
+        ),
+      );
+      await pumpScreen(tester);
+
+      await tester.tap(find.byKey(const Key('new_room_button')));
+      await tester.pumpAndSettle();
+      await createRoom(tester);
+
+      expect(find.textContaining('@joao:b.co, @bia:b.co'), findsOneWidget);
+      expect(
+        find.text(
+          'Para convidar com o histórico compartilhado, verifique esta sessão '
+          'com a chave de recuperação.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('nova criação sem falhas esconde o banner anterior', (
     tester,
   ) async {
     roomRepository.createRoomResult = const Result.ok(
-      CreatedRoom(roomId: '!nova:b.c', failedInvites: ['@joao:b.co']),
+      CreatedRoom(
+        roomId: '!nova:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
     );
     await pumpScreen(tester);
 

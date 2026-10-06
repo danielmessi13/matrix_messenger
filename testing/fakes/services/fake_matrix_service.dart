@@ -151,6 +151,29 @@ class FakeMatrixService implements MatrixService {
     return inviteResult;
   }
 
+  Result<void> roomActionResult = const Result.ok(null);
+
+  Result<bool> canInviteResult = const Result.ok(false);
+
+  final leftRooms = <String>[];
+
+  final invitedUsers = <(String, String)>[];
+
+  @override
+  Future<Result<void>> leaveRoom(String roomId) async {
+    leftRooms.add(roomId);
+    return roomActionResult;
+  }
+
+  @override
+  Future<Result<void>> inviteUser(String roomId, String userId) async {
+    invitedUsers.add((roomId, userId));
+    return roomActionResult;
+  }
+
+  @override
+  Future<Result<bool>> canInvite(String roomId) async => canInviteResult;
+
   Result<CreatedRoom> createRoomResult = const Result.ok(
     CreatedRoom(roomId: '!nova:b.c', failedInvites: []),
   );

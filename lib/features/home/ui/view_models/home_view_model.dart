@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../auth/domain/models/user_session.dart';
+import '../../../rooms/domain/models/failed_invite.dart';
 import 'home_state.dart';
 
 class HomeViewModel extends Cubit<HomeState> {
@@ -41,8 +42,8 @@ class HomeViewModel extends Cubit<HomeState> {
   void dismissSessionWarning() =>
       emit(state.copyWith(sessionWarningDismissed: true));
 
-  void showFailedInvites(List<String> ids) =>
-      emit(state.copyWith(failedInvites: List.unmodifiable(ids)));
+  void showFailedInvites(List<FailedInvite> invites) =>
+      emit(state.copyWith(failedInvites: List.unmodifiable(invites)));
 
   void dismissFailedInvites() => emit(state.copyWith(failedInvites: const []));
 }

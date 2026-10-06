@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../auth/domain/models/user_session.dart';
+import '../../../rooms/domain/models/failed_invite.dart';
 
 const _unset = Object();
 
@@ -31,7 +32,7 @@ final class HomeState extends Equatable {
   // Lista ou filtros abertos à mão com a thread aberta ficam, com a thread por cima, enquanto a janela tiver ao menos esta largura.
   final double? panesOverThreadWidth;
 
-  final List<String> failedInvites;
+  final List<FailedInvite> failedInvites;
 
   bool get showSessionWarning =>
       !session.sessionSaved && !sessionWarningDismissed;
@@ -43,7 +44,7 @@ final class HomeState extends Equatable {
     bool? threadOpen,
     Object? openThreadId = _unset,
     Object? panesOverThreadWidth = _unset,
-    List<String>? failedInvites,
+    List<FailedInvite>? failedInvites,
   }) => HomeState(
     session: session,
     filtersExpanded: filtersExpanded ?? this.filtersExpanded,

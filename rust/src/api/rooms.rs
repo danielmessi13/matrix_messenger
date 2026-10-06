@@ -10,11 +10,17 @@ use matrix_sdk::{
             },
             error::ErrorKind,
         },
-        events::{room::encryption::RoomEncryptionEventContent, InitialStateEvent},
+        events::{
+            room::{
+                encryption::RoomEncryptionEventContent,
+                history_visibility::{HistoryVisibility, RoomHistoryVisibilityEventContent},
+            },
+            InitialStateEvent,
+        },
         matrix_uri::MatrixId,
         MatrixToUri, MatrixUri, OwnedRoomOrAliasId, OwnedServerName, RoomOrAliasId, UserId,
     },
-    Room,
+    QueueWedgeError, Room, RoomState,
 };
 
 use crate::{api::client::MatrixClient, frb_generated::StreamSink};
@@ -86,18 +92,63 @@ impl From<matrix_sdk::Error> for InviteError {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RoomActionErrorKind {
+    RoomNotFound,
+    InvalidUserId,
+    Forbidden,
+    Network,
+    UnverifiedDevice,
+    Unknown,
+}
+
+#[derive(Debug)]
+pub struct RoomActionError {
+    pub kind: RoomActionErrorKind,
+    pub message: String,
+}
+
+impl From<matrix_sdk::Error> for RoomActionError {
+    fn from(error: matrix_sdk::Error) -> Self {
+        let kind = match error.client_api_error_kind() {
+            Some(ErrorKind::Forbidden) => RoomActionErrorKind::Forbidden,
+            None if matches!(error, matrix_sdk::Error::Http(_)) => RoomActionErrorKind::Network,
+            // Convidar compartilha o histórico (MSC4268), o que exige esta sessão verificada.
+            _ if matches!(
+                QueueWedgeError::from(&error),
+                QueueWedgeError::CrossVerificationRequired
+            ) =>
+            {
+                RoomActionErrorKind::UnverifiedDevice
+            }
+            _ => RoomActionErrorKind::Unknown,
+        };
+        Self {
+            kind,
+            message: error.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewRoom {
     pub name: String,
     pub topic: Option<String>,
     pub is_public: bool,
     pub invites: Vec<String>,
+    pub share_history: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FailedInvite {
+    pub user_id: String,
+    pub kind: RoomActionErrorKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreatedRoom {
     pub room_id: String,
-    pub failed_invites: Vec<String>,
+    pub failed_invites: Vec<FailedInvite>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -201,6 +252,18 @@ fn with_server_of_id(
 // O retry padrão do SDK insiste por até 15 min em 5xx/429 e travaria o diálogo esperando.
 const ROOM_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+async fn within(
+    limit: Duration,
+    request: impl std::future::Future<Output = matrix_sdk::Result<()>>,
+) -> Result<(), RoomActionError> {
+    Ok(tokio::time::timeout(limit, request)
+        .await
+        .map_err(|_| RoomActionError {
+            kind: RoomActionErrorKind::Network,
+            message: format!("sem resposta do servidor em {limit:?}"),
+        })??)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UserCheckStatus {
     Found,
@@ -232,6 +295,40 @@ impl MatrixClient {
         Ok(self.invited_room(room_id)?.leave().await?)
     }
 
+    pub async fn leave_room(&self, room_id: String) -> Result<(), RoomActionError> {
+        let room = self.action_room(room_id)?;
+        match within(ROOM_REQUEST_TIMEOUT, room.leave()).await {
+            // O sync pode ter tirado a sala (kick, outro dispositivo) durante o pedido.
+            Err(_) if room.state() == RoomState::Left => Ok(()),
+            result => result,
+        }
+    }
+
+    pub async fn invite_user(
+        &self,
+        room_id: String,
+        user_id: String,
+    ) -> Result<(), RoomActionError> {
+        let room = self.action_room(room_id)?;
+        let user_id = UserId::parse(user_id.as_str()).map_err(|_| RoomActionError {
+            kind: RoomActionErrorKind::InvalidUserId,
+            message: user_id.clone(),
+        })?;
+        within(ROOM_REQUEST_TIMEOUT, room.invite_user_by_id(&user_id)).await
+    }
+
+    pub async fn can_invite(&self, room_id: String) -> bool {
+        let Some(room) = self.find_room(&room_id) else {
+            return false;
+        };
+        if room.state() != RoomState::Joined || room.is_direct().await.unwrap_or(true) {
+            return false;
+        }
+        room.power_levels()
+            .await
+            .is_ok_and(|levels| levels.user_can_invite(room.own_user_id()))
+    }
+
     pub async fn create_room(&self, room: NewRoom) -> Result<CreatedRoom, CreateRoomError> {
         self.create_room_within(room, ROOM_REQUEST_TIMEOUT).await
     }
@@ -248,10 +345,22 @@ impl MatrixClient {
             request.preset = Some(RoomPreset::PublicChat);
         } else {
             request.preset = Some(RoomPreset::PrivateChat);
-            request.initial_state = vec![InitialStateEvent::with_empty_state_key(
-                RoomEncryptionEventContent::with_recommended_defaults(),
-            )
-            .to_raw_any()];
+            // Com "joined" o SDK não envia as chaves antigas ao convidar.
+            let history = if room.share_history {
+                HistoryVisibility::Shared
+            } else {
+                HistoryVisibility::Joined
+            };
+            request.initial_state = vec![
+                InitialStateEvent::with_empty_state_key(
+                    RoomEncryptionEventContent::with_recommended_defaults(),
+                )
+                .to_raw_any(),
+                InitialStateEvent::with_empty_state_key(RoomHistoryVisibilityEventContent::new(
+                    history,
+                ))
+                .to_raw_any(),
+            ];
         }
         let created = tokio::time::timeout(limit, self.client.create_room(request))
             .await
@@ -263,12 +372,18 @@ impl MatrixClient {
         // Convidar depois da criação: um ID ruim não derruba a sala.
         let mut failed_invites = Vec::new();
         for invite in room.invites {
-            let invited = match UserId::parse(invite.as_str()) {
-                Ok(user_id) => created.invite_user_by_id(&user_id).await.is_ok(),
-                Err(_) => false,
+            let result = match UserId::parse(invite.as_str()) {
+                Ok(user_id) => created
+                    .invite_user_by_id(&user_id)
+                    .await
+                    .map_err(|error| RoomActionError::from(error).kind),
+                Err(_) => Err(RoomActionErrorKind::InvalidUserId),
             };
-            if !invited {
-                failed_invites.push(invite);
+            if let Err(kind) = result {
+                failed_invites.push(FailedInvite {
+                    user_id: invite,
+                    kind,
+                });
             }
         }
         Ok(CreatedRoom {
@@ -335,6 +450,13 @@ impl MatrixClient {
         Ok(joined.room_id().to_string())
     }
 
+    fn action_room(&self, room_id: String) -> Result<Room, RoomActionError> {
+        self.find_room(&room_id).ok_or(RoomActionError {
+            kind: RoomActionErrorKind::RoomNotFound,
+            message: room_id,
+        })
+    }
+
     fn invited_room(&self, room_id: String) -> Result<Room, InviteError> {
         self.find_room(&room_id).ok_or(InviteError {
             kind: InviteErrorKind::RoomNotFound,
@@ -348,11 +470,12 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use matrix_sdk::{
-        ruma::{room_id, user_id},
+        ruma::{events::AnySyncStateEvent, room_id, serde::Raw, user_id, RoomId, RoomVersionId},
         test_utils::{client::MockClientBuilder, mocks::MatrixMockServer},
-        RoomState,
     };
-    use matrix_sdk_test::{event_factory::EventFactory, InvitedRoomBuilder, JoinedRoomBuilder};
+    use matrix_sdk_test::{
+        event_factory::EventFactory, InvitedRoomBuilder, JoinedRoomBuilder, LeftRoomBuilder,
+    };
     use serde_json::{json, Value};
     use wiremock::{
         matchers::{method, path_regex},
@@ -448,6 +571,263 @@ mod tests {
         }
     }
 
+    async fn client_in_room(server: &MatrixMockServer, name: &str) -> (MatrixClient, Room) {
+        let client = server.client_builder().build().await;
+        let room = server
+            .sync_joined_room(&client, room_id!("!sala:example.org"))
+            .await;
+        (MatrixClient::new(client, temp_data_dir(name), None), room)
+    }
+
+    #[tokio::test]
+    async fn leave_room_leaves_a_joined_room() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "leave_room").await;
+        server
+            .mock_room_leave()
+            .ok(room.room_id())
+            .expect(1)
+            .mount()
+            .await;
+
+        client.leave_room(room.room_id().to_string()).await.unwrap();
+
+        assert_eq!(room.state(), RoomState::Left);
+    }
+
+    #[tokio::test]
+    async fn leave_room_maps_server_errors() {
+        let cases = [
+            (ResponseTemplate::new(500), RoomActionErrorKind::Network),
+            (api_error(400, "M_UNKNOWN"), RoomActionErrorKind::Unknown),
+        ];
+        for (index, (template, kind)) in cases.into_iter().enumerate() {
+            let server = MatrixMockServer::new().await;
+            let (client, room) = client_in_room(&server, &format!("leave_error_{index}")).await;
+            server
+                .mock_room_leave()
+                .respond_with(template)
+                .mount()
+                .await;
+
+            let error = client
+                .leave_room(room.room_id().to_string())
+                .await
+                .unwrap_err();
+
+            assert_eq!(error.kind, kind, "caso {index}");
+            assert_eq!(room.state(), RoomState::Joined, "caso {index}");
+        }
+    }
+
+    // O SDK trata 403 no leave como já fora da sala.
+    #[tokio::test]
+    async fn leave_room_refused_by_server_counts_as_left() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "leave_forbidden").await;
+        server.mock_room_leave().forbidden().mount().await;
+
+        client.leave_room(room.room_id().to_string()).await.unwrap();
+
+        assert_eq!(room.state(), RoomState::Left);
+    }
+
+    // Kick ou leave em outro dispositivo chega pelo sync antes do clique em Sair.
+    #[tokio::test]
+    async fn leave_room_already_left_is_ok_without_request() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "leave_already_left").await;
+        server
+            .sync_room(&client.client, LeftRoomBuilder::new(room.room_id()))
+            .await;
+        assert_eq!(room.state(), RoomState::Left);
+        server
+            .mock_room_leave()
+            .ok(room.room_id())
+            .expect(0)
+            .mount()
+            .await;
+
+        client.leave_room(room.room_id().to_string()).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn leave_room_failing_after_sync_left_the_room_is_ok() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "leave_left_meanwhile").await;
+        server
+            .mock_room_leave()
+            .respond_with(ResponseTemplate::new(500).set_delay(Duration::from_millis(300)))
+            .mount()
+            .await;
+
+        let leave = client.leave_room(room.room_id().to_string());
+        let sync = async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            server
+                .sync_room(&client.client, LeftRoomBuilder::new(room.room_id()))
+                .await;
+        };
+        let (result, ()) = tokio::join!(leave, sync);
+
+        assert_eq!(room.state(), RoomState::Left);
+        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn invite_user_sends_the_invite() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "invite_user").await;
+        server.mock_invite_user_by_id().ok().expect(1).mount().await;
+
+        client
+            .invite_user(room.room_id().to_string(), "@ana:example.org".to_owned())
+            .await
+            .unwrap();
+
+        let requests = server.server().received_requests().await.unwrap();
+        let invite = requests
+            .iter()
+            .find(|request| request.url.path().ends_with("/invite"))
+            .expect("invite enviado");
+        let body: Value = serde_json::from_slice(&invite.body).unwrap();
+        assert_eq!(body["user_id"], "@ana:example.org");
+    }
+
+    #[tokio::test]
+    async fn invite_user_with_invalid_id_sends_nothing() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "invite_invalid").await;
+        let before = server.server().received_requests().await.unwrap().len();
+
+        let error = client
+            .invite_user(room.room_id().to_string(), "ana".to_owned())
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.kind, RoomActionErrorKind::InvalidUserId);
+        let after = server.server().received_requests().await.unwrap().len();
+        assert_eq!(after, before);
+    }
+
+    #[tokio::test]
+    async fn invite_user_refused_by_server_is_forbidden() {
+        let server = MatrixMockServer::new().await;
+        let (client, room) = client_in_room(&server, "invite_forbidden").await;
+        server
+            .mock_invite_user_by_id()
+            .respond_with(api_error(403, "M_FORBIDDEN"))
+            .mount()
+            .await;
+
+        let error = client
+            .invite_user(room.room_id().to_string(), "@ana:example.org".to_owned())
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.kind, RoomActionErrorKind::Forbidden);
+    }
+
+    // O cenário real (bundle de chaves + identidade não verificada) é inviável no mock; o SDK
+    // converte SendingFromUnverifiedDevice e CrossSigningNotSetup em CrossVerificationRequired.
+    #[test]
+    fn unverified_device_error_is_unverified_device() {
+        let error = matrix_sdk::Error::SendQueueWedgeError(Box::new(
+            QueueWedgeError::CrossVerificationRequired,
+        ));
+
+        assert_eq!(
+            RoomActionError::from(error).kind,
+            RoomActionErrorKind::UnverifiedDevice
+        );
+    }
+
+    #[tokio::test]
+    async fn room_actions_on_unknown_room_are_room_not_found() {
+        let server = MatrixMockServer::new().await;
+        let client = created_client(&server, "room_action_unknown").await;
+
+        for room_id in ["!naoexiste:b.c", "isto não é um id"] {
+            let leave = client.leave_room(room_id.to_owned()).await.unwrap_err();
+            let invite = client
+                .invite_user(room_id.to_owned(), "@ana:example.org".to_owned())
+                .await
+                .unwrap_err();
+            assert_eq!(leave.kind, RoomActionErrorKind::RoomNotFound, "{room_id}");
+            assert_eq!(invite.kind, RoomActionErrorKind::RoomNotFound, "{room_id}");
+            assert!(!client.can_invite(room_id.to_owned()).await, "{room_id}");
+        }
+    }
+
+    fn room_with_invite_level(room_id: &RoomId, invite: i64) -> JoinedRoomBuilder {
+        let f = EventFactory::new();
+        let own = user_id!("@example:localhost");
+        let power_levels: Raw<AnySyncStateEvent> = Raw::new(&json!({
+            "type": "m.room.power_levels",
+            "state_key": "",
+            "event_id": format!("$pl{invite}:example.org"),
+            "sender": own,
+            "origin_server_ts": 1,
+            "content": { "invite": invite, "users": {} },
+        }))
+        .unwrap()
+        .cast_unchecked();
+        JoinedRoomBuilder::new(room_id)
+            .add_state_event(f.create(own, RoomVersionId::V1).sender(own))
+            .add_state_event(power_levels)
+    }
+
+    #[tokio::test]
+    async fn can_invite_follows_the_power_levels() {
+        let server = MatrixMockServer::new().await;
+        let inner = server.client_builder().build().await;
+        server
+            .sync_room(
+                &inner,
+                room_with_invite_level(room_id!("!livre:example.org"), 0),
+            )
+            .await;
+        server
+            .sync_room(
+                &inner,
+                room_with_invite_level(room_id!("!restrita:example.org"), 50),
+            )
+            .await;
+        let client = MatrixClient::new(inner, temp_data_dir("can_invite"), None);
+
+        assert!(client.can_invite("!livre:example.org".to_owned()).await);
+        assert!(!client.can_invite("!restrita:example.org".to_owned()).await);
+    }
+
+    #[tokio::test]
+    async fn can_invite_is_false_for_direct_and_invited_rooms() {
+        let server = MatrixMockServer::new().await;
+        let inner = server.client_builder().build().await;
+        let dm = room_id!("!dm:example.org");
+        let bob = user_id!("@bob:example.org");
+        server
+            .mock_sync()
+            .ok_and_run(&inner, |builder| {
+                builder.add_joined_room(room_with_invite_level(dm, 0));
+                builder.add_global_account_data(
+                    EventFactory::new()
+                        .direct()
+                        .add_user(bob.to_owned().into(), dm),
+                );
+            })
+            .await;
+        server
+            .sync_room(
+                &inner,
+                InvitedRoomBuilder::new(room_id!("!convite:example.org")),
+            )
+            .await;
+        let client = MatrixClient::new(inner, temp_data_dir("can_invite_dm"), None);
+
+        assert!(!client.can_invite(dm.to_string()).await);
+        assert!(!client.can_invite("!convite:example.org".to_owned()).await);
+    }
+
     /// Requer MATRIX_HOMESERVER, MATRIX_USERNAME e MATRIX_PASSWORD.
     #[tokio::test]
     #[ignore]
@@ -484,6 +864,7 @@ mod tests {
             topic: Some("Coordenação".to_owned()),
             is_public,
             invites: invites.iter().map(|id| (*id).to_owned()).collect(),
+            share_history: true,
         }
     }
 
@@ -527,6 +908,38 @@ mod tests {
         assert!(body.get("visibility").is_none());
     }
 
+    fn history_visibility(body: &Value) -> Option<&Value> {
+        body["initial_state"]
+            .as_array()?
+            .iter()
+            .find(|event| event["type"] == "m.room.history_visibility")
+            .map(|event| &event["content"]["history_visibility"])
+    }
+
+    #[tokio::test]
+    async fn create_private_room_sets_history_visibility_from_share_history() {
+        for (share_history, visibility) in [(true, "shared"), (false, "joined")] {
+            let server = MatrixMockServer::new().await;
+            let client = created_client(&server, &format!("create_history_{share_history}")).await;
+            server.mock_create_room().ok().mount().await;
+
+            client
+                .create_room(NewRoom {
+                    share_history,
+                    ..new_room(false, &[])
+                })
+                .await
+                .unwrap();
+
+            let body = create_room_body(&server).await;
+            assert_eq!(
+                history_visibility(&body),
+                Some(&json!(visibility)),
+                "share_history {share_history}"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn create_public_room_is_not_encrypted() {
         let server = MatrixMockServer::new().await;
@@ -536,6 +949,7 @@ mod tests {
         client
             .create_room(NewRoom {
                 topic: None,
+                share_history: false,
                 ..new_room(true, &[])
             })
             .await
@@ -576,7 +990,16 @@ mod tests {
         assert_eq!(created.room_id, "!room:example.org");
         assert_eq!(
             created.failed_invites,
-            vec!["@joao:example.org", "isto não é id"]
+            vec![
+                FailedInvite {
+                    user_id: "@joao:example.org".to_owned(),
+                    kind: RoomActionErrorKind::Unknown,
+                },
+                FailedInvite {
+                    user_id: "isto não é id".to_owned(),
+                    kind: RoomActionErrorKind::InvalidUserId,
+                },
+            ]
         );
     }
 

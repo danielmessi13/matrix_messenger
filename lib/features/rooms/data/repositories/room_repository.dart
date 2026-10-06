@@ -14,6 +14,12 @@ abstract interface class RoomRepository {
 
   Future<Result<void>> declineInvite(String roomId);
 
+  Future<Result<void>> leaveRoom(String roomId);
+
+  Future<Result<void>> inviteUser(String roomId, String userId);
+
+  Future<bool> canInvite(String roomId);
+
   Future<Result<CreatedRoom>> createRoom(NewRoom room);
 
   Future<UserCheck> checkUser(String userId);

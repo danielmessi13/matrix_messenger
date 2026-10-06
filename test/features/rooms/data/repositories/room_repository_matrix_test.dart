@@ -2,11 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository_matrix.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/create_room_failure.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/failed_invite.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/join_room_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/message_search_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room_action_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/user_check.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart' as bridge;
@@ -93,7 +95,19 @@ void main() {
 
   test('criar sala converte o pedido e o resultado', () async {
     service.createRoomResult = const Result.ok(
-      bridge.CreatedRoom(roomId: '!x:b.c', failedInvites: ['@joao:b.c']),
+      bridge.CreatedRoom(
+        roomId: '!x:b.c',
+        failedInvites: [
+          bridge.FailedInvite(
+            userId: '@joao:b.c',
+            kind: bridge.RoomActionErrorKind.unverifiedDevice,
+          ),
+          bridge.FailedInvite(
+            userId: 'joao',
+            kind: bridge.RoomActionErrorKind.invalidUserId,
+          ),
+        ],
+      ),
     );
 
     final result = await repository.createRoom(
@@ -102,17 +116,31 @@ void main() {
         topic: 'Coordenação',
         isPublic: true,
         invites: ['@ana:b.c', '@joao:b.c'],
+        shareHistory: false,
       ),
     );
 
     expect(
       (result as Ok<CreatedRoom>).value,
-      const CreatedRoom(roomId: '!x:b.c', failedInvites: ['@joao:b.c']),
+      const CreatedRoom(
+        roomId: '!x:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.c', RoomActionFailureType.unverifiedDevice),
+          FailedInvite('joao', RoomActionFailureType.invalidUserId),
+        ],
+      ),
     );
     expect(service.createdRooms.single.name, 'Plantão');
     expect(service.createdRooms.single.topic, 'Coordenação');
     expect(service.createdRooms.single.isPublic, isTrue);
     expect(service.createdRooms.single.invites, ['@ana:b.c', '@joao:b.c']);
+    expect(service.createdRooms.single.shareHistory, isFalse);
+  });
+
+  test('nova sala compartilha o histórico por padrão', () async {
+    await repository.createRoom(const NewRoom(name: 'a', isPublic: false));
+
+    expect(service.createdRooms.single.shareHistory, isTrue);
   });
 
   test('falha ao criar vira CreateRoomFailure com o tipo', () async {
@@ -231,6 +259,60 @@ void main() {
       ((result as Error).error as JoinRoomFailure).type,
       JoinRoomFailureType.unknown,
     );
+  });
+
+  test('sair e convidar repassam ao serviço', () async {
+    expect(await repository.leaveRoom('!a:b.c'), isA<Ok<void>>());
+    expect(await repository.inviteUser('!b:b.c', '@ana:b.c'), isA<Ok<void>>());
+
+    expect(service.leftRooms, ['!a:b.c']);
+    expect(service.invitedUsers, [('!b:b.c', '@ana:b.c')]);
+  });
+
+  test('falha em ação de sala vira RoomActionFailure com o tipo', () async {
+    for (final (kind, type) in [
+      (bridge.RoomActionErrorKind.roomNotFound, RoomActionFailureType.notFound),
+      (
+        bridge.RoomActionErrorKind.invalidUserId,
+        RoomActionFailureType.invalidUserId,
+      ),
+      (bridge.RoomActionErrorKind.forbidden, RoomActionFailureType.forbidden),
+      (bridge.RoomActionErrorKind.network, RoomActionFailureType.network),
+      (
+        bridge.RoomActionErrorKind.unverifiedDevice,
+        RoomActionFailureType.unverifiedDevice,
+      ),
+      (bridge.RoomActionErrorKind.unknown, RoomActionFailureType.unknown),
+    ]) {
+      service.roomActionResult = Result.error(
+        bridge.RoomActionError(kind: kind, message: 'x'),
+      );
+
+      final left = await repository.leaveRoom('!a:b.c');
+      final invited = await repository.inviteUser('!a:b.c', '@ana:b.c');
+
+      expect(((left as Error).error as RoomActionFailure).type, type);
+      expect(((invited as Error).error as RoomActionFailure).type, type);
+    }
+  });
+
+  test('erro que não veio do Rust em ação de sala é unknown', () async {
+    service.roomActionResult = Result.error(Exception('sem sessão'));
+
+    final result = await repository.leaveRoom('!a:b.c');
+
+    expect(
+      ((result as Error).error as RoomActionFailure).type,
+      RoomActionFailureType.unknown,
+    );
+  });
+
+  test('canInvite repassa o serviço e erro vira false', () async {
+    service.canInviteResult = const Result.ok(true);
+    expect(await repository.canInvite('!a:b.c'), isTrue);
+
+    service.canInviteResult = Result.error(Exception('sem sessão'));
+    expect(await repository.canInvite('!a:b.c'), isFalse);
   });
 
   test('busca de mensagens converte a página e repassa o next_batch', () async {

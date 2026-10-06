@@ -12,7 +12,9 @@ import '../../../recovery/data/repositories/recovery_repository.dart';
 import '../../../recovery/ui/view_models/recovery_view_model.dart';
 import '../../../recovery/ui/widgets/recovery_banner.dart';
 import '../../../rooms/data/repositories/room_repository.dart';
+import '../../../rooms/domain/models/failed_invite.dart';
 import '../../../rooms/domain/models/new_room.dart';
+import '../../../rooms/domain/models/room_action_failure.dart';
 import '../../../rooms/domain/models/room_filter.dart';
 import '../../../rooms/ui/new_room/view_models/join_room_view_model.dart';
 import '../../../rooms/ui/new_room/view_models/new_room_view_model.dart';
@@ -139,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         if (home.failedInvites.isNotEmpty)
                           _FailedInvitesBanner(
-                            ids: home.failedInvites,
+                            invites: home.failedInvites,
                             onDismiss: widget.viewModel.dismissFailedInvites,
                           ),
                         RecoveryBanner(
@@ -184,10 +186,10 @@ class _SessionWarningBanner extends StatelessWidget {
 }
 
 class _FailedInvitesBanner extends StatelessWidget {
-  const _FailedInvitesBanner({required this.ids, required this.onDismiss})
+  const _FailedInvitesBanner({required this.invites, required this.onDismiss})
     : super(key: const Key('failed_invites_banner'));
 
-  final List<String> ids;
+  final List<FailedInvite> invites;
 
   final VoidCallback onDismiss;
 
@@ -243,13 +245,26 @@ class _FailedInvitesBanner extends StatelessWidget {
                     style: TextStyle(color: colors.textSecondary),
                     children: [
                       TextSpan(
-                        text: ids.join(', '),
+                        text: invites.map((invite) => invite.userId).join(', '),
                         style: TextStyle(color: colors.textPrimary),
                       ),
                     ],
                   ),
                   style: const TextStyle(fontSize: 14, height: 1.5),
                 ),
+                if (invites.any(
+                  (invite) =>
+                      invite.type == RoomActionFailureType.unverifiedDevice,
+                ))
+                  Text(
+                    'Para convidar com o histórico compartilhado, verifique '
+                    'esta sessão com a chave de recuperação.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: colors.textSecondary,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -343,6 +358,7 @@ class _Panes extends StatelessWidget {
           Expanded(
             child: ConversationPane(
               room: list.selectedRoom,
+              ownUserId: home.session.userId,
               now: now,
               focus: list.focus,
               threadRequest: list.threadRequest,

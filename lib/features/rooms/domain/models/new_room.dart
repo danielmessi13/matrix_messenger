@@ -1,11 +1,14 @@
 import 'package:equatable/equatable.dart';
 
+import 'failed_invite.dart';
+
 final class NewRoom extends Equatable {
   const NewRoom({
     required this.name,
     this.topic,
     required this.isPublic,
     this.invites = const [],
+    this.shareHistory = true,
   });
 
   final String name;
@@ -16,8 +19,11 @@ final class NewRoom extends Equatable {
 
   final List<String> invites;
 
+  // Só vale para sala privada: convidados recebem as chaves das mensagens anteriores.
+  final bool shareHistory;
+
   @override
-  List<Object?> get props => [name, topic, isPublic, invites];
+  List<Object?> get props => [name, topic, isPublic, invites, shareHistory];
 }
 
 // O diálogo de nova sala devolve a sala a abrir, criada ou em que se entrou.
@@ -33,7 +39,7 @@ final class CreatedRoom extends NewRoomResult {
   @override
   final String roomId;
 
-  final List<String> failedInvites;
+  final List<FailedInvite> failedInvites;
 
   @override
   List<Object?> get props => [roomId, failedInvites];

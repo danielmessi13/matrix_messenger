@@ -7,8 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/create_room_failure.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/failed_invite.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/join_room_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room_action_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/user_check.dart';
 import 'package:matrix_messenger/features/rooms/ui/new_room/view_models/join_room_view_model.dart';
 import 'package:matrix_messenger/features/rooms/ui/new_room/view_models/new_room_view_model.dart';
@@ -120,6 +122,55 @@ void main() {
     expect(find.text('Entra quem tiver o link · sem cifra'), findsOneWidget);
   });
 
+  const shareHistoryHelp =
+      'Ao convidar, as chaves das mensagens anteriores vão junto. Para isso, '
+      'esta sessão precisa estar verificada (chave de recuperação).';
+
+  testWidgets(
+    'privada mostra o histórico compartilhado ligado; pública esconde',
+    (
+      tester,
+    ) async {
+      await open(tester);
+
+      final option = find.byKey(const Key('new_room_share_history'));
+      expect(option, findsOneWidget);
+      expect(tester.widget<Switch>(option).value, isTrue);
+      expect(
+        find.text('Novos membros veem as mensagens anteriores'),
+        findsOneWidget,
+      );
+      expect(find.text(shareHistoryHelp), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('new_room_public')));
+      await tester.pumpAndSettle();
+
+      expect(option, findsNothing);
+      expect(find.text(shareHistoryHelp), findsNothing);
+    },
+  );
+
+  testWidgets('desligar o histórico compartilhado vai no pedido', (
+    tester,
+  ) async {
+    await open(tester);
+    await tester.enterText(find.byKey(const Key('new_room_name')), 'Plantão');
+
+    await tester.tap(find.byKey(const Key('new_room_share_history')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const Key('new_room_share_history')))
+          .value,
+      isFalse,
+    );
+
+    await tester.tap(find.byKey(const Key('new_room_submit')));
+    await tester.pumpAndSettle();
+
+    expect(repository.createdRooms.single.shareHistory, isFalse);
+  });
+
   testWidgets('Enter no convite cria chip e limpa o campo', (tester) async {
     await open(tester);
 
@@ -183,7 +234,104 @@ void main() {
     );
   });
 
-  testWidgets('Backspace com o campo vazio remove o último chip', (
+  Color? borderColor(WidgetTester tester, Finder finder) {
+    final decoration = tester.widget<Container>(finder).decoration;
+    return ((decoration! as BoxDecoration).border as Border?)?.top.color;
+  }
+
+  Finder inviteBox() => find
+      .ancestor(
+        of: find.byKey(const Key('new_room_invite')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Container &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration! as BoxDecoration).border != null,
+        ),
+      )
+      .first;
+
+  testWidgets('não verificado fica âmbar, avisa e não bloqueia', (
+    tester,
+  ) async {
+    repository.userChecks['@rui:b.co'] = const UserUnknown();
+    repository.userChecks['@lia:b.co'] = const UserUnknown();
+    await open(tester);
+    await tester.enterText(find.byKey(const Key('new_room_name')), 'Plantão');
+
+    await tester.enterText(
+      find.byKey(const Key('new_room_invite')),
+      '@rui:b.co, @lia:b.co,',
+    );
+    await tester.pumpAndSettle();
+
+    const colors = AppColors.dark;
+    final chip = find.byKey(const Key('new_room_chip_@rui:b.co'));
+    expect(borderColor(tester, chip), colors.warning);
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: chip, matching: find.text('@rui:b.co')),
+          )
+          .style!
+          .color,
+      colors.warningText,
+    );
+    expect(borderColor(tester, inviteBox()), colors.warning);
+    final help = tester.widget<Text>(
+      find.byKey(const Key('new_room_invite_help')),
+    );
+    expect(
+      help.data,
+      'Não foi possível verificar “@rui:b.co”, “@lia:b.co”. '
+      'O convite será enviado mesmo assim.',
+    );
+    expect(help.style!.color, colors.warningText);
+    expect(submitEnabled(tester), isTrue);
+  });
+
+  testWidgets('erro prevalece sobre o aviso de não verificado', (
+    tester,
+  ) async {
+    repository.userChecks['@rui:b.co'] = const UserUnknown();
+    repository.userChecks['@joao:b.co'] = const UserNotFound();
+    await open(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('new_room_invite')),
+      '@rui:b.co @joao:b.co ',
+    );
+    await tester.pumpAndSettle();
+
+    const colors = AppColors.dark;
+    expect(borderColor(tester, inviteBox()), colors.danger);
+    expect(
+      borderColor(tester, find.byKey(const Key('new_room_chip_@rui:b.co'))),
+      colors.warning,
+    );
+    expect(find.text('“@joao:b.co” não existe no servidor.'), findsOneWidget);
+  });
+
+  testWidgets('chip encontrado e campo sem aviso usam a borda normal', (
+    tester,
+  ) async {
+    await open(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('new_room_invite')),
+      '@ana:b.co,',
+    );
+    await tester.pumpAndSettle();
+
+    const colors = AppColors.dark;
+    expect(
+      borderColor(tester, find.byKey(const Key('new_room_chip_@ana:b.co'))),
+      isNull,
+    );
+    expect(borderColor(tester, inviteBox()), colors.dialogBorder);
+  });
+
+  testWidgets('Backspace com o campo vazio devolve o último chip ao texto', (
     tester,
   ) async {
     await open(tester);
@@ -198,6 +346,13 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('new_room_chip_@ana:b.co')), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('new_room_invite')))
+          .controller!
+          .text,
+      '@ana:b.co',
+    );
   });
 
   testWidgets('criando: campos desabilitados e nada fecha', (tester) async {
@@ -284,7 +439,12 @@ void main() {
 
   testWidgets('Enter no nome cria e devolve a sala', (tester) async {
     repository.createRoomResult = const Result.ok(
-      CreatedRoom(roomId: '!x:b.c', failedInvites: ['@joao:b.co']),
+      CreatedRoom(
+        roomId: '!x:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
     );
     await open(tester);
 
@@ -295,7 +455,12 @@ void main() {
     expect(find.byKey(const Key('new_room_dialog')), findsNothing);
     expect(
       popped,
-      const CreatedRoom(roomId: '!x:b.c', failedInvites: ['@joao:b.co']),
+      const CreatedRoom(
+        roomId: '!x:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
     );
   });
 

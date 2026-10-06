@@ -137,6 +137,25 @@ class MatrixService {
     await client.declineInvite(roomId: roomId);
   });
 
+  Future<Result<void>> leaveRoom(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    await client.leaveRoom(roomId: roomId);
+  });
+
+  Future<Result<void>> inviteUser(String roomId, String userId) =>
+      _guard(() async {
+        final client = _client;
+        if (client == null) throw StateError('Sem sessão ativa');
+        await client.inviteUser(roomId: roomId, userId: userId);
+      });
+
+  Future<Result<bool>> canInvite(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.canInvite(roomId: roomId);
+  });
+
   Future<Result<CreatedRoom>> createRoom(NewRoom room) => _guard(() async {
     final client = _client;
     if (client == null) throw StateError('Sem sessão ativa');
@@ -230,6 +249,7 @@ class MatrixService {
       error is InviteError ||
       error is CreateRoomError ||
       error is JoinRoomError ||
+      error is RoomActionError ||
       error is SearchError ||
       error is LocalStorageException;
 }

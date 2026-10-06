@@ -7,8 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `create_room_within`, `invited_room`, `join_room_within`, `parse_join_target`, `with_server_of_id`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `action_room`, `create_room_within`, `invited_room`, `join_room_within`, `parse_join_target`, `with_server_of_id`, `within`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
 
 class CreateRoomError implements FrbException {
   final CreateRoomErrorKind kind;
@@ -38,7 +38,7 @@ enum CreateRoomErrorKind {
 
 class CreatedRoom {
   final String roomId;
-  final List<String> failedInvites;
+  final List<FailedInvite> failedInvites;
 
   const CreatedRoom({
     required this.roomId,
@@ -55,6 +55,27 @@ class CreatedRoom {
           runtimeType == other.runtimeType &&
           roomId == other.roomId &&
           failedInvites == other.failedInvites;
+}
+
+class FailedInvite {
+  final String userId;
+  final RoomActionErrorKind kind;
+
+  const FailedInvite({
+    required this.userId,
+    required this.kind,
+  });
+
+  @override
+  int get hashCode => userId.hashCode ^ kind.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FailedInvite &&
+          runtimeType == other.runtimeType &&
+          userId == other.userId &&
+          kind == other.kind;
 }
 
 class InviteError implements FrbException {
@@ -161,17 +182,23 @@ class NewRoom {
   final String? topic;
   final bool isPublic;
   final List<String> invites;
+  final bool shareHistory;
 
   const NewRoom({
     required this.name,
     this.topic,
     required this.isPublic,
     required this.invites,
+    required this.shareHistory,
   });
 
   @override
   int get hashCode =>
-      name.hashCode ^ topic.hashCode ^ isPublic.hashCode ^ invites.hashCode;
+      name.hashCode ^
+      topic.hashCode ^
+      isPublic.hashCode ^
+      invites.hashCode ^
+      shareHistory.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -181,7 +208,38 @@ class NewRoom {
           name == other.name &&
           topic == other.topic &&
           isPublic == other.isPublic &&
-          invites == other.invites;
+          invites == other.invites &&
+          shareHistory == other.shareHistory;
+}
+
+class RoomActionError implements FrbException {
+  final RoomActionErrorKind kind;
+  final String message;
+
+  const RoomActionError({
+    required this.kind,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoomActionError &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message;
+}
+
+enum RoomActionErrorKind {
+  roomNotFound,
+  invalidUserId,
+  forbidden,
+  network,
+  unverifiedDevice,
+  unknown,
 }
 
 class RoomSummary {

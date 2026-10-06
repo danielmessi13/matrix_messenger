@@ -226,6 +226,52 @@ void main() {
     expect(await service.declineInvite('!a:b.c'), isA<Error<void>>());
   });
 
+  test('ações de sala chamam o cliente atual', () async {
+    final client = FakeMatrixClient.of(kUserSession)..canInviteValue = true;
+    bridge.loginClient = client;
+    await login();
+
+    expect(await service.leaveRoom('!a:b.c'), isA<Ok<void>>());
+    expect(
+      await service.inviteUser('!b:b.c', '@ana:b.c'),
+      isA<Ok<void>>(),
+    );
+    expect(
+      await service.canInvite('!b:b.c'),
+      isA<Ok<bool>>().having((r) => r.value, 'value', isTrue),
+    );
+
+    expect(client.leftRooms, ['!a:b.c']);
+    expect(client.invitedUsers, [('!b:b.c', '@ana:b.c')]);
+  });
+
+  test('leaveRoom devolve o RoomActionError do Rust', () async {
+    final client = FakeMatrixClient.of(kUserSession);
+    client.roomActionError = const RoomActionError(
+      kind: RoomActionErrorKind.forbidden,
+      message: 'x',
+    );
+    bridge.loginClient = client;
+    await login();
+
+    final result = await service.leaveRoom('!a:b.c');
+
+    expect(
+      (result as Error<void>).error,
+      isA<RoomActionError>().having(
+        (e) => e.kind,
+        'kind',
+        RoomActionErrorKind.forbidden,
+      ),
+    );
+  });
+
+  test('ações de sala sem cliente são erro', () async {
+    expect(await service.leaveRoom('!a:b.c'), isA<Error<void>>());
+    expect(await service.inviteUser('!a:b.c', '@ana:b.c'), isA<Error<void>>());
+    expect(await service.canInvite('!a:b.c'), isA<Error<bool>>());
+  });
+
   test('recover devolve o RecoveryError do Rust', () async {
     final client = FakeMatrixClient.of(kUserSession);
     client.recoverError = const RecoveryError(

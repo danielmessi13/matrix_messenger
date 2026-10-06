@@ -121,6 +121,36 @@ class FakeMatrixClient implements MatrixClient {
     }
   }
 
+  Object? roomActionError;
+
+  bool canInviteValue = false;
+
+  final leftRooms = <String>[];
+
+  final invitedUsers = <(String, String)>[];
+
+  @override
+  Future<void> leaveRoom({required String roomId}) async {
+    leftRooms.add(roomId);
+    if (roomActionError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  @override
+  Future<void> inviteUser({
+    required String roomId,
+    required String userId,
+  }) async {
+    invitedUsers.add((roomId, userId));
+    if (roomActionError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  @override
+  Future<bool> canInvite({required String roomId}) async => canInviteValue;
+
   CreatedRoom createdRoom = const CreatedRoom(
     roomId: '!nova:b.c',
     failedInvites: [],

@@ -31,6 +31,7 @@ class ConversationPane extends StatelessWidget {
   const ConversationPane({
     super.key,
     required this.room,
+    required this.ownUserId,
     required this.now,
     this.focus,
     this.threadRequest,
@@ -39,6 +40,8 @@ class ConversationPane extends StatelessWidget {
   });
 
   final Room? room;
+
+  final String ownUserId;
 
   final DateTime now;
 
@@ -68,7 +71,7 @@ class ConversationPane extends StatelessWidget {
         ),
         Room(isInvite: true) => Column(
           children: [
-            ConversationHeader(room: room),
+            ConversationHeader(room: room, ownUserId: ownUserId),
             Expanded(
               child: Center(
                 child: BlocProvider(
@@ -96,7 +99,11 @@ class ConversationPane extends StatelessWidget {
                 request: threadRequest?.roomId == room.id
                     ? threadRequest
                     : null,
-                child: _Conversation(room: room, now: now),
+                child: _Conversation(
+                  room: room,
+                  ownUserId: ownUserId,
+                  now: now,
+                ),
               ),
             ),
           ),
@@ -230,9 +237,15 @@ class _ThreadVisibilityState extends State<_ThreadVisibility> {
 }
 
 class _Conversation extends StatelessWidget {
-  const _Conversation({required this.room, required this.now});
+  const _Conversation({
+    required this.room,
+    required this.ownUserId,
+    required this.now,
+  });
 
   final Room room;
+
+  final String ownUserId;
 
   final DateTime now;
 
@@ -242,7 +255,7 @@ class _Conversation extends StatelessWidget {
     final colors = context.colors;
     final conversation = Column(
       children: [
-        ConversationHeader(room: room),
+        ConversationHeader(room: room, ownUserId: ownUserId),
         Expanded(
           child: BlocBuilder<ConversationViewModel, ConversationState>(
             builder: (context, state) => switch (state.status) {

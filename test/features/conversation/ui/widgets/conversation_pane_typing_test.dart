@@ -39,6 +39,7 @@ void main() {
           home: Scaffold(
             body: ConversationPane(
               room: kTeamRoom,
+              ownUserId: '@eu:b.c',
               now: kDay.add(const Duration(hours: 12)),
             ),
           ),

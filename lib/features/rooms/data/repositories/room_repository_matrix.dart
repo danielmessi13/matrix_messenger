@@ -3,11 +3,13 @@ import '../../../../core/utils/result.dart';
 import '../../../../src/rust/api/rooms.dart' as bridge;
 import '../../../../src/rust/api/search.dart' as search;
 import '../../domain/models/create_room_failure.dart';
+import '../../domain/models/failed_invite.dart';
 import '../../domain/models/join_room_failure.dart';
 import '../../domain/models/message_hit.dart';
 import '../../domain/models/message_search_failure.dart';
 import '../../domain/models/new_room.dart';
 import '../../domain/models/room.dart';
+import '../../domain/models/room_action_failure.dart';
 import '../../domain/models/sync_state.dart';
 import '../../domain/models/user_check.dart';
 import 'latest_message_mapper.dart';
@@ -36,19 +38,40 @@ class RoomRepositoryMatrix implements RoomRepository {
       _service.declineInvite(roomId);
 
   @override
+  Future<Result<void>> leaveRoom(String roomId) async =>
+      _toRoomActionResult(await _service.leaveRoom(roomId));
+
+  @override
+  Future<Result<void>> inviteUser(String roomId, String userId) async =>
+      _toRoomActionResult(await _service.inviteUser(roomId, userId));
+
+  @override
+  Future<bool> canInvite(String roomId) async =>
+      switch (await _service.canInvite(roomId)) {
+        Ok(:final value) => value,
+        Error() => false,
+      };
+
+  @override
   Future<Result<CreatedRoom>> createRoom(NewRoom room) async {
     final request = bridge.NewRoom(
       name: room.name,
       topic: room.topic,
       isPublic: room.isPublic,
       invites: room.invites,
+      shareHistory: room.shareHistory,
     );
     switch (await _service.createRoom(request)) {
       case Ok(:final value):
         return Result.ok(
           CreatedRoom(
             roomId: value.roomId,
-            failedInvites: List.unmodifiable(value.failedInvites),
+            failedInvites: List.unmodifiable(
+              value.failedInvites.map(
+                (failed) =>
+                    FailedInvite(failed.userId, _toRoomActionType(failed.kind)),
+              ),
+            ),
           ),
         );
       case Error(:final error):
@@ -123,6 +146,32 @@ class RoomRepositoryMatrix implements RoomRepository {
     ),
     _ => MessageSearchFailure(MessageSearchFailureType.unknown, '$error'),
   };
+
+  Result<void> _toRoomActionResult(Result<void> result) => switch (result) {
+    Ok() => const Result.ok(null),
+    Error(:final error) => Result.error(_toRoomActionFailure(error)),
+  };
+
+  RoomActionFailure _toRoomActionFailure(Exception error) => switch (error) {
+    bridge.RoomActionError(:final kind, :final message) => RoomActionFailure(
+      _toRoomActionType(kind),
+      message,
+    ),
+    _ => RoomActionFailure(RoomActionFailureType.unknown, '$error'),
+  };
+
+  RoomActionFailureType _toRoomActionType(bridge.RoomActionErrorKind kind) =>
+      switch (kind) {
+        bridge.RoomActionErrorKind.roomNotFound =>
+          RoomActionFailureType.notFound,
+        bridge.RoomActionErrorKind.invalidUserId =>
+          RoomActionFailureType.invalidUserId,
+        bridge.RoomActionErrorKind.forbidden => RoomActionFailureType.forbidden,
+        bridge.RoomActionErrorKind.network => RoomActionFailureType.network,
+        bridge.RoomActionErrorKind.unverifiedDevice =>
+          RoomActionFailureType.unverifiedDevice,
+        bridge.RoomActionErrorKind.unknown => RoomActionFailureType.unknown,
+      };
 
   JoinRoomFailure _toJoinFailure(Exception error) => switch (error) {
     bridge.JoinRoomError(:final kind, :final message) => JoinRoomFailure(

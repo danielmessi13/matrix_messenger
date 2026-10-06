@@ -190,6 +190,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CreatedRoom dco_decode_created_room(dynamic raw);
 
   @protected
+  FailedInvite dco_decode_failed_invite(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -218,6 +221,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<FailedInvite> dco_decode_list_failed_invite(dynamic raw);
 
   @protected
   List<MessageHit> dco_decode_list_message_hit(dynamic raw);
@@ -317,6 +323,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReplyState dco_decode_reply_state(dynamic raw);
+
+  @protected
+  RoomActionError dco_decode_room_action_error(dynamic raw);
+
+  @protected
+  RoomActionErrorKind dco_decode_room_action_error_kind(dynamic raw);
 
   @protected
   RoomEvent dco_decode_room_event(dynamic raw);
@@ -539,6 +551,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CreatedRoom sse_decode_created_room(SseDeserializer deserializer);
 
   @protected
+  FailedInvite sse_decode_failed_invite(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
@@ -571,6 +586,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<FailedInvite> sse_decode_list_failed_invite(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<MessageHit> sse_decode_list_message_hit(SseDeserializer deserializer);
@@ -696,6 +716,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReplyState sse_decode_reply_state(SseDeserializer deserializer);
+
+  @protected
+  RoomActionError sse_decode_room_action_error(SseDeserializer deserializer);
+
+  @protected
+  RoomActionErrorKind sse_decode_room_action_error_kind(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RoomEvent sse_decode_room_event(SseDeserializer deserializer);
@@ -959,6 +987,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_created_room(CreatedRoom self, SseSerializer serializer);
 
   @protected
+  void sse_encode_failed_invite(FailedInvite self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
@@ -996,6 +1027,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_failed_invite(
+    List<FailedInvite> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_message_hit(
@@ -1153,6 +1190,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reply_state(ReplyState self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_room_action_error(
+    RoomActionError self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_room_action_error_kind(
+    RoomActionErrorKind self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_room_event(RoomEvent self, SseSerializer serializer);

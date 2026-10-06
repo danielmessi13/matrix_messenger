@@ -41,6 +41,45 @@ class FakeRoomRepository implements RoomRepository {
     return inviteResult;
   }
 
+  Result<void> leaveRoomResult = const Result.ok(null);
+
+  Completer<void>? leaveRoomGate;
+
+  final leftRooms = <String>[];
+
+  @override
+  Future<Result<void>> leaveRoom(String roomId) async {
+    leftRooms.add(roomId);
+    await leaveRoomGate?.future;
+    return leaveRoomResult;
+  }
+
+  Result<void> inviteUserResult = const Result.ok(null);
+
+  Completer<void>? inviteUserGate;
+
+  final invitedUsers = <(String, String)>[];
+
+  @override
+  Future<Result<void>> inviteUser(String roomId, String userId) async {
+    invitedUsers.add((roomId, userId));
+    await inviteUserGate?.future;
+    return inviteUserResult;
+  }
+
+  bool canInviteValue = false;
+
+  Completer<void>? canInviteGate;
+
+  final canInviteCalls = <String>[];
+
+  @override
+  Future<bool> canInvite(String roomId) async {
+    canInviteCalls.add(roomId);
+    await canInviteGate?.future;
+    return canInviteValue;
+  }
+
   Result<CreatedRoom> createRoomResult = const Result.ok(
     CreatedRoom(roomId: '!nova:b.c'),
   );

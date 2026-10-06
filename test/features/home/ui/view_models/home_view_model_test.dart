@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_state.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/failed_invite.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room_action_failure.dart';
 
 import '../../../../../testing/models/user_session.dart';
 
@@ -110,10 +112,17 @@ void main() {
     'mostra e dispensa os convites que falharam',
     build: () => HomeViewModel(kUserSession),
     act: (viewModel) => viewModel
-      ..showFailedInvites(['@joao:b.co'])
+      ..showFailedInvites(const [
+        FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+      ])
       ..dismissFailedInvites(),
     expect: () => const [
-      HomeState(session: kUserSession, failedInvites: ['@joao:b.co']),
+      HomeState(
+        session: kUserSession,
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
       HomeState(session: kUserSession),
     ],
   );
