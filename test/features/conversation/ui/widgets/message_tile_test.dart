@@ -78,7 +78,7 @@ void main() {
     expect(find.text('Diego Alves'), findsOneWidget);
     expect(find.text('10:05'), findsOneWidget);
     expect(find.textContaining('A integração com o gateway'), findsOneWidget);
-    expect(find.text('VOCÊ'), findsNothing);
+    expect(find.text('Você'), findsNothing);
   });
 
   Future<void> hover(WidgetTester tester, Finder target) async {
@@ -164,7 +164,7 @@ void main() {
   testWidgets('mensagem própria: etiqueta e "Lida por"', (tester) async {
     await pump(tester, kOwnMessage);
 
-    expect(find.text('VOCÊ'), findsOneWidget);
+    expect(find.text('Você'), findsOneWidget);
     expect(find.text('✓✓ Lida por Carla e Diego'), findsOneWidget);
   });
 
@@ -231,45 +231,6 @@ void main() {
       body: 'ok',
     ),
   );
-
-  testWidgets('cabeçalho da citação ocupa a largura do cartão', (tester) async {
-    await pump(
-      tester,
-      quoted('Ana', 'um corpo bem mais largo que o cabeçalho da citação'),
-    );
-
-    final card = tester.getSize(find.byKey(const Key('message_reply_quote')));
-    final header = tester.getSize(find.byKey(const Key('reply_quote_header')));
-
-    expect(header.width, closeTo(card.width - 2, 2));
-  });
-
-  testWidgets('citação longa não alarga o cartão de uma resposta curta', (
-    tester,
-  ) async {
-    await pump(
-      tester,
-      MessageItem(
-        id: '\$q',
-        senderId: '@bob:b.c',
-        senderName: 'Bob',
-        isOwn: false,
-        timestamp: DateTime(2026, 10, 4, 10, 21),
-        kind: MessageKind.text,
-        body: 'ok',
-        replyTo: ReplyPreview(
-          eventId: '\$1',
-          state: ReplyState.ready,
-          senderName: 'Ana',
-          kind: MessageKind.text,
-          body: 'uma mensagem original bem comprida ' * 6,
-        ),
-      ),
-    );
-
-    final card = tester.getSize(find.byKey(const Key('message_reply_quote')));
-    expect(card.width, lessThan(260));
-  });
 
   testWidgets('menu fica junto do balão, não no canto da linha', (
     tester,
@@ -532,10 +493,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(
-      find.descendant(of: quote, matching: find.textContaining('concordo')),
-      findsOneWidget,
-    );
+    expect(find.textContaining('concordo'), findsOneWidget);
   });
 
   testWidgets('citação de mensagem minha mostra "Você" no lugar do nome', (
@@ -573,6 +531,71 @@ void main() {
     );
   });
 
+  testWidgets('mensagem de outra pessoa mostra o avatar com as iniciais', (
+    tester,
+  ) async {
+    await pump(tester, kOtherMessage);
+
+    expect(
+      find.descendant(
+        of: find.byKey(Key('message_avatar_${kOtherMessage.id}')),
+        matching: find.text('DA'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('continuação não repete o avatar', (tester) async {
+    await pump(tester, kOtherMessage, continuation: true);
+
+    expect(find.byKey(Key('message_avatar_${kOtherMessage.id}')), findsNothing);
+  });
+
+  testWidgets('resposta em continuação alinha a citação com o texto', (
+    tester,
+  ) async {
+    await pump(tester, quoted('Ana', 'concordo'), continuation: true);
+
+    final quote = tester.getTopLeft(find.text('Ana'));
+    final body = tester.getTopLeft(find.textContaining('concordo'));
+    expect(quote.dx, greaterThanOrEqualTo(body.dx));
+  });
+
+  testWidgets('minha resposta a mim mesmo mostra só o trecho citado', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      MessageItem(
+        id: '\$2',
+        senderId: '@alice:a.b',
+        senderName: 'Alice',
+        isOwn: true,
+        timestamp: DateTime(2026, 10, 4, 10, 21),
+        kind: MessageKind.text,
+        body: 'tenta de novo',
+        replyTo: const ReplyPreview(
+          eventId: '\$1',
+          state: ReplyState.ready,
+          isOwn: true,
+          senderName: 'Alice',
+          kind: MessageKind.text,
+          body: 'tenta agora',
+        ),
+      ),
+    );
+
+    final quote = find.byKey(const Key('message_reply_quote'));
+    expect(
+      find.descendant(of: quote, matching: find.text('tenta agora')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: quote, matching: find.text('Você')),
+      findsNothing,
+    );
+  });
+
   testWidgets('mensagem sem resposta não mostra citação', (tester) async {
     await pump(tester, kOtherMessage);
 
@@ -594,7 +617,7 @@ void main() {
   ) async {
     await pump(tester, kOwnMessage, continuation: true);
 
-    expect(find.text('VOCÊ'), findsNothing);
+    expect(find.text('Você'), findsNothing);
     expect(find.text('10:21'), findsNothing);
     expect(find.text(readByLabel(kOwnMessage.readBy)), findsOneWidget);
   });

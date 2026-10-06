@@ -11,10 +11,12 @@ import 'package:matrix_messenger/features/auth/ui/auth_gate/widgets/auth_gate.da
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/threads/data/repositories/recent_threads_repository.dart';
 
 import '../../../../../../testing/desktop_size.dart';
 import '../../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../../testing/fakes/repositories/fake_recent_threads_repository.dart';
 import '../../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../../testing/fakes/services/fake_browser_launcher.dart';
@@ -37,6 +39,9 @@ void main() {
         providers: [
           RepositoryProvider<AuthRepository>.value(value: repository),
           RepositoryProvider<RoomRepository>.value(value: roomRepository),
+          RepositoryProvider<RecentThreadsRepository>.value(
+            value: FakeRecentThreadsRepository(),
+          ),
           RepositoryProvider<RecoveryRepository>.value(
             value: recoveryRepository,
           ),

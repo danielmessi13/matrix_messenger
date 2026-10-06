@@ -10,6 +10,7 @@ import '../../domain/models/new_room.dart';
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
 import '../../domain/models/user_check.dart';
+import 'latest_message_mapper.dart';
 import 'room_repository.dart';
 
 class RoomRepositoryMatrix implements RoomRepository {
@@ -156,29 +157,13 @@ class RoomRepositoryMatrix implements RoomRepository {
     isPublic: summary.isPublic,
     unreadMessages: summary.unreadMessages,
     unreadMentions: summary.unreadMentions,
-    unreadThreadReplies: summary.unreadThreadReplies,
     memberCount: summary.memberCount,
     heroes: List.unmodifiable(summary.heroes),
     latest: switch (summary.latest) {
       null => null,
-      final latest => LatestMessage(
-        senderName: latest.senderName,
-        isOwn: latest.isOwn,
-        kind: _toKind(latest.kind),
-        body: latest.body,
-        timestamp: DateTime.fromMillisecondsSinceEpoch(latest.timestampMs),
-      ),
+      final latest => toLatestMessage(latest),
     },
   );
-
-  // O switch quebra se o Rust ganhar um caso novo.
-  LatestMessageKind _toKind(bridge.LatestMessageKind kind) => switch (kind) {
-    bridge.LatestMessageKind.text => LatestMessageKind.text,
-    bridge.LatestMessageKind.image => LatestMessageKind.image,
-    bridge.LatestMessageKind.file => LatestMessageKind.file,
-    bridge.LatestMessageKind.encrypted => LatestMessageKind.encrypted,
-    bridge.LatestMessageKind.other => LatestMessageKind.other,
-  };
 
   SyncState _toSyncState(bridge.SyncStatus status) => switch (status) {
     bridge.SyncStatus.connecting => SyncState.connecting,

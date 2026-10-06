@@ -6,6 +6,7 @@ mod diff_window;
 mod frb_generated;
 mod media;
 mod oidc_callback;
+mod recent_threads;
 mod room_list;
 mod session_store;
 #[cfg(test)]

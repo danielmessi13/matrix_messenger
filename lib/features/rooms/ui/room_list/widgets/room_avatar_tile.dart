@@ -11,6 +11,7 @@ class RoomAvatarTile extends StatelessWidget {
     required this.selected,
     required this.unread,
     required this.onTap,
+    this.tooltip,
   });
 
   final Room room;
@@ -21,11 +22,13 @@ class RoomAvatarTile extends StatelessWidget {
 
   final VoidCallback onTap;
 
+  final String? tooltip;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Tooltip(
-      message: roomName(room),
+      message: tooltip ?? roomName(room),
       child: InkWell(
         key: Key('room_avatar_${room.id}'),
         onTap: onTap,

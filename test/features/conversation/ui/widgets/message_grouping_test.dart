@@ -46,7 +46,7 @@ void main() {
     expect(continuesGroup(DateDividerItem(kDay), msg()), isFalse);
   });
 
-  test('resposta a mim mantém o cabeçalho', () {
+  test('resposta mantém o cabeçalho', () {
     const mine = ReplyPreview(
       eventId: '\$1',
       state: ReplyState.ready,
@@ -56,7 +56,7 @@ void main() {
     const at = Duration(minutes: 1);
 
     expect(continuesGroup(msg(), msg(at: at, replyTo: mine)), isFalse);
-    expect(continuesGroup(msg(), msg(at: at, replyTo: others)), isTrue);
+    expect(continuesGroup(msg(), msg(at: at, replyTo: others)), isFalse);
   });
 
   test('mensagem depois de uma resposta a mim começa outro grupo', () {
@@ -91,7 +91,7 @@ void main() {
     );
   });
 
-  test('minha resposta a mim mesmo continua o grupo', () {
+  test('minha resposta a mim mesmo começa outro grupo', () {
     const mine = ReplyPreview(
       eventId: '\$1',
       state: ReplyState.ready,
@@ -103,7 +103,7 @@ void main() {
         msg(isOwn: true),
         msg(isOwn: true, at: const Duration(minutes: 1), replyTo: mine),
       ),
-      isTrue,
+      isFalse,
     );
   });
 

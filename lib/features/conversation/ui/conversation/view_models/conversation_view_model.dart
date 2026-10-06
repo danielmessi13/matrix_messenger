@@ -288,9 +288,19 @@ class ConversationViewModel extends Cubit<ConversationState> {
     return true;
   }
 
-  Future<Result<Conversation>> _openThreadTimeline(String rootEventId) async =>
-      await _conversation?.openThread(rootEventId) ??
-      const Result.error(ConversationFailure(ConversationFailureType.unknown));
+  Future<Result<Conversation>> _openThreadTimeline(String rootEventId) async {
+    // Pedido vindo da lista de threads chega antes da conversa terminar de abrir.
+    await _opening;
+    if (_closing || isClosed) {
+      return const Result.error(
+        ConversationFailure(ConversationFailureType.unknown),
+      );
+    }
+    return await _conversation?.openThread(rootEventId) ??
+        const Result.error(
+          ConversationFailure(ConversationFailureType.unknown),
+        );
+  }
 
   void _onSnapshot(ConversationSnapshot snapshot) {
     if (_closing || isClosed) return;

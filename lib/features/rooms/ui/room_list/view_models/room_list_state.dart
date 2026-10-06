@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import '../../../domain/models/room.dart';
 import '../../../domain/models/room_filter.dart';
 import '../../../domain/models/sync_state.dart';
+import '../../../domain/models/thread_request.dart';
 import 'message_search_state.dart';
 
 final class RoomListState extends Equatable {
@@ -16,6 +17,7 @@ final class RoomListState extends Equatable {
     this.selectedRoomId,
     this.pendingRoomId,
     this.focus,
+    this.threadRequest,
   });
 
   final List<Room> rooms;
@@ -35,6 +37,8 @@ final class RoomListState extends Equatable {
   final String? pendingRoomId;
 
   final EventFocus? focus;
+
+  final ThreadRequest? threadRequest;
 
   bool get searching => query.trim().isNotEmpty;
 
@@ -63,6 +67,7 @@ final class RoomListState extends Equatable {
     String? Function()? selectedRoomId,
     String? Function()? pendingRoomId,
     EventFocus? Function()? focus,
+    ThreadRequest? Function()? threadRequest,
   }) => RoomListState(
     rooms: rooms ?? this.rooms,
     loaded: loaded ?? this.loaded,
@@ -75,6 +80,7 @@ final class RoomListState extends Equatable {
         : selectedRoomId(),
     pendingRoomId: pendingRoomId == null ? this.pendingRoomId : pendingRoomId(),
     focus: focus == null ? this.focus : focus(),
+    threadRequest: threadRequest == null ? this.threadRequest : threadRequest(),
   );
 
   @override
@@ -88,5 +94,6 @@ final class RoomListState extends Equatable {
     selectedRoomId,
     pendingRoomId,
     focus,
+    threadRequest,
   ];
 }

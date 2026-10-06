@@ -10,6 +10,7 @@ import 'package:matrix_messenger/features/auth/data/repositories/auth_repository
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/focus_flash.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/thread_panel.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
@@ -20,13 +21,17 @@ import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/widgets/room_list_pane.dart';
+import 'package:matrix_messenger/features/threads/domain/models/recent_thread.dart';
+import 'package:matrix_messenger/features/threads/ui/view_models/recent_threads_view_model.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_recent_threads_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../testing/models/message.dart';
+import '../../../../../testing/models/recent_thread.dart';
 import '../../../../../testing/models/room.dart';
 import '../../../../../testing/models/user_session.dart';
 
@@ -35,18 +40,21 @@ void main() {
   late FakeRoomRepository roomRepository;
   late FakeRecoveryRepository recoveryRepository;
   late FakeConversationRepository conversationRepository;
+  late FakeRecentThreadsRepository recentThreadsRepository;
 
   setUp(() {
     authRepository = FakeAuthRepository(savedSession: kUserSession);
     roomRepository = FakeRoomRepository();
     recoveryRepository = FakeRecoveryRepository();
     conversationRepository = FakeConversationRepository();
+    recentThreadsRepository = FakeRecentThreadsRepository();
   });
 
   tearDown(() async {
     await authRepository.dispose();
     await roomRepository.dispose();
     await recoveryRepository.dispose();
+    await recentThreadsRepository.dispose();
   });
 
   Future<void> pumpScreen(
@@ -58,7 +66,11 @@ void main() {
     final viewModel = HomeViewModel(session);
     final roomListViewModel = RoomListViewModel(roomRepository)..init();
     addTearDown(viewModel.close);
+    final recentThreadsViewModel = RecentThreadsViewModel(
+      recentThreadsRepository,
+    )..init();
     addTearDown(roomListViewModel.close);
+    addTearDown(recentThreadsViewModel.close);
     await tester.pumpWidget(
       MultiRepositoryProvider(
         providers: [
@@ -76,6 +88,7 @@ void main() {
           home: HomeScreen(
             viewModel: viewModel,
             roomListViewModel: roomListViewModel,
+            recentThreadsViewModel: recentThreadsViewModel,
             clock: () => kNow,
           ),
         ),
@@ -118,6 +131,84 @@ void main() {
 
     expect(find.byKey(Key('room_${kDirectRoom.id}')), findsOneWidget);
     expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
+  });
+
+  Future<void> showThreads(WidgetTester tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+    recentThreadsRepository.controller.add(
+      RecentThreads(status: RecentThreadsStatus.ready, threads: [kTeamThread]),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('filter_threads')));
+    await tester.pumpAndSettle();
+  }
+
+  final teamThreadKey = Key(
+    'thread_${kTeamThread.roomId}_${kTeamThread.rootEventId}',
+  );
+
+  testWidgets('filtro Threads troca a lista de salas pelas threads recentes', (
+    tester,
+  ) async {
+    await showThreads(tester);
+
+    expect(find.text('Threads recentes'), findsOneWidget);
+    expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('filter_inbox')));
+    await tester.pumpAndSettle();
+    expect(find.text('Threads recentes'), findsNothing);
+    expect(find.byKey(Key('room_${kTeamRoom.id}')), findsOneWidget);
+  });
+
+  testWidgets('clicar numa thread abre a sala com o painel da thread', (
+    tester,
+  ) async {
+    await showThreads(tester);
+
+    await tester.tap(find.byKey(teamThreadKey));
+    // Sem pumpAndSettle: a conversa sem snapshot mantém um indicador animando.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('#lançamento-q4'), findsWidgets);
+    expect(find.byType(ThreadPanel), findsOneWidget);
+  });
+
+  testWidgets('voltar à sala por selectRoom não reabre a thread antiga', (
+    tester,
+  ) async {
+    await showThreads(tester);
+    await tester.tap(find.byKey(teamThreadKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(conversationRepository.conversation.openedThreads, [
+      kTeamThread.rootEventId,
+    ]);
+
+    await tester.tap(find.byKey(const Key('filter_inbox')));
+    await tester.pump(const Duration(milliseconds: 500));
+    // Com a thread aberta a lista está recolhida: só os avatares.
+    await tester.tap(find.byKey(Key('room_avatar_${kDirectRoom.id}')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(Key('room_avatar_${kTeamRoom.id}')));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(conversationRepository.conversation.openedThreads, [
+      kTeamThread.rootEventId,
+    ]);
+  });
+
+  testWidgets('busca com o filtro Threads não esconde as threads', (
+    tester,
+  ) async {
+    await showThreads(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'zzz');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(teamThreadKey), findsOneWidget);
   });
 
   testWidgets('busca no servidor e o resultado abre a sala focada', (

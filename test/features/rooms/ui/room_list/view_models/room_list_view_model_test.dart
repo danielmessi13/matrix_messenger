@@ -29,6 +29,86 @@ void main() {
   });
 
   blocTest<RoomListViewModel, RoomListState>(
+    'selectThread seleciona a sala e registra um pedido novo a cada clique',
+    build: () => RoomListViewModel(repository),
+    seed: () => RoomListState(rooms: [kTeamRoom], loaded: true),
+    act: (viewModel) {
+      viewModel.selectThread(kTeamRoom.id, r'$raiz');
+      viewModel.selectThread(kTeamRoom.id, r'$raiz');
+    },
+    verify: (viewModel) {
+      expect(viewModel.state.selectedRoomId, kTeamRoom.id);
+      expect(viewModel.state.threadRequest?.rootEventId, r'$raiz');
+    },
+    expect: () => [isA<RoomListState>(), isA<RoomListState>()],
+  );
+
+  blocTest<RoomListViewModel, RoomListState>(
+    'selectThread leva a conversa até a raiz a cada clique',
+    build: () => RoomListViewModel(repository),
+    seed: () => RoomListState(rooms: [kTeamRoom], loaded: true),
+    act: (viewModel) {
+      viewModel.selectThread(kTeamRoom.id, r'$raiz');
+      viewModel.selectThread(kTeamRoom.id, r'$raiz');
+    },
+    expect: () => [
+      isA<RoomListState>().having(
+        (state) => state.focus?.eventId,
+        'focus',
+        r'$raiz',
+      ),
+      isA<RoomListState>().having(
+        (state) => state.focus?.eventId,
+        'focus',
+        r'$raiz',
+      ),
+    ],
+  );
+
+  blocTest<RoomListViewModel, RoomListState>(
+    'selectRoom limpa o pedido de thread',
+    build: () => RoomListViewModel(repository),
+    seed: () => RoomListState(rooms: kRooms, loaded: true),
+    act: (viewModel) => viewModel
+      ..selectThread(kTeamRoom.id, r'$raiz')
+      ..selectRoom(kDirectRoom.id),
+    verify: (viewModel) {
+      expect(viewModel.state.selectedRoomId, kDirectRoom.id);
+      expect(viewModel.state.threadRequest, isNull);
+    },
+  );
+
+  blocTest<RoomListViewModel, RoomListState>(
+    'openMessage limpa o pedido de thread',
+    build: () => RoomListViewModel(repository),
+    seed: () => RoomListState(rooms: kRooms, loaded: true),
+    act: (viewModel) => viewModel
+      ..selectThread(kTeamRoom.id, r'$raiz')
+      ..openMessage(
+        MessageHit(
+          roomId: kDirectRoom.id,
+          roomName: kDirectRoom.name,
+          eventId: r'$e',
+          senderName: 'Bob',
+          body: 'oi',
+          timestamp: DateTime(2026),
+        ),
+      ),
+    verify: (viewModel) {
+      expect(viewModel.state.selectedRoomId, kDirectRoom.id);
+      expect(viewModel.state.threadRequest, isNull);
+    },
+  );
+
+  blocTest<RoomListViewModel, RoomListState>(
+    'selectThread de sala fora da lista não faz nada',
+    build: () => RoomListViewModel(repository),
+    seed: () => RoomListState(rooms: [kTeamRoom], loaded: true),
+    act: (viewModel) => viewModel.selectThread('!outra:b.c', r'$raiz'),
+    expect: () => const <RoomListState>[],
+  );
+
+  blocTest<RoomListViewModel, RoomListState>(
     'primeira lista marca como carregado',
     build: () => RoomListViewModel(repository)..init(),
     act: (_) => repository.roomsController.add(kRooms),
@@ -44,21 +124,18 @@ void main() {
 
   test('não lidas por filtro somam o contador de cada filtro', () {
     final state = RoomListState(
-      rooms: [
-        ...kRooms,
-        const Room(id: '!t:b.c', name: 'obras', unreadThreadReplies: 3),
-      ],
+      rooms: kRooms,
       loaded: true,
     );
     expect(state.unreadByFilter, {
       RoomFilter.inbox: 6,
       RoomFilter.mentions: 1,
-      RoomFilter.threads: 3,
+      RoomFilter.threads: 0,
       RoomFilter.rooms: 4,
       RoomFilter.direct: 2,
     });
     expect(state.visibleUnread, 6);
-    expect(state.copyWith(filter: RoomFilter.threads).visibleUnread, 3);
+    expect(state.copyWith(filter: RoomFilter.threads).visibleUnread, 0);
   });
 
   blocTest<RoomListViewModel, RoomListState>(

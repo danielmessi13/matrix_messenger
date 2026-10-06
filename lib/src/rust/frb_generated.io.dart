@@ -10,6 +10,7 @@ import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';
 import 'api/search.dart';
+import 'api/threads.dart';
 import 'api/timeline.dart';
 
 import 'dart:async';
@@ -106,6 +107,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustStreamSink<List<RoomSummary>> dco_decode_StreamSink_list_room_summary_Sse(
     dynamic raw,
   );
+
+  @protected
+  RustStreamSink<RecentThreadsSnapshot>
+  dco_decode_StreamSink_recent_threads_snapshot_Sse(dynamic raw);
 
   @protected
   RustStreamSink<RecoveryStatus> dco_decode_StreamSink_recovery_status_Sse(
@@ -219,6 +224,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<RecentThread> dco_decode_list_recent_thread(dynamic raw);
+
+  @protected
   List<RoomSummary> dco_decode_list_room_summary(dynamic raw);
 
   @protected
@@ -277,6 +285,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
+  RecentThread dco_decode_recent_thread(dynamic raw);
+
+  @protected
+  RecentThreadsSnapshot dco_decode_recent_threads_snapshot(dynamic raw);
+
+  @protected
+  RecentThreadsStatus dco_decode_recent_threads_status(dynamic raw);
 
   @protected
   RecoveryError dco_decode_recovery_error(dynamic raw);
@@ -421,6 +438,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<RecentThreadsSnapshot>
+  sse_decode_StreamSink_recent_threads_snapshot_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RustStreamSink<RecoveryStatus> sse_decode_StreamSink_recovery_status_Sse(
     SseDeserializer deserializer,
   );
@@ -548,6 +571,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<RecentThread> sse_decode_list_recent_thread(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<RoomSummary> sse_decode_list_room_summary(SseDeserializer deserializer);
 
   @protected
@@ -624,6 +652,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  RecentThread sse_decode_recent_thread(SseDeserializer deserializer);
+
+  @protected
+  RecentThreadsSnapshot sse_decode_recent_threads_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RecentThreadsStatus sse_decode_recent_threads_status(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RecoveryError sse_decode_recovery_error(SseDeserializer deserializer);
@@ -782,6 +823,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_list_room_summary_Sse(
     RustStreamSink<List<RoomSummary>> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_recent_threads_snapshot_Sse(
+    RustStreamSink<RecentThreadsSnapshot> self,
     SseSerializer serializer,
   );
 
@@ -949,6 +996,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_recent_thread(
+    List<RecentThread> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_room_summary(
     List<RoomSummary> self,
     SseSerializer serializer,
@@ -1044,6 +1097,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_recent_thread(RecentThread self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_recent_threads_snapshot(
+    RecentThreadsSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_recent_threads_status(
+    RecentThreadsStatus self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_recovery_error(RecoveryError self, SseSerializer serializer);

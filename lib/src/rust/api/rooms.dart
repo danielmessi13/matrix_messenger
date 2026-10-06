@@ -192,7 +192,6 @@ class RoomSummary {
   final bool isPublic;
   final int unreadMessages;
   final int unreadMentions;
-  final int unreadThreadReplies;
   final int memberCount;
   final List<String> heroes;
   final LatestMessage? latest;
@@ -205,7 +204,6 @@ class RoomSummary {
     required this.isPublic,
     required this.unreadMessages,
     required this.unreadMentions,
-    required this.unreadThreadReplies,
     required this.memberCount,
     required this.heroes,
     this.latest,
@@ -220,7 +218,6 @@ class RoomSummary {
       isPublic.hashCode ^
       unreadMessages.hashCode ^
       unreadMentions.hashCode ^
-      unreadThreadReplies.hashCode ^
       memberCount.hashCode ^
       heroes.hashCode ^
       latest.hashCode;
@@ -237,7 +234,6 @@ class RoomSummary {
           isPublic == other.isPublic &&
           unreadMessages == other.unreadMessages &&
           unreadMentions == other.unreadMentions &&
-          unreadThreadReplies == other.unreadThreadReplies &&
           memberCount == other.memberCount &&
           heroes == other.heroes &&
           latest == other.latest;

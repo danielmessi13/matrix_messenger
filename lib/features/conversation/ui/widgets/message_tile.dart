@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../../../../app/theme.dart';
+import '../../../rooms/ui/room_list/widgets/room_labels.dart';
 import '../../domain/models/timeline_item.dart';
 import 'image_message.dart';
 import 'markdown_text.dart';
@@ -105,62 +105,99 @@ class _OtherMessage extends StatelessWidget {
   final AppColors colors;
 
   @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(maxWidth: 640),
-    padding: _groupGap(continuation, continuedBelow),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (!continuation) ...[
+  Widget build(BuildContext context) {
+    final avatar = compact ? 32.0 : 40.0;
+    final reply = message.replyTo;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 640),
+      padding: _groupGap(continuation, continuedBelow),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (reply != null)
+            _ReplyLine(
+              reply: reply,
+              avatar: avatar,
+              connected: !continuation,
+              onQuoteTap: onQuoteTap,
+              colors: colors,
+            ),
           Row(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (continuation)
+                SizedBox(width: avatar)
+              else
+                _Avatar(
+                  key: Key('message_avatar_${message.id}'),
+                  initials: initialsOfName(message.senderName),
+                  size: avatar,
+                  background: colors.surfaceHigh,
+                  foreground: colors.textPrimary,
+                ),
+              const SizedBox(width: _avatarGap),
               Flexible(
-                child: Text(
-                  message.senderName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: colors.textPrimary,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!continuation) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              message.senderName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (reply?.isOwn ?? false) ...[
+                            const SizedBox(width: 10),
+                            Text(
+                              'respondeu a você',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: colors.accent,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(width: 10),
+                          Text(
+                            formatMessageTime(message.timestamp),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: colors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    _Body(
+                      message: message,
+                      colors: colors,
+                      italic: false,
+                      compact: compact,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Text(
-                formatMessageTime(message.timestamp),
-                style: TextStyle(fontSize: 12.5, color: colors.textMuted),
-              ),
-              if (message.replyTo?.isOwn ?? false) ...[
-                const SizedBox(width: 10),
-                Text(
-                  'respondeu a você',
-                  style: TextStyle(fontSize: 12.5, color: colors.accent),
-                ),
-              ],
             ],
           ),
-          const SizedBox(height: 6),
         ],
-        _QuotedBody(
-          reply: message.replyTo,
-          alignEnd: false,
-          onQuoteTap: onQuoteTap,
-          colors: colors,
-          child: _Body(
-            message: message,
-            colors: colors,
-            italic: false,
-            compact: compact,
-          ),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _OwnMessage extends StatelessWidget {
@@ -202,230 +239,293 @@ class _OwnMessage extends StatelessWidget {
       message.sendState == SendState.rejected;
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(maxWidth: 640),
-    child: Container(
-      padding:
-          _groupGap(continuation, continuedBelow) +
-          const EdgeInsets.only(right: 18),
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: colors.accent, width: 2)),
-      ),
+  Widget build(BuildContext context) {
+    final avatar = compact ? 32.0 : 40.0;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 640),
+      padding: _groupGap(continuation, continuedBelow),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!continuation) ...[
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  formatMessageTime(message.timestamp),
-                  style: TextStyle(fontSize: 12.5, color: colors.textMuted),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.accent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'VOCÊ',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.7,
-                      color: colors.background,
+          if (message.replyTo case final reply?)
+            _ReplyLine(
+              reply: reply,
+              avatar: avatar,
+              connected: !continuation,
+              alignEnd: true,
+              onQuoteTap: onQuoteTap,
+              colors: colors,
+            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (!continuation) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            formatMessageTime(message.timestamp),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: colors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Você',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: colors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    _Body(
+                      message: message,
+                      colors: colors,
+                      italic: true,
+                      compact: compact,
                     ),
-                  ),
+                    if (_showsStatus) ...[
+                      const SizedBox(height: 6),
+                      _Status(
+                        message: message,
+                        onRetry: onRetry,
+                        onCancel: onCancel,
+                        colors: colors,
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-          ],
-          _QuotedBody(
-            reply: message.replyTo,
-            alignEnd: true,
-            onQuoteTap: onQuoteTap,
-            colors: colors,
-            child: _Body(
-              message: message,
-              colors: colors,
-              italic: true,
-              compact: compact,
-            ),
+              ),
+              const SizedBox(width: _avatarGap),
+              if (continuation)
+                SizedBox(width: avatar)
+              else
+                _Avatar(
+                  key: Key('message_avatar_${message.id}'),
+                  initials: 'VC',
+                  size: avatar,
+                  background: colors.accent,
+                  foreground: colors.onAccent,
+                ),
+            ],
           ),
-          if (_showsStatus) ...[
-            const SizedBox(height: 6),
-            _Status(
-              message: message,
-              onRetry: onRetry,
-              onCancel: onCancel,
-              colors: colors,
-            ),
-          ],
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
-class _QuotedBody extends StatelessWidget {
-  const _QuotedBody({
+// Linha da citação acima do cabeçalho; o conector liga o avatar de quem respondeu à mensagem citada.
+class _ReplyLine extends StatelessWidget {
+  const _ReplyLine({
     required this.reply,
-    required this.alignEnd,
+    required this.avatar,
+    required this.connected,
     required this.onQuoteTap,
     required this.colors,
-    required this.child,
+    this.alignEnd = false,
   });
 
-  final ReplyPreview? reply;
+  final ReplyPreview reply;
 
+  final double avatar;
+
+  // Continuação não tem avatar: a citação só recua até o texto.
+  final bool connected;
+
+  // Mensagem própria: avatar à direita, então a linha é espelhada.
   final bool alignEnd;
 
   final ValueChanged<String>? onQuoteTap;
 
   final AppColors colors;
 
-  final Widget child;
-
   @override
   Widget build(BuildContext context) {
-    final reply = this.reply;
-    if (reply == null) return child;
     final mine = reply.isOwn;
-    final line = mine ? colors.accent.withValues(alpha: 0.25) : colors.border;
-    final name = mine ? 'Você' : reply.senderName;
-    return Container(
-      key: const Key('message_reply_quote'),
-      margin: const EdgeInsets.only(bottom: 2),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: mine
-              ? colors.accent.withValues(alpha: 0.45)
-              : colors.borderStrong,
+    // Resposta a mim mesmo: o cabeçalho já diz "Você".
+    final name = mine ? (alignEnd ? null : 'Você') : reply.senderName;
+    final connector = connected
+        ? CustomPaint(
+            size: Size(avatar + _avatarGap, _replyLineHeight),
+            painter: _ReplyConnector(
+              x: avatar / 2,
+              mirrored: alignEnd,
+              color: mine ? colors.accent : colors.borderStrong,
+            ),
+          )
+        : SizedBox(width: avatar + _avatarGap);
+    final quote = <Widget>[
+      if (name != null) ...[
+        _Avatar(
+          initials: mine ? 'VC' : initialsOfName(name),
+          size: 20,
+          background: mine ? colors.accent : colors.surfaceHigh,
+          foreground: mine ? colors.onAccent : colors.textPrimary,
         ),
-      ),
-      // Largura do conteúdo, mas o cabeçalho ocupa o cartão inteiro.
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: _quoteMinWidth),
-        child: IntrinsicWidth(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Material(
-                color: mine
-                    ? colors.accent.withValues(alpha: 0.12)
-                    : colors.selectedRow,
-                child: Tooltip(
-                  message: 'Ir para a mensagem original',
-                  child: InkWell(
-                    key: const Key('reply_quote_header'),
-                    onTap: switch (onQuoteTap) {
-                      null => null,
-                      final onTap => () => onTap(reply.eventId),
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: line)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.reply,
-                            size: 14,
-                            color: mine ? colors.accent : colors.textPrimary,
-                          ),
-                          if (name != null) ...[
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: mine
-                                      ? colors.accent
-                                      : colors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                          Flexible(
-                            child: _NoIntrinsicWidth(
-                              child: Text(
-                                ' · ${replyQuoteLabel(reply)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontStyle: reply.state == ReplyState.ready
-                                      ? FontStyle.normal
-                                      : FontStyle.italic,
-                                  color: colors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                child: Align(
-                  alignment: alignEnd
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: child,
-                ),
-              ),
-            ],
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: mine ? colors.accent : colors.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
+      Flexible(
+        child: Text(
+          replyQuoteLabel(reply),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            fontStyle: reply.state == ReplyState.ready
+                ? FontStyle.normal
+                : FontStyle.italic,
+            color: colors.textSecondary,
           ),
         ),
       ),
+    ];
+    return Row(
+      key: const Key('message_reply_quote'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!alignEnd) connector,
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: _replyLineGap),
+            child: Tooltip(
+              message: 'Ir para a mensagem original',
+              child: InkWell(
+                key: const Key('reply_quote_header'),
+                borderRadius: BorderRadius.circular(10),
+                onTap: switch (onQuoteTap) {
+                  null => null,
+                  final onTap => () => onTap(reply.eventId),
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: alignEnd ? quote.reversed.toList() : quote,
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (alignEnd) connector,
+      ],
     );
   }
 }
 
-const _quoteMinWidth = 200.0;
+const _avatarGap = 12.0;
+
+const _replyLineHeight = 20.0 + _replyLineGap;
+
+const _replyLineGap = 6.0;
+
+// Sobe do topo do avatar e faz a curva até a linha da citação.
+class _ReplyConnector extends CustomPainter {
+  const _ReplyConnector({
+    required this.x,
+    required this.mirrored,
+    required this.color,
+  });
+
+  final double x;
+
+  final bool mirrored;
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const radius = 8.0;
+    final y = (size.height - _replyLineGap) / 2;
+    if (mirrored) {
+      canvas
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
+    }
+    final path = Path()
+      ..moveTo(x, size.height)
+      ..lineTo(x, y + radius)
+      ..quadraticBezierTo(x, y, x + radius, y)
+      ..lineTo(size.width - 4, y);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ReplyConnector oldDelegate) =>
+      oldDelegate.x != x ||
+      oldDelegate.mirrored != mirrored ||
+      oldDelegate.color != color;
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({
+    super.key,
+    required this.initials,
+    required this.size,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String initials;
+
+  final double size;
+
+  final Color background;
+
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+    child: Text(
+      initials,
+      style: TextStyle(
+        fontSize: size * 0.38,
+        fontWeight: FontWeight.w600,
+        color: foreground,
+      ),
+    ),
+  );
+}
 
 EdgeInsets _groupGap(bool continuation, bool continuedBelow) => EdgeInsets.only(
   top: continuation ? 3 : 0,
   bottom: continuedBelow ? 3 : 0,
 );
-
-// O trecho citado não define a largura do cartão: ela vem do nome e da resposta, e o trecho ganha reticências.
-class _NoIntrinsicWidth extends SingleChildRenderObjectWidget {
-  const _NoIntrinsicWidth({required super.child});
-
-  @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _RenderNoIntrinsicWidth();
-}
-
-class _RenderNoIntrinsicWidth extends RenderProxyBox {
-  @override
-  double computeMinIntrinsicWidth(double height) => 0;
-
-  @override
-  double computeMaxIntrinsicWidth(double height) => 0;
-}
 
 // Ancorado no balão, ao lado do canto superior; fica numa camada acima para o clique funcionar fora do balão.
 class _HoverActions extends StatefulWidget {

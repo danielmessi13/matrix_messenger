@@ -5,6 +5,7 @@ import 'package:matrix_messenger/src/rust/api/auth.dart';
 import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/threads.dart';
 import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 import '../../../testing/fakes/services/fake_matrix_bridge.dart';
@@ -115,7 +116,6 @@ void main() {
       isPublic: false,
       unreadMessages: 0,
       unreadMentions: 0,
-      unreadThreadReplies: 0,
       memberCount: 1,
       heroes: [],
       latest: null,
@@ -130,7 +130,28 @@ void main() {
   test('sem cliente, os streams de salas terminam vazios', () async {
     expect(await service.watchRooms().toList(), isEmpty);
     expect(await service.watchSyncStatus().toList(), isEmpty);
+    expect(await service.watchRecentThreads().isEmpty, isTrue);
   });
+
+  test(
+    'watchRecentThreads repassa o stream e retry chega ao cliente',
+    () async {
+      final client = FakeMatrixClient.of(kUserSession);
+      bridge.loginClient = client;
+      await login();
+      const snapshot = RecentThreadsSnapshot(
+        status: RecentThreadsStatus.ready,
+        threads: [],
+      );
+
+      final received = service.watchRecentThreads().first;
+      client.recentThreadsController.add(snapshot);
+      expect(await received, snapshot);
+
+      await service.retryRecentThreads();
+      expect(client.recentThreadsRetries, 1);
+    },
+  );
 
   test('openTimeline abre a conversa no cliente atual', () async {
     final client = FakeMatrixClient.of(kUserSession);

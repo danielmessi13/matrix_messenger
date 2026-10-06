@@ -11,6 +11,7 @@ import '../../src/rust/api/oidc.dart';
 import '../../src/rust/api/recovery.dart';
 import '../../src/rust/api/rooms.dart';
 import '../../src/rust/api/search.dart';
+import '../../src/rust/api/threads.dart';
 import '../../src/rust/api/timeline.dart';
 import '../utils/result.dart';
 import 'local_storage_exception.dart';
@@ -97,6 +98,11 @@ class MatrixService {
 
   Stream<RecoveryStatus> watchRecovery() =>
       _client?.watchRecovery() ?? const Stream.empty();
+
+  Stream<RecentThreadsSnapshot> watchRecentThreads() =>
+      _client?.watchRecentThreads() ?? const Stream.empty();
+
+  Future<void> retryRecentThreads() async => _client?.retryRecentThreads();
 
   Future<Result<void>> recover(String recoveryKey) => _guard(() async {
     final client = _client;

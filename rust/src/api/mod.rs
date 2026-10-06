@@ -6,4 +6,5 @@ pub mod oidc;
 pub mod recovery;
 pub mod rooms;
 pub mod search;
+pub mod threads;
 pub mod timeline;

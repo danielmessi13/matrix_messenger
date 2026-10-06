@@ -6,12 +6,7 @@ void main() {
   const group = Room(id: '!g:b.c', name: 'geral');
   const mentioned = Room(id: '!m:b.c', name: 'time', unreadMentions: 2);
   const direct = Room(id: '!d:b.c', name: 'Ana', isDirect: true);
-  const threaded = Room(
-    id: '!t:b.c',
-    name: 'obras',
-    unreadMessages: 1,
-    unreadThreadReplies: 3,
-  );
+  const plain = Room(id: '!t:b.c', name: 'obras', unreadMessages: 1);
 
   final cases = <(RoomFilter, Room, bool)>[
     (RoomFilter.inbox, group, true),
@@ -20,7 +15,6 @@ void main() {
     (RoomFilter.mentions, mentioned, true),
     (RoomFilter.threads, group, false),
     (RoomFilter.threads, direct, false),
-    (RoomFilter.threads, threaded, true),
     (RoomFilter.rooms, group, true),
     (RoomFilter.rooms, direct, false),
     (RoomFilter.direct, group, false),
@@ -33,9 +27,12 @@ void main() {
     });
   }
 
-  test('Menções e Threads somam o próprio contador; os outros, mensagens', () {
-    expect(RoomFilter.mentions.unreadOf(mentioned), 2);
-    expect(RoomFilter.threads.unreadOf(threaded), 3);
-    expect(RoomFilter.inbox.unreadOf(threaded), 1);
-  });
+  test(
+    'Menções somam o próprio contador, Threads zero; os outros, mensagens',
+    () {
+      expect(RoomFilter.mentions.unreadOf(mentioned), 2);
+      expect(RoomFilter.threads.unreadOf(plain), 0);
+      expect(RoomFilter.inbox.unreadOf(plain), 1);
+    },
+  );
 }

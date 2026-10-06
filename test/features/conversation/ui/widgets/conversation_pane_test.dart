@@ -14,6 +14,7 @@ import 'package:matrix_messenger/features/conversation/ui/widgets/conversation_p
 import 'package:matrix_messenger/features/conversation/ui/widgets/message_labels.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/thread_request.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
@@ -36,6 +37,7 @@ void main() {
     WidgetTester tester,
     Room? room, {
     Size size = const Size(1440, 900),
+    ThreadRequest? threadRequest,
   }) async {
     useDesktopSize(tester, size);
     await tester.pumpWidget(
@@ -50,6 +52,7 @@ void main() {
             body: ConversationPane(
               room: room,
               now: kDay.add(const Duration(hours: 12)),
+              threadRequest: threadRequest,
             ),
           ),
         ),
@@ -57,6 +60,38 @@ void main() {
     );
     await tester.pump();
   }
+
+  testWidgets('pedido de thread abre a thread, também com a sala já aberta', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    expect(repository.conversation.openedThreads, isEmpty);
+
+    final request = ThreadRequest(roomId: kTeamRoom.id, rootEventId: r'$raiz');
+    await pump(tester, kTeamRoom, threadRequest: request);
+    await pump(tester, kTeamRoom, threadRequest: request);
+
+    expect(repository.conversation.openedThreads, [r'$raiz']);
+    expect(repository.openedRooms, [kTeamRoom.id]);
+
+    await pump(
+      tester,
+      kTeamRoom,
+      threadRequest: ThreadRequest(roomId: kTeamRoom.id, rootEventId: r'$raiz'),
+    );
+    // Pedido novo para a thread já aberta não reabre (openThread ignora a mesma raiz).
+    expect(repository.conversation.openedThreads, [r'$raiz']);
+  });
+
+  testWidgets('pedido de thread de outra sala é ignorado', (tester) async {
+    await pump(
+      tester,
+      kTeamRoom,
+      threadRequest: ThreadRequest(roomId: kDirectRoom.id, rootEventId: r'$x'),
+    );
+
+    expect(repository.conversation.openedThreads, isEmpty);
+  });
 
   // Dois pumps: na abertura nada anima, e o frame do novo estado só sai no seguinte.
   Future<void> show(WidgetTester tester, ConversationSnapshot snapshot) async {
@@ -111,7 +146,7 @@ void main() {
     expect(find.text('#lançamento-q4'), findsOneWidget);
     expect(find.text('Hoje, 4 de outubro'), findsOneWidget);
     expect(find.text('Diego Alves'), findsOneWidget);
-    expect(find.text('VOCÊ'), findsOneWidget);
+    expect(find.text('Você'), findsOneWidget);
     expect(find.text('4 respostas'), findsOneWidget);
   });
 
@@ -793,7 +828,8 @@ void main() {
         reachedStart: true,
       ),
     );
-    final first = find.text('mensagem 0');
+    // A citação também mostra "mensagem 0"; vale só a mensagem original.
+    final first = find.byKey(const Key('message_u0'));
     expect(first, findsNothing);
 
     await tester.tap(find.byKey(const Key('reply_quote_header')));
@@ -1222,7 +1258,7 @@ void main() {
       ], reachedStart: true),
     );
 
-    expect(find.text('VOCÊ'), findsOneWidget);
+    expect(find.text('Você'), findsOneWidget);
     expect(find.text('Enviada'), findsOneWidget);
     final a = tester.getRect(find.byKey(const Key(r'message_$a')));
     final b = tester.getRect(find.byKey(const Key(r'message_$b')));

@@ -36,7 +36,6 @@ void main() {
         isPublic: true,
         unreadMessages: 3,
         unreadMentions: 1,
-        unreadThreadReplies: 5,
         memberCount: 2,
         heroes: ['Bob'],
         latest: bridge.LatestMessage(
@@ -57,7 +56,6 @@ void main() {
         isPublic: true,
         unreadMessages: 3,
         unreadMentions: 1,
-        unreadThreadReplies: 5,
         memberCount: 2,
         heroes: const ['Bob'],
         latest: LatestMessage(

@@ -8,7 +8,8 @@ bool continuesGroup(TimelineItem? previous, MessageItem message) =>
     previous is MessageItem &&
     sameSenderNearby(previous, message) &&
     !_repliesToMe(previous) &&
-    !_repliesToMe(message);
+    // A citação se liga ao avatar; sem cabeçalho ela ficaria solta.
+    message.replyTo == null;
 
 bool sameSenderNearby(TimelineItem? previous, MessageItem message) =>
     previous is MessageItem &&

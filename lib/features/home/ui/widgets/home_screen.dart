@@ -13,6 +13,7 @@ import '../../../recovery/ui/view_models/recovery_view_model.dart';
 import '../../../recovery/ui/widgets/recovery_banner.dart';
 import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/new_room.dart';
+import '../../../rooms/domain/models/room_filter.dart';
 import '../../../rooms/ui/new_room/view_models/join_room_view_model.dart';
 import '../../../rooms/ui/new_room/view_models/new_room_view_model.dart';
 import '../../../rooms/ui/new_room/widgets/new_room_button.dart';
@@ -22,6 +23,9 @@ import '../../../rooms/ui/room_list/view_models/room_list_view_model.dart';
 import '../../../rooms/ui/room_list/widgets/filter_rail.dart';
 import '../../../rooms/ui/room_list/widgets/room_list_pane.dart';
 import '../../../rooms/ui/room_list/widgets/room_search_field.dart';
+import '../../../threads/ui/view_models/recent_threads_state.dart';
+import '../../../threads/ui/view_models/recent_threads_view_model.dart';
+import '../../../threads/ui/widgets/recent_threads_pane.dart';
 import '../view_models/home_state.dart';
 import '../view_models/home_view_model.dart';
 import 'top_bar.dart';
@@ -33,12 +37,15 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.roomListViewModel,
+    required this.recentThreadsViewModel,
     this.clock = DateTime.now,
   });
 
   final HomeViewModel viewModel;
 
   final RoomListViewModel roomListViewModel;
+
+  final RecentThreadsViewModel recentThreadsViewModel;
 
   final DateTime Function() clock;
 
@@ -144,6 +151,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             list: list,
                             viewModel: widget.viewModel,
                             roomListViewModel: rooms,
+                            recentThreadsViewModel:
+                                widget.recentThreadsViewModel,
                             now: widget.clock(),
                           ),
                         ),
@@ -265,6 +274,7 @@ class _Panes extends StatelessWidget {
     required this.list,
     required this.viewModel,
     required this.roomListViewModel,
+    required this.recentThreadsViewModel,
     required this.now,
   });
 
@@ -275,6 +285,8 @@ class _Panes extends StatelessWidget {
   final HomeViewModel viewModel;
 
   final RoomListViewModel roomListViewModel;
+
+  final RecentThreadsViewModel recentThreadsViewModel;
 
   final DateTime now;
 
@@ -294,23 +306,45 @@ class _Panes extends StatelessWidget {
                 ? viewModel.toggleFilters
                 : () => viewModel.expandFilters(width: box.maxWidth),
           ),
-          RoomListPane(
-            expanded: panes.list,
-            state: list,
-            now: now,
-            onSelect: roomListViewModel.selectRoom,
-            onToggle: panes.list
-                ? viewModel.toggleRoomList
-                : () => viewModel.expandRoomList(width: box.maxWidth),
-            onOpenMessage: roomListViewModel.openMessage,
-            onLoadMoreMessages: roomListViewModel.loadMoreMessages,
-            onRetryMessages: roomListViewModel.retryMessageSearch,
-          ),
+          // O filtro decide antes da busca: com Threads a lista de threads fica.
+          if (list.filter == RoomFilter.threads)
+            BlocBuilder<RecentThreadsViewModel, RecentThreadsState>(
+              bloc: recentThreadsViewModel,
+              builder: (context, threads) => RecentThreadsPane(
+                expanded: panes.list,
+                state: threads,
+                rooms: list.rooms,
+                selectedRoomId: list.selectedRoomId,
+                now: now,
+                onSelect: (thread) => roomListViewModel.selectThread(
+                  thread.roomId,
+                  thread.rootEventId,
+                ),
+                onRetry: recentThreadsViewModel.retry,
+                onToggle: panes.list
+                    ? viewModel.toggleRoomList
+                    : () => viewModel.expandRoomList(width: box.maxWidth),
+              ),
+            )
+          else
+            RoomListPane(
+              expanded: panes.list,
+              state: list,
+              now: now,
+              onSelect: roomListViewModel.selectRoom,
+              onToggle: panes.list
+                  ? viewModel.toggleRoomList
+                  : () => viewModel.expandRoomList(width: box.maxWidth),
+              onOpenMessage: roomListViewModel.openMessage,
+              onLoadMoreMessages: roomListViewModel.loadMoreMessages,
+              onRetryMessages: roomListViewModel.retryMessageSearch,
+            ),
           Expanded(
             child: ConversationPane(
               room: list.selectedRoom,
               now: now,
               focus: list.focus,
+              threadRequest: list.threadRequest,
               onThreadOpenChanged: viewModel.threadVisibilityChanged,
             ),
           ),

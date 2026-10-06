@@ -8,6 +8,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/services/image_file_picker.dart';
 import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/room.dart';
+import '../../../rooms/domain/models/thread_request.dart';
 import '../../../rooms/ui/invite/view_models/invite_view_model.dart';
 import '../../../rooms/ui/invite/widgets/invite_actions.dart';
 import '../../../rooms/ui/room_list/view_models/message_search_state.dart';
@@ -32,6 +33,7 @@ class ConversationPane extends StatelessWidget {
     required this.room,
     required this.now,
     this.focus,
+    this.threadRequest,
     this.onThreadOpenChanged,
   });
 
@@ -40,6 +42,8 @@ class ConversationPane extends StatelessWidget {
   final DateTime now;
 
   final EventFocus? focus;
+
+  final ThreadRequest? threadRequest;
 
   // A home recolhe a lista de salas para a thread caber ao lado.
   final ValueChanged<bool>? onThreadOpenChanged;
@@ -83,7 +87,12 @@ class ConversationPane extends StatelessWidget {
             focus: focus,
             child: _ThreadVisibility(
               onChanged: onThreadOpenChanged,
-              child: _Conversation(room: room, now: now),
+              child: _ThreadRequestListener(
+                request: threadRequest?.roomId == room.id
+                    ? threadRequest
+                    : null,
+                child: _Conversation(room: room, now: now),
+              ),
             ),
           ),
         ),
@@ -128,6 +137,39 @@ class _FocusOnEventState extends State<_FocusOnEvent> {
     if (eventId != null) {
       context.read<ConversationViewModel>().focusEvent(eventId);
     }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+class _ThreadRequestListener extends StatefulWidget {
+  const _ThreadRequestListener({required this.request, required this.child});
+
+  final ThreadRequest? request;
+
+  final Widget child;
+
+  @override
+  State<_ThreadRequestListener> createState() => _ThreadRequestListenerState();
+}
+
+class _ThreadRequestListenerState extends State<_ThreadRequestListener> {
+  @override
+  void initState() {
+    super.initState();
+    _open(widget.request);
+  }
+
+  @override
+  void didUpdateWidget(_ThreadRequestListener old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.request, widget.request)) _open(widget.request);
+  }
+
+  void _open(ThreadRequest? request) {
+    if (request == null) return;
+    context.read<ConversationViewModel>().openThread(request.rootEventId);
   }
 
   @override

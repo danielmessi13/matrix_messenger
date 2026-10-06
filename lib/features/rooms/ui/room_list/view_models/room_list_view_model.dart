@@ -9,6 +9,7 @@ import '../../../domain/models/message_search_failure.dart';
 import '../../../domain/models/room.dart';
 import '../../../domain/models/room_filter.dart';
 import '../../../domain/models/sync_state.dart';
+import '../../../domain/models/thread_request.dart';
 import 'message_search_state.dart';
 import 'room_list_state.dart';
 
@@ -86,9 +87,23 @@ class RoomListViewModel extends Cubit<RoomListState> {
           selectedRoomId: () => roomId,
           pendingRoomId: () => null,
           focus: () => null,
+          threadRequest: () => null,
         ),
       );
     }
+  }
+
+  void selectThread(String roomId, String rootEventId) {
+    if (!state.rooms.any((room) => room.id == roomId)) return;
+    emit(
+      state.copyWith(
+        selectedRoomId: () => roomId,
+        pendingRoomId: () => null,
+        focus: () => EventFocus(rootEventId, ++_focusSeq),
+        threadRequest: () =>
+            ThreadRequest(roomId: roomId, rootEventId: rootEventId),
+      ),
+    );
   }
 
   void openMessage(MessageHit hit) {
@@ -98,6 +113,7 @@ class RoomListViewModel extends Cubit<RoomListState> {
         selectedRoomId: () => hit.roomId,
         pendingRoomId: () => null,
         focus: () => EventFocus(hit.eventId, ++_focusSeq),
+        threadRequest: () => null,
       ),
     );
   }
@@ -175,6 +191,7 @@ class RoomListViewModel extends Cubit<RoomListState> {
         selectedRoomId: () => next,
         pendingRoomId: arrived ? () => null : null,
         focus: next != state.selectedRoomId ? () => null : null,
+        threadRequest: next != state.selectedRoomId ? () => null : null,
       ),
     );
   }

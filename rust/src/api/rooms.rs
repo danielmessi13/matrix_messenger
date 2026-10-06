@@ -28,7 +28,6 @@ pub struct RoomSummary {
     pub is_public: bool,
     pub unread_messages: u32,
     pub unread_mentions: u32,
-    pub unread_thread_replies: u32,
     pub member_count: u32,
     pub heroes: Vec<String>,
     pub latest: Option<LatestMessage>,

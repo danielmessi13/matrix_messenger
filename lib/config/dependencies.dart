@@ -13,6 +13,8 @@ import '../features/recovery/data/repositories/recovery_repository.dart';
 import '../features/recovery/data/repositories/recovery_repository_matrix.dart';
 import '../features/rooms/data/repositories/room_repository.dart';
 import '../features/rooms/data/repositories/room_repository_matrix.dart';
+import '../features/threads/data/repositories/recent_threads_repository.dart';
+import '../features/threads/data/repositories/recent_threads_repository_matrix.dart';
 
 List<RepositoryProvider<Object>> providers({
   Future<String> Function()? dataDir,
@@ -26,6 +28,10 @@ List<RepositoryProvider<Object>> providers({
   ),
   RepositoryProvider<RoomRepository>(
     create: (context) => RoomRepositoryMatrix(context.read<MatrixService>()),
+  ),
+  RepositoryProvider<RecentThreadsRepository>(
+    create: (context) =>
+        RecentThreadsRepositoryMatrix(context.read<MatrixService>()),
   ),
   RepositoryProvider<ConversationRepository>(
     create: (context) =>

@@ -7,6 +7,7 @@ import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
 import 'package:matrix_messenger/src/rust/api/search.dart';
+import 'package:matrix_messenger/src/rust/api/threads.dart';
 import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 import '../../models/user_session.dart';
@@ -35,6 +36,11 @@ class FakeMatrixService implements MatrixService {
   final syncStatusController = StreamController<SyncStatus>.broadcast();
 
   final recoveryController = StreamController<RecoveryStatus>.broadcast();
+
+  final recentThreadsController =
+      StreamController<RecentThreadsSnapshot>.broadcast();
+
+  var recentThreadsRetries = 0;
 
   Result<void> recoverResult = const Result.ok(null);
 
@@ -93,6 +99,13 @@ class FakeMatrixService implements MatrixService {
 
   @override
   Stream<RecoveryStatus> watchRecovery() => recoveryController.stream;
+
+  @override
+  Stream<RecentThreadsSnapshot> watchRecentThreads() =>
+      recentThreadsController.stream;
+
+  @override
+  Future<void> retryRecentThreads() async => recentThreadsRetries++;
 
   @override
   Future<Result<void>> recover(String recoveryKey) async {
@@ -194,5 +207,6 @@ class FakeMatrixService implements MatrixService {
     await roomsController.close();
     await syncStatusController.close();
     await recoveryController.close();
+    await recentThreadsController.close();
   }
 }
