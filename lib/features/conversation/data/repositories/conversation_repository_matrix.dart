@@ -28,7 +28,8 @@ class _MatrixConversation implements Conversation {
   final bridge.RoomTimeline _timeline;
 
   @override
-  Stream<ConversationSnapshot> get updates => _timeline.watch().map(_toSnapshot);
+  Stream<ConversationSnapshot> get updates =>
+      _timeline.watch().map(_toSnapshot);
 
   @override
   Future<Result<bool>> loadOlder() => _run(_timeline.paginateBackwards);
@@ -70,7 +71,8 @@ class _MatrixConversation implements Conversation {
 ConversationFailure _toFailure(Exception error) => switch (error) {
   bridge.TimelineError(:final kind, :final message) => ConversationFailure(
     switch (kind) {
-      bridge.TimelineErrorKind.roomNotFound => ConversationFailureType.roomNotFound,
+      bridge.TimelineErrorKind.roomNotFound =>
+        ConversationFailureType.roomNotFound,
       bridge.TimelineErrorKind.messageNotFound =>
         ConversationFailureType.messageNotFound,
       bridge.TimelineErrorKind.network => ConversationFailureType.network,

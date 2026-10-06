@@ -1,6 +1,15 @@
 import 'package:equatable/equatable.dart';
 
-enum MessageKind { text, notice, emote, image, file, encrypted, redacted, other }
+enum MessageKind {
+  text,
+  notice,
+  emote,
+  image,
+  file,
+  encrypted,
+  redacted,
+  other,
+}
 
 enum SendState { sent, sending, failed, rejected }
 

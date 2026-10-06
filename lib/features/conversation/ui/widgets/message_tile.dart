@@ -171,7 +171,11 @@ class _ReplyQuote extends StatelessWidget {
             name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: colors.textSecondary),
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: colors.textSecondary,
+            ),
           ),
         Text(
           replyQuoteLabel(reply),
@@ -179,7 +183,9 @@ class _ReplyQuote extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 13.5,
-            fontStyle: reply.state == ReplyState.ready ? FontStyle.normal : FontStyle.italic,
+            fontStyle: reply.state == ReplyState.ready
+                ? FontStyle.normal
+                : FontStyle.italic,
             color: colors.textMuted,
           ),
         ),
@@ -309,7 +315,10 @@ class _ReplyInThread extends StatelessWidget {
     message: 'Em breve',
     child: Text(
       'Responder em thread',
-      style: TextStyle(fontSize: 12.5, color: colors.textMuted.withValues(alpha: 0.6)),
+      style: TextStyle(
+        fontSize: 12.5,
+        color: colors.textMuted.withValues(alpha: 0.6),
+      ),
     ),
   );
 }

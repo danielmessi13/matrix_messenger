@@ -34,7 +34,9 @@ class ThreadSection extends StatelessWidget {
           onPressed: onToggle,
           style: OutlinedButton.styleFrom(
             side: BorderSide(color: colors.borderStrong),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
           ),
           child: Row(
@@ -44,12 +46,19 @@ class ThreadSection extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 repliesLabel(summary.replies),
-                style: TextStyle(fontWeight: FontWeight.w600, color: colors.accent, fontSize: 13.5),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: colors.accent,
+                  fontSize: 13.5,
+                ),
               ),
               if (summary.unread > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: colors.accent,
                     borderRadius: BorderRadius.circular(8),
@@ -64,18 +73,25 @@ class ThreadSection extends StatelessWidget {
                   ),
                 ),
               ],
-              if (threadSummaryLabel(summary) case final label when label.isNotEmpty) ...[
+              if (threadSummaryLabel(summary) case final label
+                  when label.isNotEmpty) ...[
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: colors.textSecondary, fontSize: 13.5),
+                    style: TextStyle(
+                      color: colors.textSecondary,
+                      fontSize: 13.5,
+                    ),
                   ),
                 ),
               ],
               const SizedBox(width: 10),
-              Text('Expandir', style: TextStyle(color: colors.textPrimary, fontSize: 13.5)),
+              Text(
+                'Expandir',
+                style: TextStyle(color: colors.textPrimary, fontSize: 13.5),
+              ),
             ],
           ),
         ),
@@ -83,13 +99,21 @@ class ThreadSection extends StatelessWidget {
     }
     return BlocProvider.value(
       value: viewModel,
-      child: _Replies(colors: colors, onCollapse: onToggle, rootEventId: summary.rootEventId),
+      child: _Replies(
+        colors: colors,
+        onCollapse: onToggle,
+        rootEventId: summary.rootEventId,
+      ),
     );
   }
 }
 
 class _Replies extends StatelessWidget {
-  const _Replies({required this.colors, required this.onCollapse, required this.rootEventId});
+  const _Replies({
+    required this.colors,
+    required this.onCollapse,
+    required this.rootEventId,
+  });
 
   final AppColors colors;
 
@@ -110,7 +134,10 @@ class _Replies extends StatelessWidget {
         children: [
           ...switch (state.status) {
             ThreadStatus.loading => [
-              Text('Carregando respostas…', style: TextStyle(color: colors.textMuted, fontSize: 13.5)),
+              Text(
+                'Carregando respostas…',
+                style: TextStyle(color: colors.textMuted, fontSize: 13.5),
+              ),
             ],
             ThreadStatus.failed => [
               Row(

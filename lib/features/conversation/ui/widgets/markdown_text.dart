@@ -34,14 +34,30 @@ class MarkdownText extends StatelessWidget {
 }
 
 const _inlineTags = {
-  'strong', 'em', 'del', 'code', 'a', 'br', 'img', 'span', 'sup', 'sub', 'input',
+  'strong',
+  'em',
+  'del',
+  'code',
+  'a',
+  'br',
+  'img',
+  'span',
+  'sup',
+  'sub',
+  'input',
 };
 
-List<List<InlineSpan>> _lines(List<md.Node> nodes, TextStyle style, TextStyle code) {
+List<List<InlineSpan>> _lines(
+  List<md.Node> nodes,
+  TextStyle style,
+  TextStyle code,
+) {
   final lines = <List<InlineSpan>>[];
   var pending = <InlineSpan>[];
   void flush() {
-    final blank = pending.every((s) => s is TextSpan && (s.text ?? '').trim().isEmpty);
+    final blank = pending.every(
+      (s) => s is TextSpan && (s.text ?? '').trim().isEmpty,
+    );
     if (!blank) lines.add(pending);
     pending = [];
   }
@@ -58,7 +74,11 @@ List<List<InlineSpan>> _lines(List<md.Node> nodes, TextStyle style, TextStyle co
   return lines;
 }
 
-List<List<InlineSpan>> _blockLines(md.Element node, TextStyle style, TextStyle code) {
+List<List<InlineSpan>> _blockLines(
+  md.Element node,
+  TextStyle style,
+  TextStyle code,
+) {
   final children = node.children ?? const <md.Node>[];
   switch (node.tag) {
     case 'ul' || 'ol':
@@ -67,7 +87,9 @@ List<List<InlineSpan>> _blockLines(md.Element node, TextStyle style, TextStyle c
         for (final (index, item) in children.indexed)
           ..._itemLines(
             node.tag == 'ul' ? '• ' : '${start + index}. ',
-            item is md.Element ? _lines(item.children ?? const [], style, code) : const [],
+            item is md.Element
+                ? _lines(item.children ?? const [], style, code)
+                : const [],
           ),
       ];
     case 'tr':
@@ -85,14 +107,22 @@ List<List<InlineSpan>> _blockLines(md.Element node, TextStyle style, TextStyle c
         [TextSpan(text: text, style: style.merge(code))],
       ];
     case 'h1' || 'h2' || 'h3' || 'h4' || 'h5' || 'h6':
-      return _lines(children, style.copyWith(fontWeight: FontWeight.w600), code);
+      return _lines(
+        children,
+        style.copyWith(fontWeight: FontWeight.w600),
+        code,
+      );
     default:
       return _lines(children, style, code);
   }
 }
 
 List<List<InlineSpan>> _itemLines(String marker, List<List<InlineSpan>> lines) {
-  if (lines.isEmpty) return [[TextSpan(text: marker.trimRight())]];
+  if (lines.isEmpty) {
+    return [
+      [TextSpan(text: marker.trimRight())],
+    ];
+  }
   return [
     for (final (index, line) in lines.indexed)
       [TextSpan(text: index == 0 ? marker : '  '), ...line],
@@ -101,7 +131,9 @@ List<List<InlineSpan>> _itemLines(String marker, List<List<InlineSpan>> lines) {
 
 List<InlineSpan> _inlineSpans(md.Node node, TextStyle style, TextStyle code) {
   if (node is md.Text) return [TextSpan(text: node.text, style: style)];
-  if (node is! md.Element) return [TextSpan(text: node.textContent, style: style)];
+  if (node is! md.Element) {
+    return [TextSpan(text: node.textContent, style: style)];
+  }
   if (node.tag == 'br') return [const TextSpan(text: '\n')];
   final nested = switch (node.tag) {
     'strong' => style.copyWith(fontWeight: FontWeight.w600),

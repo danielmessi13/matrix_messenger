@@ -1,8 +1,18 @@
 import '../../domain/models/timeline_item.dart';
 
 const _months = [
-  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+  'janeiro',
+  'fevereiro',
+  'março',
+  'abril',
+  'maio',
+  'junho',
+  'julho',
+  'agosto',
+  'setembro',
+  'outubro',
+  'novembro',
+  'dezembro',
 ];
 
 String formatDayDivider(DateTime day, DateTime now) {
@@ -37,7 +47,8 @@ String readByLabel(List<String> names) {
   return '✓✓ Lida por $joined';
 }
 
-String repliesLabel(int count) => '$count ${count == 1 ? 'resposta' : 'respostas'}';
+String repliesLabel(int count) =>
+    '$count ${count == 1 ? 'resposta' : 'respostas'}';
 
 String unreadRepliesLabel(int count) => count == 1 ? '1 nova' : '$count novas';
 
@@ -60,8 +71,7 @@ String? kindPlaceholder(MessageKind kind) => switch (kind) {
   MessageKind.text || MessageKind.notice || MessageKind.emote => null,
   MessageKind.image => 'Imagem',
   MessageKind.file => 'Arquivo',
-  MessageKind.encrypted =>
-    'Mensagem criptografada — não foi possível descriptografar neste dispositivo',
+  MessageKind.encrypted => 'Mensagem criptografada — não foi possível descriptografar neste dispositivo',
   MessageKind.redacted => 'Mensagem apagada',
   MessageKind.other => 'Mensagem de um tipo não suportado',
 };
