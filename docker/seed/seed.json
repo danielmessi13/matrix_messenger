@@ -1,0 +1,178 @@
+{
+  "users": [
+    {
+      "username": "avaliador",
+      "password": "avaliador123",
+      "display_name": "Avaliador"
+    },
+    {
+      "username": "daniel",
+      "password": "daniel123",
+      "display_name": "Daniel Messias"
+    },
+    {
+      "username": "maria",
+      "password": "maria123",
+      "display_name": "Maria Souza"
+    },
+    {
+      "username": "joao",
+      "password": "joao123",
+      "display_name": "João Pereira"
+    }
+  ],
+  "rooms": [
+    {
+      "direct": true,
+      "members": [
+        "daniel",
+        "avaliador"
+      ],
+      "messages": [
+        {
+          "from": "daniel",
+          "ago": "2d 3h",
+          "text": "Olá! Obrigado por avaliar o Matrix Messenger."
+        },
+        {
+          "from": "avaliador",
+          "ago": "2d 2h",
+          "text": "Oi, Daniel! Vou começar pelo login e pela lista de salas."
+        },
+        {
+          "from": "daniel",
+          "ago": "25m",
+          "text": "Qualquer dúvida sobre o projeto, é só mandar mensagem por aqui."
+        },
+        {
+          "from": "daniel",
+          "ago": "22m",
+          "text": [
+            "Pra facilitar, aqui vai um resumo do que já dá pra testar:",
+            "- Login com usuário e senha, com a opção de manter conectado pra não precisar entrar de novo",
+            "- Também dá pra entrar pelo navegador (OIDC), e o app avisa se a sessão for encerrada em outro lugar",
+            "- Clicando no seu avatar no topo, aparecem seu nome, seu Matrix ID e a opção de sair",
+            "- As salas atualizam em tempo real, com a parte do Matrix toda em Rust",
+            "- Dá pra filtrar por menções, threads, salas ou conversas diretas e ver quantas mensagens não foram lidas",
+            "- A busca procura mensagens em todas as suas salas, direto no servidor. Experimenta o Cmd+K (ou Ctrl+K)",
+            "- Você pode criar salas com nome, tópico, visibilidade e convites, ou entrar em uma pelo link ou ID",
+            "- Dentro de uma sala dá pra convidar mais gente ou sair dela, direto pelo cabeçalho",
+            "- Nas salas públicas tem um botão pra copiar o link e mandar pra alguém",
+            "- Convites aparecem na lista e dá pra aceitar ou recusar",
+            "- Dá pra escrever com formatação, tipo negrito, itálico e código, usando markdown",
+            "- Você pode mandar e receber imagens direto na conversa",
+            "- Tem threads e respostas, tanto na sala quanto dentro de uma thread, e a thread abre do lado da conversa",
+            "- E dá pra reagir às mensagens com emoji",
+            "- Mostra quando alguém está digitando e o status da sua última mensagem",
+            "- Mensagens seguidas da mesma pessoa ficam agrupadas, e entradas e saídas da sala aparecem resumidas",
+            "- O histórico vai carregando aos poucos conforme você sobe, sem a barra de rolagem pular",
+            "- Se a conta usa criptografia, dá pra recuperar as mensagens antigas com a chave de recuperação",
+            "- Sem internet, o app continua mostrando o que já estava salvo",
+            "- A lista de salas e os filtros recolhem com animação pra sobrar mais espaço",
+            "- Fiz um tema próprio, com fontes escolhidas a dedo",
+            "- Tem build pra macOS, Windows e Linux, gerada automaticamente quando eu crio uma tag"
+          ]
+        },
+        {
+          "from": "daniel",
+          "ago": "20m",
+          "text": "As instruções de build estão no README."
+        }
+      ]
+    },
+    {
+      "direct": true,
+      "members": [
+        "maria",
+        "avaliador"
+      ],
+      "messages": [
+        {
+          "from": "maria",
+          "ago": "4d",
+          "text": "Bom dia! Você recebeu o convite para a sala do desafio?"
+        },
+        {
+          "from": "avaliador",
+          "ago": "4d",
+          "text": "Recebi sim, já entrei."
+        }
+      ]
+    },
+    {
+      "name": "Desafio técnico",
+      "topic": "Discussões sobre o desenvolvimento do cliente Matrix",
+      "creator": "daniel",
+      "members": [
+        "avaliador",
+        "maria",
+        "joao"
+      ],
+      "messages": [
+        {
+          "from": "daniel",
+          "ago": "6d",
+          "text": "Bem-vindos à sala do desafio técnico!"
+        },
+        {
+          "from": "maria",
+          "ago": "6d",
+          "text": "Oi, pessoal!"
+        },
+        {
+          "from": "joao",
+          "ago": "5d",
+          "text": "A comunicação com o Matrix é feita em Rust, certo?"
+        },
+        {
+          "from": "daniel",
+          "ago": "5d",
+          "text": "Isso, com o Matrix Rust SDK exposto ao Flutter pelo Flutter Rust Bridge."
+        },
+        {
+          "from": "maria",
+          "ago": "1d 2h",
+          "text": "@avaliador, o que achou da tela de salas?",
+          "mentions": [
+            "avaliador"
+          ]
+        },
+        {
+          "from": "joao",
+          "ago": "1h",
+          "text": "Subi a nova build para os três sistemas."
+        }
+      ]
+    },
+    {
+      "name": "Geral",
+      "topic": "Conversa livre",
+      "creator": "joao",
+      "members": [
+        "avaliador",
+        "daniel",
+        "maria"
+      ],
+      "messages": [
+        {
+          "from": "joao",
+          "ago": "3d",
+          "text": "Alguém vai almoçar agora?"
+        },
+        {
+          "from": "maria",
+          "ago": "3d",
+          "text": "Eu vou! Daqui a 10 minutos."
+        },
+        {
+          "from": "daniel",
+          "ago": "10m",
+          "text": "Sexta tem café da tarde, @avaliador está convidado.",
+          "mentions": [
+            "avaliador"
+          ]
+        }
+      ]
+    }
+  ]
+}

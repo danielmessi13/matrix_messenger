@@ -1,0 +1,14 @@
+# Appservice usado só pelo seed: envia eventos em nome dos usuários de teste
+# com timestamps no passado (parâmetro `ts`). Apenas para desenvolvimento.
+id: seed
+url: null
+as_token: "dev-only-seed-as-token"
+hs_token: "dev-only-seed-hs-token"
+sender_localpart: seed-bot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: false
+      regex: "@.*:localhost"
+  aliases: []
+  rooms: []
