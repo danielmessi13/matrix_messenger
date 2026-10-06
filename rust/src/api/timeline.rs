@@ -69,7 +69,6 @@ pub struct ImageContent {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub mimetype: Option<String>,
-    // Opaco para o Dart: só volta para `MatrixClient::load_media`.
     pub media: String,
 }
 

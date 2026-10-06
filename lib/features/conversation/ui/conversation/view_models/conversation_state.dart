@@ -5,7 +5,6 @@ import 'message_search.dart';
 
 enum ConversationStatus { opening, ready, failed }
 
-// Toda tentativa passa por `sending`, então duas falhas seguidas ainda mudam o estado.
 enum ImageSendStatus { idle, sending, failed, invalid }
 
 const _unset = Object();

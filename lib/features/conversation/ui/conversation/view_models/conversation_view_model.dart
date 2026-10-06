@@ -145,7 +145,6 @@ class ConversationViewModel extends Cubit<ConversationState> {
     return true;
   }
 
-  // Como o texto, a imagem responde à mensagem marcada; o eco local chega pelo snapshot.
   Future<void> sendImage(String path) async {
     final conversation = _conversation;
     if (conversation == null || state.imageSend == ImageSendStatus.sending) {

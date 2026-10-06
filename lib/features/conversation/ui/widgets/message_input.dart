@@ -46,7 +46,6 @@ class MessageInput extends StatefulWidget {
 
   final VoidCallback? onAttachImage;
 
-  // Imagem a caminho da fila de envio; o "+" espera.
   final bool attaching;
 
   @override

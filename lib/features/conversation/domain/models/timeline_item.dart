@@ -80,7 +80,6 @@ class ImageContent extends Equatable {
     this.mimetype,
   });
 
-  /// Referência opaca do Rust; só serve para pedir os bytes.
   final String media;
 
   final String filename;

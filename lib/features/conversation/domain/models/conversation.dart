@@ -14,7 +14,6 @@ abstract interface class Conversation {
   /// [inReplyTo] é o id do evento citado.
   Future<Result<void>> sendReply(String markdown, String inReplyTo);
 
-  /// [path] é um arquivo local; [inReplyTo] é o id do evento citado.
   Future<Result<void>> sendImage(String path, {String? inReplyTo});
 
   Future<Result<void>> retry(String messageId);

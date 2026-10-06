@@ -219,7 +219,6 @@ impl TimelineHandle {
         Ok(())
     }
 
-    // Pela fila de envio, como o texto: eco local na hora e o mesmo retry/cancel.
     pub(crate) async fn send_image(
         &self,
         path: &str,
@@ -2001,7 +2000,6 @@ mod tests {
             .ok(UInt::from(1_000_000_u32))
             .mount()
             .await;
-        // Upload pendente: o eco fica local enquanto o teste o confere.
         server
             .mock_upload()
             .respond_with(wiremock::ResponseTemplate::new(200).set_delay(Duration::from_secs(60)))
