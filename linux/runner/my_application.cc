@@ -63,7 +63,8 @@ static void my_application_activate(GApplication* application) {
 
   gtk_window_set_default_size(window, 1280, 720);
   GdkGeometry geometry;
-  geometry.min_width = 1024;
+  // Rail e lista recolhidos (88 + 84) mais conversa e thread lado a lado (1000).
+  geometry.min_width = 1180;
   geometry.min_height = 640;
   gtk_window_set_geometry_hints(window, nullptr, &geometry, GDK_HINT_MIN_SIZE);
 

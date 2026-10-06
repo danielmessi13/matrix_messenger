@@ -8,7 +8,8 @@ class MainFlutterWindow: NSWindow {
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
 
-    self.contentMinSize = NSSize(width: 1024, height: 640)
+    // Rail e lista recolhidos (88 + 84) mais conversa e thread lado a lado (1000).
+    self.contentMinSize = NSSize(width: 1180, height: 640)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

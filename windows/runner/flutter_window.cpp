@@ -71,7 +71,8 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
           MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST));
       const double scale = dpi / 96.0;
       // ptMinTrackSize inclui a moldura; Linux e macOS limitam só a área útil.
-      RECT rect = {0, 0, static_cast<LONG>(1024 * scale),
+      // Rail e lista recolhidos (88 + 84) mais conversa e thread lado a lado (1000).
+      RECT rect = {0, 0, static_cast<LONG>(1180 * scale),
                    static_cast<LONG>(640 * scale)};
       AdjustWindowRectExForDpi(
           &rect, static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_STYLE)), FALSE,
