@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme.dart';
 import '../../../rooms/domain/models/room.dart';
+import '../../../rooms/ui/room_link/widgets/copy_room_link_button.dart';
 import '../../../rooms/ui/room_list/widgets/room_labels.dart';
 
 class ConversationHeader extends StatelessWidget {
@@ -52,6 +53,10 @@ class ConversationHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 24),
+              if (room.isPublic && !room.isDirect) ...[
+                CopyRoomLinkButton(key: ValueKey(room.id), roomId: room.id),
+                const SizedBox(width: 12),
+              ],
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

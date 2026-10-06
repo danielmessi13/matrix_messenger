@@ -115,6 +115,18 @@ class MatrixService {
     await client.declineInvite(roomId: roomId);
   });
 
+  Future<Result<String?>> roomLink(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.roomLink(roomId: roomId);
+  });
+
+  Future<Result<String>> joinRoom(String target) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.joinRoom(target: target);
+  });
+
   Future<Result<void>> logout() => _guard(() async {
     final client = _client;
     if (client == null) return;
@@ -172,5 +184,6 @@ class MatrixService {
       error is TimelineError ||
       error is RecoveryError ||
       error is InviteError ||
+      error is JoinRoomError ||
       error is LocalStorageException;
 }

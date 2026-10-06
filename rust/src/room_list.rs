@@ -362,6 +362,7 @@ async fn summarize(room: &Room) -> RoomSummary {
         name,
         is_direct: room.is_dm(),
         is_invite: room.state() == RoomState::Invited,
+        is_public: room.is_public().unwrap_or(false),
         unread_messages: count(room.num_unread_messages()),
         unread_mentions: count(room.num_unread_mentions()),
         unread_thread_replies: unread_by_thread(room)
@@ -437,7 +438,7 @@ mod tests {
     use std::time::Duration;
 
     use matrix_sdk::{
-        ruma::{event_id, room_id, user_id},
+        ruma::{event_id, events::room::join_rules::JoinRule, room_id, user_id},
         test_utils::mocks::MatrixMockServer,
     };
     use matrix_sdk_test::{event_factory::EventFactory, JoinedRoomBuilder};
@@ -585,6 +586,30 @@ mod tests {
 
         wait_until(|| async move { summarize(room).await.unread_thread_replies == 2 }).await;
         assert_eq!(summarize(room).await.unread_messages, 1);
+    }
+
+    #[tokio::test]
+    async fn summarize_reads_whether_the_room_is_public() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let bob = user_id!("@bob:b.c");
+        let public = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id!("!pub:b.c")).add_state_event(
+                    EventFactory::new()
+                        .room_join_rules(JoinRule::Public)
+                        .sender(bob),
+                ),
+            )
+            .await;
+        let private = server
+            .sync_room(&client, JoinedRoomBuilder::new(room_id!("!priv:b.c")))
+            .await;
+
+        assert!(summarize(&public).await.is_public);
+        assert!(!summarize(&private).await.is_public);
     }
 
     // Responde a cada 50 ms, mais rápido que a janela de 100 ms da emissão.

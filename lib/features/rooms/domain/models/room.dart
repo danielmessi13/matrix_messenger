@@ -31,6 +31,7 @@ class Room extends Equatable {
     required this.name,
     this.isDirect = false,
     this.isInvite = false,
+    this.isPublic = false,
     this.unreadMessages = 0,
     this.unreadMentions = 0,
     this.unreadThreadReplies = 0,
@@ -47,6 +48,8 @@ class Room extends Equatable {
   final bool isDirect;
 
   final bool isInvite;
+
+  final bool isPublic;
 
   final int unreadMessages;
 
@@ -66,6 +69,7 @@ class Room extends Equatable {
     name,
     isDirect,
     isInvite,
+    isPublic,
     unreadMessages,
     unreadMentions,
     unreadThreadReplies,

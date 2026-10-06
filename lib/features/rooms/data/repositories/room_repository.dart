@@ -10,4 +10,8 @@ abstract interface class RoomRepository {
   Future<Result<void>> acceptInvite(String roomId);
 
   Future<Result<void>> declineInvite(String roomId);
+
+  Future<String?> roomLink(String roomId);
+
+  Future<Result<String>> joinRoom(String target);
 }

@@ -24,6 +24,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
 
   String get deviceId;
 
+  Future<String> joinRoom({required String target});
+
   static Future<MatrixClient> login({
     required String homeserver,
     required String username,
@@ -46,6 +48,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
       RustLib.instance.api.crateApiClientMatrixClientRestoreSession(
         dataDir: dataDir,
       );
+
+  Future<String?> roomLink({required String roomId});
 
   Stream<SessionEvent> sessionEvents();
 

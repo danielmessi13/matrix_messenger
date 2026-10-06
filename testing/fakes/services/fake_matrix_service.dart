@@ -115,6 +115,23 @@ class FakeMatrixService implements MatrixService {
     return inviteResult;
   }
 
+  Result<String?> roomLinkResult = const Result.ok(
+    'https://matrix.to/#/!a:b.c?via=b.c',
+  );
+
+  @override
+  Future<Result<String?>> roomLink(String roomId) async => roomLinkResult;
+
+  Result<String> joinRoomResult = const Result.ok('!entrou:b.c');
+
+  final joinedTargets = <String>[];
+
+  @override
+  Future<Result<String>> joinRoom(String target) async {
+    joinedTargets.add(target);
+    return joinRoomResult;
+  }
+
   Future<void> dispose() async {
     await revokedController.close();
     await roomsController.close();

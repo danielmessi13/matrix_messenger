@@ -7,8 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `invited_room`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `invited_room`, `join_room_within`, `parse_join_target`, `with_server_of_id`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 class InviteError implements FrbException {
   final InviteErrorKind kind;
@@ -33,6 +33,35 @@ class InviteError implements FrbException {
 
 enum InviteErrorKind {
   roomNotFound,
+  network,
+  unknown,
+}
+
+class JoinRoomError implements FrbException {
+  final JoinRoomErrorKind kind;
+  final String message;
+
+  const JoinRoomError({
+    required this.kind,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JoinRoomError &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message;
+}
+
+enum JoinRoomErrorKind {
+  invalidLink,
+  notFound,
+  forbidden,
   network,
   unknown,
 }
@@ -85,6 +114,7 @@ class RoomSummary {
   final String name;
   final bool isDirect;
   final bool isInvite;
+  final bool isPublic;
   final int unreadMessages;
   final int unreadMentions;
   final int unreadThreadReplies;
@@ -97,6 +127,7 @@ class RoomSummary {
     required this.name,
     required this.isDirect,
     required this.isInvite,
+    required this.isPublic,
     required this.unreadMessages,
     required this.unreadMentions,
     required this.unreadThreadReplies,
@@ -111,6 +142,7 @@ class RoomSummary {
       name.hashCode ^
       isDirect.hashCode ^
       isInvite.hashCode ^
+      isPublic.hashCode ^
       unreadMessages.hashCode ^
       unreadMentions.hashCode ^
       unreadThreadReplies.hashCode ^
@@ -127,6 +159,7 @@ class RoomSummary {
           name == other.name &&
           isDirect == other.isDirect &&
           isInvite == other.isInvite &&
+          isPublic == other.isPublic &&
           unreadMessages == other.unreadMessages &&
           unreadMentions == other.unreadMentions &&
           unreadThreadReplies == other.unreadThreadReplies &&

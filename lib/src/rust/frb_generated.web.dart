@@ -169,6 +169,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   InviteErrorKind dco_decode_invite_error_kind(dynamic raw);
 
   @protected
+  JoinRoomError dco_decode_join_room_error(dynamic raw);
+
+  @protected
+  JoinRoomErrorKind dco_decode_join_room_error_kind(dynamic raw);
+
+  @protected
   LatestMessage dco_decode_latest_message(dynamic raw);
 
   @protected
@@ -408,6 +414,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InviteErrorKind sse_decode_invite_error_kind(SseDeserializer deserializer);
+
+  @protected
+  JoinRoomError sse_decode_join_room_error(SseDeserializer deserializer);
+
+  @protected
+  JoinRoomErrorKind sse_decode_join_room_error_kind(
+    SseDeserializer deserializer,
+  );
 
   @protected
   LatestMessage sse_decode_latest_message(SseDeserializer deserializer);
@@ -698,6 +712,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_invite_error_kind(
     InviteErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_join_room_error(JoinRoomError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_join_room_error_kind(
+    JoinRoomErrorKind self,
     SseSerializer serializer,
   );
 

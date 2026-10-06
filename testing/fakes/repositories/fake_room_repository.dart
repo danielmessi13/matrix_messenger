@@ -38,6 +38,35 @@ class FakeRoomRepository implements RoomRepository {
     return inviteResult;
   }
 
+  String? roomLinkValue = 'https://matrix.to/#/!a:b.c?via=b.c';
+
+  Completer<void>? roomLinkGate;
+
+  Exception? roomLinkError;
+
+  final roomLinkCalls = <String>[];
+
+  @override
+  Future<String?> roomLink(String roomId) async {
+    roomLinkCalls.add(roomId);
+    await roomLinkGate?.future;
+    if (roomLinkError case final error?) throw error;
+    return roomLinkValue;
+  }
+
+  Result<String> joinRoomResult = const Result.ok('!entrou:b.c');
+
+  Completer<void>? joinRoomGate;
+
+  final joinedTargets = <String>[];
+
+  @override
+  Future<Result<String>> joinRoom(String target) async {
+    joinedTargets.add(target);
+    await joinRoomGate?.future;
+    return joinRoomResult;
+  }
+
   Future<void> dispose() async {
     await roomsController.close();
     await syncStateController.close();

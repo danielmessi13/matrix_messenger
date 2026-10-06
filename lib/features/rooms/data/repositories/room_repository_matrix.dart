@@ -1,6 +1,7 @@
 import '../../../../core/services/matrix_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../src/rust/api/rooms.dart' as bridge;
+import '../../domain/models/join_room_failure.dart';
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
 import 'room_repository.dart';
@@ -27,11 +28,43 @@ class RoomRepositoryMatrix implements RoomRepository {
   Future<Result<void>> declineInvite(String roomId) =>
       _service.declineInvite(roomId);
 
+  @override
+  Future<String?> roomLink(String roomId) async =>
+      switch (await _service.roomLink(roomId)) {
+        Ok(:final value) => value,
+        Error() => null,
+      };
+
+  @override
+  Future<Result<String>> joinRoom(String target) async {
+    switch (await _service.joinRoom(target)) {
+      case Ok(:final value):
+        return Result.ok(value);
+      case Error(:final error):
+        return Result.error(_toJoinFailure(error));
+    }
+  }
+
+  JoinRoomFailure _toJoinFailure(Exception error) => switch (error) {
+    bridge.JoinRoomError(:final kind, :final message) => JoinRoomFailure(
+      switch (kind) {
+        bridge.JoinRoomErrorKind.invalidLink => JoinRoomFailureType.invalidLink,
+        bridge.JoinRoomErrorKind.notFound => JoinRoomFailureType.notFound,
+        bridge.JoinRoomErrorKind.forbidden => JoinRoomFailureType.forbidden,
+        bridge.JoinRoomErrorKind.network => JoinRoomFailureType.network,
+        bridge.JoinRoomErrorKind.unknown => JoinRoomFailureType.unknown,
+      },
+      message,
+    ),
+    _ => JoinRoomFailure(JoinRoomFailureType.unknown, '$error'),
+  };
+
   Room _toRoom(bridge.RoomSummary summary) => Room(
     id: summary.id,
     name: summary.name,
     isDirect: summary.isDirect,
     isInvite: summary.isInvite,
+    isPublic: summary.isPublic,
     unreadMessages: summary.unreadMessages,
     unreadMentions: summary.unreadMentions,
     unreadThreadReplies: summary.unreadThreadReplies,

@@ -106,6 +106,19 @@ class FakeMatrixClient implements MatrixClient {
     }
   }
 
+  String? roomLinkValue = 'https://matrix.to/#/!a:b.c?via=b.c';
+
+  @override
+  Future<String?> roomLink({required String roomId}) async => roomLinkValue;
+
+  final joinedTargets = <String>[];
+
+  @override
+  Future<String> joinRoom({required String target}) async {
+    joinedTargets.add(target);
+    return '!entrou:b.c';
+  }
+
   @override
   void dispose() {
     isDisposed = true;

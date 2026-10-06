@@ -112,6 +112,7 @@ void main() {
       name: 'Sala A',
       isDirect: false,
       isInvite: false,
+      isPublic: false,
       unreadMessages: 0,
       unreadMentions: 0,
       unreadThreadReplies: 0,
