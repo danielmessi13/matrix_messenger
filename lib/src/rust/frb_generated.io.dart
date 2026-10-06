@@ -5,6 +5,7 @@
 
 import 'api/auth.dart';
 import 'api/client.dart';
+import 'api/media.dart';
 import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';
@@ -145,6 +146,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  ImageContent dco_decode_box_autoadd_image_content(dynamic raw);
+
+  @protected
   LatestMessage dco_decode_box_autoadd_latest_message(dynamic raw);
 
   @protected
@@ -166,6 +170,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TimelineMessage dco_decode_box_autoadd_timeline_message(dynamic raw);
 
   @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   CreateRoomError dco_decode_create_room_error(dynamic raw);
 
   @protected
@@ -179,6 +186,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  ImageContent dco_decode_image_content(dynamic raw);
 
   @protected
   InviteError dco_decode_invite_error(dynamic raw);
@@ -211,6 +221,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TimelineEntry> dco_decode_list_timeline_entry(dynamic raw);
 
   @protected
+  MediaError dco_decode_media_error(dynamic raw);
+
+  @protected
+  MediaErrorKind dco_decode_media_error_kind(dynamic raw);
+
+  @protected
   MessageKind dco_decode_message_kind(dynamic raw);
 
   @protected
@@ -229,6 +245,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
+  ImageContent? dco_decode_opt_box_autoadd_image_content(dynamic raw);
+
+  @protected
   LatestMessage? dco_decode_opt_box_autoadd_latest_message(dynamic raw);
 
   @protected
@@ -245,6 +264,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TimelineMessage? dco_decode_opt_box_autoadd_timeline_message(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
   RecoveryError dco_decode_recovery_error(dynamic raw);
@@ -424,6 +446,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  ImageContent sse_decode_box_autoadd_image_content(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   LatestMessage sse_decode_box_autoadd_latest_message(
     SseDeserializer deserializer,
   );
@@ -451,6 +478,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   CreateRoomError sse_decode_create_room_error(SseDeserializer deserializer);
 
   @protected
@@ -466,6 +496,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  ImageContent sse_decode_image_content(SseDeserializer deserializer);
 
   @protected
   InviteError sse_decode_invite_error(SseDeserializer deserializer);
@@ -504,6 +537,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  MediaError sse_decode_media_error(SseDeserializer deserializer);
+
+  @protected
+  MediaErrorKind sse_decode_media_error_kind(SseDeserializer deserializer);
+
+  @protected
   MessageKind sse_decode_message_kind(SseDeserializer deserializer);
 
   @protected
@@ -520,6 +559,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  ImageContent? sse_decode_opt_box_autoadd_image_content(
+    SseDeserializer deserializer,
+  );
 
   @protected
   LatestMessage? sse_decode_opt_box_autoadd_latest_message(
@@ -550,6 +594,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TimelineMessage? sse_decode_opt_box_autoadd_timeline_message(
     SseDeserializer deserializer,
   );
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
   RecoveryError sse_decode_recovery_error(SseDeserializer deserializer);
@@ -755,6 +802,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_image_content(
+    ImageContent self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_latest_message(
     LatestMessage self,
     SseSerializer serializer,
@@ -794,6 +847,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_create_room_error(
     CreateRoomError self,
     SseSerializer serializer,
@@ -813,6 +869,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_image_content(ImageContent self, SseSerializer serializer);
 
   @protected
   void sse_encode_invite_error(InviteError self, SseSerializer serializer);
@@ -863,6 +922,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_media_error(MediaError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_media_error_kind(
+    MediaErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_message_kind(MessageKind self, SseSerializer serializer);
 
   @protected
@@ -881,6 +949,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_i_64(
     PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_image_content(
+    ImageContent? self,
     SseSerializer serializer,
   );
 
@@ -919,6 +993,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     TimelineMessage? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_recovery_error(RecoveryError self, SseSerializer serializer);

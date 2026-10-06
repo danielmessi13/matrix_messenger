@@ -1911,6 +1911,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "imagesize"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65b27460c2c92b037f3f94c538ed9a3342f3fdf923606781629ccb35f82d042a"
+
+[[package]]
 name = "imbl"
 version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3667,11 +3673,13 @@ dependencies = [
  "flutter_rust_bridge",
  "futures-util",
  "getrandom 0.2.17",
+ "imagesize",
  "keyring",
  "log",
  "matrix-sdk",
  "matrix-sdk-test",
  "matrix-sdk-ui",
+ "mime",
  "serde",
  "serde_json",
  "tokio",

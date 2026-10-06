@@ -70,6 +70,40 @@ class ThreadSummary extends Equatable {
   ];
 }
 
+class ImageContent extends Equatable {
+  const ImageContent({
+    required this.media,
+    required this.filename,
+    this.caption,
+    this.width,
+    this.height,
+    this.mimetype,
+  });
+
+  /// Referência opaca do Rust; só serve para pedir os bytes.
+  final String media;
+
+  final String filename;
+
+  final String? caption;
+
+  final int? width;
+
+  final int? height;
+
+  final String? mimetype;
+
+  @override
+  List<Object?> get props => [
+    media,
+    filename,
+    caption,
+    width,
+    height,
+    mimetype,
+  ];
+}
+
 sealed class TimelineItem extends Equatable {
   const TimelineItem();
 }
@@ -99,6 +133,7 @@ final class MessageItem extends TimelineItem {
     this.thread,
     this.replyTo,
     this.readBy = const [],
+    this.image,
   });
 
   final String id;
@@ -129,6 +164,8 @@ final class MessageItem extends TimelineItem {
 
   final List<String> readBy;
 
+  final ImageContent? image;
+
   @override
   List<Object?> get props => [
     id,
@@ -145,6 +182,7 @@ final class MessageItem extends TimelineItem {
     thread,
     replyTo,
     readBy,
+    image,
   ];
 }
 

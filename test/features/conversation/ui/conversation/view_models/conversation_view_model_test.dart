@@ -4,6 +4,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/conversation.dart';
+import 'package:matrix_messenger/features/conversation/domain/models/conversation_failure.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_state.dart';
 import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_view_model.dart';
@@ -324,6 +325,85 @@ void main() {
     expect(await viewModel.send('re'), isTrue);
     expect(conversation.sentReplies, [('re', '\$other')]);
     expect(viewModel.state.replyTo, isNull);
+  });
+
+  group('envio de imagem', () {
+    test('passa por sending e volta a idle', () async {
+      final viewModel = await ready();
+      final gate = Completer<void>();
+      conversation.sendImageCompleter = gate;
+
+      final sending = viewModel.sendImage('/fotos/gato.png');
+      expect(viewModel.state.imageSend, ImageSendStatus.sending);
+      gate.complete();
+      await sending;
+
+      expect(conversation.sentImages, [('/fotos/gato.png', null)]);
+      expect(viewModel.state.imageSend, ImageSendStatus.idle);
+    });
+
+    test('com resposta marcada, responde e limpa', () async {
+      final viewModel = await ready();
+      viewModel.startReply(kOtherMessage);
+
+      await viewModel.sendImage('/fotos/gato.png');
+
+      expect(conversation.sentImages, [('/fotos/gato.png', '\$other')]);
+      expect(viewModel.state.replyTo, isNull);
+    });
+
+    test('arquivo que não é imagem vira invalid', () async {
+      final viewModel = await ready();
+      conversation.sendImageResult = const Result.error(
+        ConversationFailure(ConversationFailureType.invalidImage),
+      );
+
+      await viewModel.sendImage('/notas.txt');
+
+      expect(viewModel.state.imageSend, ImageSendStatus.invalid);
+    });
+
+    test(
+      'outra falha vira failed e a seguinte passa por sending de novo',
+      () async {
+        final viewModel = await ready();
+        conversation.sendImageResult = const Result.error(
+          ConversationFailure(ConversationFailureType.network),
+        );
+        final seen = <ImageSendStatus>[];
+        final subscription = viewModel.stream.listen(
+          (state) => seen.add(state.imageSend),
+        );
+
+        await viewModel.sendImage('/a.png');
+        await viewModel.sendImage('/b.png');
+        await flush();
+        await subscription.cancel();
+
+        expect(seen, [
+          ImageSendStatus.sending,
+          ImageSendStatus.failed,
+          ImageSendStatus.sending,
+          ImageSendStatus.failed,
+        ]);
+      },
+    );
+
+    test('um envio por vez e nada antes de abrir', () async {
+      final closed = build();
+      await closed.sendImage('/a.png');
+      expect(conversation.sentImages, isEmpty);
+
+      final viewModel = await ready();
+      final gate = Completer<void>();
+      conversation.sendImageCompleter = gate;
+      final first = viewModel.sendImage('/a.png');
+      await viewModel.sendImage('/b.png');
+      gate.complete();
+      await first;
+
+      expect(conversation.sentImages, [('/a.png', null)]);
+    });
   });
 
   test('goTo acha a mensagem carregada', () async {

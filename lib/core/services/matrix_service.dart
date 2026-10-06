@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 
 import '../../src/rust/api/auth.dart';
 import '../../src/rust/api/client.dart';
+import '../../src/rust/api/media.dart';
 import '../../src/rust/api/oidc.dart';
 import '../../src/rust/api/recovery.dart';
 import '../../src/rust/api/rooms.dart';
@@ -103,6 +105,15 @@ class MatrixService {
     return client.openTimeline(roomId: roomId);
   });
 
+  Future<Result<Uint8List>> loadMedia(
+    String media, {
+    required bool thumbnail,
+  }) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.loadMedia(media: media, thumbnail: thumbnail);
+  });
+
   Future<Result<void>> acceptInvite(String roomId) => _guard(() async {
     final client = _client;
     if (client == null) throw StateError('Sem sessão ativa');
@@ -194,6 +205,7 @@ class MatrixService {
   static bool _isExpected(Object error) =>
       error is AuthError ||
       error is TimelineError ||
+      error is MediaError ||
       error is RecoveryError ||
       error is InviteError ||
       error is CreateRoomError ||

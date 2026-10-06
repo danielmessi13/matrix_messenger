@@ -5,6 +5,9 @@ import 'message_search.dart';
 
 enum ConversationStatus { opening, ready, failed }
 
+// Toda tentativa passa por `sending`, então duas falhas seguidas ainda mudam o estado.
+enum ImageSendStatus { idle, sending, failed, invalid }
+
 const _unset = Object();
 
 final class ConversationState extends Equatable {
@@ -19,6 +22,7 @@ final class ConversationState extends Equatable {
     this.replyTo,
     this.focusRequest,
     this.typing = const [],
+    this.imageSend = ImageSendStatus.idle,
   });
 
   final ConversationStatus status;
@@ -43,6 +47,8 @@ final class ConversationState extends Equatable {
 
   final List<String> typing;
 
+  final ImageSendStatus imageSend;
+
   // `openThreadId`/`replyTo: null` limpam; sem o argumento, mantêm.
   ConversationState copyWith({
     ConversationStatus? status,
@@ -55,6 +61,7 @@ final class ConversationState extends Equatable {
     Object? replyTo = _unset,
     FocusRequest? focusRequest,
     List<String>? typing,
+    ImageSendStatus? imageSend,
   }) => ConversationState(
     status: status ?? this.status,
     items: items ?? this.items,
@@ -70,6 +77,7 @@ final class ConversationState extends Equatable {
         : replyTo as MessageItem?,
     focusRequest: focusRequest ?? this.focusRequest,
     typing: typing ?? this.typing,
+    imageSend: imageSend ?? this.imageSend,
   );
 
   @override
@@ -84,5 +92,6 @@ final class ConversationState extends Equatable {
     replyTo,
     focusRequest,
     typing,
+    imageSend,
   ];
 }

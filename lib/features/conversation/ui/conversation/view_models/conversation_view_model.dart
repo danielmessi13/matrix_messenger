@@ -145,6 +145,40 @@ class ConversationViewModel extends Cubit<ConversationState> {
     return true;
   }
 
+  // Como o texto, a imagem responde à mensagem marcada; o eco local chega pelo snapshot.
+  Future<void> sendImage(String path) async {
+    final conversation = _conversation;
+    if (conversation == null || state.imageSend == ImageSendStatus.sending) {
+      return;
+    }
+    emit(state.copyWith(imageSend: ImageSendStatus.sending));
+    final target = state.replyTo;
+    final result = await conversation.sendImage(
+      path,
+      inReplyTo: target?.eventId,
+    );
+    if (_closing || isClosed) return;
+    switch (result) {
+      case Ok():
+        emit(
+          state.replyTo == target
+              ? state.copyWith(imageSend: ImageSendStatus.idle, replyTo: null)
+              : state.copyWith(imageSend: ImageSendStatus.idle),
+        );
+      case Error(:final error):
+        log('Falha ao enviar a imagem', name: 'conversation', error: error);
+        emit(
+          state.copyWith(
+            imageSend:
+                error is ConversationFailure &&
+                    error.type == ConversationFailureType.invalidImage
+                ? ImageSendStatus.invalid
+                : ImageSendStatus.failed,
+          ),
+        );
+    }
+  }
+
   Future<bool> retry(String messageId) async =>
       await _conversation?.retry(messageId) is Ok;
 

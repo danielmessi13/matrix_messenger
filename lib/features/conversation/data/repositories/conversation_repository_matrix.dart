@@ -44,6 +44,10 @@ class _MatrixConversation implements Conversation {
   );
 
   @override
+  Future<Result<void>> sendImage(String path, {String? inReplyTo}) =>
+      _run(() => _timeline.sendImage(path: path, inReplyTo: inReplyTo));
+
+  @override
   Future<Result<void>> retry(String messageId) =>
       _run(() => _timeline.retry(itemId: messageId));
 
@@ -87,6 +91,8 @@ ConversationFailure _toFailure(Exception error) => switch (error) {
         ConversationFailureType.roomNotFound,
       bridge.TimelineErrorKind.messageNotFound =>
         ConversationFailureType.messageNotFound,
+      bridge.TimelineErrorKind.invalidImage =>
+        ConversationFailureType.invalidImage,
       bridge.TimelineErrorKind.network => ConversationFailureType.network,
       bridge.TimelineErrorKind.unknown => ConversationFailureType.unknown,
     },
@@ -185,6 +191,17 @@ MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
     ),
   },
   readBy: List.unmodifiable(message.readBy),
+  image: switch (message.image) {
+    null => null,
+    final image => ImageContent(
+      media: image.media,
+      filename: image.filename,
+      caption: image.caption,
+      width: image.width,
+      height: image.height,
+      mimetype: image.mimetype,
+    ),
+  },
 );
 
 MessageKind _toKind(bridge.MessageKind kind) => switch (kind) {

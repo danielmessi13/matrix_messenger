@@ -301,6 +301,77 @@ void main() {
     );
   });
 
+  test('converte a imagem da mensagem', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      const bridge.TimelineSnapshot(
+        items: [
+          bridge.TimelineEntry(
+            message: bridge.TimelineMessage(
+              id: '\$img',
+              senderId: '@bob:b.c',
+              senderName: 'Bob',
+              isOwn: false,
+              timestampMs: 1000,
+              kind: bridge.MessageKind.image,
+              edited: false,
+              sendState: bridge.SendState.sent,
+              canReply: true,
+              readBy: [],
+              image: bridge.ImageContent(
+                filename: 'gato.png',
+                caption: 'olha',
+                width: 800,
+                height: 600,
+                mimetype: 'image/png',
+                media: '{"url":"mxc://b.c/gato"}',
+              ),
+            ),
+          ),
+        ],
+        reachedStart: true,
+        paginating: false,
+      ),
+    );
+
+    final message = (await received).items.single as MessageItem;
+
+    expect(message.kind, MessageKind.image);
+    expect(
+      message.image,
+      const ImageContent(
+        media: '{"url":"mxc://b.c/gato"}',
+        filename: 'gato.png',
+        caption: 'olha',
+        width: 800,
+        height: 600,
+        mimetype: 'image/png',
+      ),
+    );
+  });
+
+  test('sendImage repassa e InvalidImage vira invalidImage', () async {
+    final conversation = await open();
+
+    await conversation.sendImage('/a.png', inReplyTo: '\$1');
+    timeline.error = const bridge.TimelineError(
+      kind: bridge.TimelineErrorKind.invalidImage,
+      message: 'nota.txt',
+    );
+    final result = await conversation.sendImage('/nota.txt');
+
+    expect(timeline.images, [('/a.png', '\$1')]);
+    expect(
+      (result as Error<void>).error,
+      isA<ConversationFailure>().having(
+        (f) => f.type,
+        'type',
+        ConversationFailureType.invalidImage,
+      ),
+    );
+  });
+
   test('converte o estado da paginação', () async {
     final conversation = await open();
     final received = conversation.updates.take(2).toList();

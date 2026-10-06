@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    path::Path,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -7,6 +8,7 @@ use std::{
 use eyeball_im::Vector;
 use futures_util::{pin_mut, stream, StreamExt};
 use matrix_sdk::{
+    attachment::AttachmentInfo,
     event_cache::PaginationStatus,
     ruma::{
         api::client::receipt::create_receipt::v3::ReceiptType,
@@ -22,18 +24,21 @@ use matrix_sdk::{
     Room,
 };
 use matrix_sdk_ui::timeline::{
-    AnyOtherStateEventContentChange, EventSendState, EventTimelineItem, MembershipChange,
-    MsgLikeKind, Profile, Timeline, TimelineBuilder, TimelineDetails, TimelineFocus, TimelineItem,
-    TimelineItemContent, TimelineReadReceiptTracking, TimelineUniqueId, VirtualTimelineItem,
+    AnyOtherStateEventContentChange, AttachmentConfig, AttachmentSource, EventSendState,
+    EventTimelineItem, MembershipChange, MsgLikeKind, Profile, Timeline, TimelineBuilder,
+    TimelineDetails, TimelineFocus, TimelineItem, TimelineItemContent, TimelineReadReceiptTracking,
+    TimelineUniqueId, VirtualTimelineItem,
 };
 use tokio::{runtime::Handle, task::AbortHandle};
 
 use crate::{
     api::timeline::{
-        MessageKind, ReplyPreview, ReplyState, RoomEvent, RoomEventKind, SendState, ThreadInfo,
-        TimelineEntry, TimelineError, TimelineErrorKind, TimelineMessage, TimelineSnapshot,
+        ImageContent, MessageKind, ReplyPreview, ReplyState, RoomEvent, RoomEventKind, SendState,
+        ThreadInfo, TimelineEntry, TimelineError, TimelineErrorKind, TimelineMessage,
+        TimelineSnapshot,
     },
     diff_window::next_batch_or,
+    media,
     threads::{changed_in, unread_by_thread, ThreadReads},
     typing,
 };
@@ -214,6 +219,43 @@ impl TimelineHandle {
         Ok(())
     }
 
+    // Pela fila de envio, como o texto: eco local na hora e o mesmo retry/cancel.
+    pub(crate) async fn send_image(
+        &self,
+        path: &str,
+        in_reply_to: Option<&str>,
+    ) -> Result<(), TimelineError> {
+        let invalid =
+            |message: String| TimelineError::new(TimelineErrorKind::InvalidImage, message);
+        let bytes = tokio::fs::read(path)
+            .await
+            .map_err(|error| invalid(error.to_string()))?;
+        let filename = Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| invalid(path.to_owned()))?
+            .to_owned();
+        let (mime, info) =
+            media::image_attachment(&bytes).ok_or_else(|| invalid(filename.clone()))?;
+        let in_reply_to = in_reply_to
+            .map(|id| {
+                OwnedEventId::try_from(id).map_err(|error| {
+                    TimelineError::new(TimelineErrorKind::MessageNotFound, error.to_string())
+                })
+            })
+            .transpose()?;
+        let config = AttachmentConfig {
+            info: Some(AttachmentInfo::Image(info)),
+            in_reply_to,
+            ..Default::default()
+        };
+        self.timeline
+            .send_attachment(AttachmentSource::Data { bytes, filename }, mime, config)
+            .use_send_queue()
+            .await?;
+        Ok(())
+    }
+
     // Qualquer falha de envio desliga a fila da sala no SDK; sem religar, nada mais sai.
     pub(crate) async fn retry(&self, item_id: &str) -> Result<(), TimelineError> {
         let handle = self.send_handle(item_id).await?;
@@ -349,6 +391,13 @@ pub(crate) fn kind_and_body(
     })
 }
 
+fn image(content: &TimelineItemContent) -> Option<ImageContent> {
+    match content.as_message()?.msgtype() {
+        MessageType::Image(image) => Some(media::image_content(image)),
+        _ => None,
+    }
+}
+
 fn send_state(item: &EventTimelineItem) -> SendState {
     match item.send_state() {
         None | Some(EventSendState::Sent { .. }) => SendState::Sent,
@@ -477,6 +526,7 @@ fn message(
         thread: thread_info(item, unread),
         reply_to: reply_preview(item, own_user),
         read_by: Vec::new(),
+        image: image(item.content()),
     })
 }
 
@@ -664,7 +714,7 @@ mod tests {
             api::client::receipt::create_receipt::v3::ReceiptType,
             event_id,
             events::receipt::{ReceiptThread, ReceiptType as EventReceiptType},
-            room_id, user_id,
+            mxc_uri, room_id, user_id, UInt,
         },
         test_utils::mocks::{
             MatrixMockServer, RoomMessagesResponseTemplate, RoomRelationsResponseTemplate,
@@ -1899,6 +1949,108 @@ mod tests {
             .iter()
             .filter(|e| !e.is_own)
             .all(|e| e.sender_name == "Roberto"));
+    }
+
+    #[tokio::test]
+    async fn snapshot_carries_the_image_of_an_image_message() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(
+                        f.image("foto.png".to_owned(), mxc_uri!("mxc://b.c/foto").to_owned())
+                            .sender(user_id!("@bob:b.c")),
+                    )
+                    .add_timeline_event(f.text_msg("oi").sender(user_id!("@bob:b.c"))),
+            )
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+
+        let current = wait_for(&handle, |s| messages(s).len() == 2).await;
+
+        let all = messages(&current);
+        assert_eq!(
+            (all[0].kind, all[0].body.as_deref()),
+            (MessageKind::Image, None)
+        );
+        let image = all[0].image.as_ref().expect("conteúdo da imagem");
+        assert_eq!(image.filename, "foto.png");
+        assert!(image.media.contains("mxc://b.c/foto"));
+        assert!(all[1].image.is_none());
+    }
+
+    #[tokio::test]
+    async fn send_image_shows_a_local_echo_whose_bytes_load_from_the_cache() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room = server.sync_joined_room(&client, room_id!("!a:b.c")).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server
+            .mock_authenticated_media_config()
+            .ok(UInt::from(1_000_000_u32))
+            .mount()
+            .await;
+        server
+            .mock_media_config()
+            .ok(UInt::from(1_000_000_u32))
+            .mount()
+            .await;
+        // Upload pendente: o eco fica local enquanto o teste o confere.
+        server
+            .mock_upload()
+            .respond_with(wiremock::ResponseTemplate::new(200).set_delay(Duration::from_secs(60)))
+            .mount()
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+        let path = std::path::Path::new(&crate::test_support::temp_data_dir("send_image"))
+            .join("gato.png");
+        let bytes = crate::test_support::png(40, 30);
+        std::fs::write(&path, &bytes).unwrap();
+
+        handle
+            .send_image(path.to_str().unwrap(), None)
+            .await
+            .unwrap();
+        let current = wait_for(&handle, |s| messages(s).len() == 1).await;
+
+        let echo = messages(&current)[0];
+        assert!(echo.is_own);
+        assert_eq!(
+            (echo.kind, echo.send_state),
+            (MessageKind::Image, SendState::Sending)
+        );
+        let image = echo.image.as_ref().unwrap();
+        assert_eq!(image.filename, "gato.png");
+        assert_eq!((image.width, image.height), (Some(40), Some(30)));
+        assert_eq!(image.mimetype.as_deref(), Some("image/png"));
+        let loaded = media::load(&client, &image.media, true).await.unwrap();
+        assert_eq!(loaded, bytes);
+    }
+
+    #[tokio::test]
+    async fn send_image_rejects_a_file_that_is_not_an_image() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room = server.sync_joined_room(&client, room_id!("!a:b.c")).await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+        let dir = crate::test_support::temp_data_dir("send_not_image");
+        let path = std::path::Path::new(&dir).join("nota.png");
+        std::fs::write(&path, b"texto com extensao de imagem").unwrap();
+
+        for target in [path.to_str().unwrap(), "/nao/existe.png"] {
+            let error = handle.send_image(target, None).await.unwrap_err();
+            assert_eq!(error.kind, TimelineErrorKind::InvalidImage, "{target}");
+        }
     }
 
     #[tokio::test]

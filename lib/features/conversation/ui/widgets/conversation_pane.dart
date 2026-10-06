@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/services/image_file_picker.dart';
 import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/room.dart';
 import '../../../rooms/ui/invite/view_models/invite_view_model.dart';
@@ -175,10 +176,24 @@ class _Conversation extends StatelessWidget {
             },
           ),
         ),
-        BlocBuilder<ConversationViewModel, ConversationState>(
+        BlocConsumer<ConversationViewModel, ConversationState>(
+          listenWhen: (a, b) => a.imageSend != b.imageSend,
+          listener: (context, state) {
+            final message = switch (state.imageSend) {
+              ImageSendStatus.invalid =>
+                'O arquivo não é uma imagem PNG, JPEG, GIF ou WebP.',
+              ImageSendStatus.failed => 'Não foi possível enviar a imagem.',
+              ImageSendStatus.idle || ImageSendStatus.sending => null,
+            };
+            if (message == null) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(message)));
+          },
           buildWhen: (a, b) =>
               a.status != b.status ||
               a.replyTo != b.replyTo ||
+              a.imageSend != b.imageSend ||
               (a.openThreadId == null) != (b.openThreadId == null),
           builder: (context, state) => MessageInput(
             placeholder: composerHint(
@@ -191,6 +206,8 @@ class _Conversation extends StatelessWidget {
             covered: state.openThreadId != null,
             onSend: viewModel.send,
             onChanged: viewModel.onDraftChanged,
+            onAttachImage: () => _attachImage(context, viewModel),
+            attaching: state.imageSend == ImageSendStatus.sending,
             status: const _TypingLine(),
           ),
         ),
@@ -258,6 +275,14 @@ class _Conversation extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _attachImage(
+  BuildContext context,
+  ConversationViewModel viewModel,
+) async {
+  final path = await context.read<ImageFilePicker>().pickImage();
+  if (path != null) await viewModel.sendImage(path);
 }
 
 // Altura fixa: aparecer e sumir não empurra a timeline.

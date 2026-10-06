@@ -11,6 +11,7 @@ class FakeRoomTimeline implements RoomTimeline {
   int paginateCalls = 0;
   final sentBodies = <String>[];
   final replies = <(String, String)>[];
+  final images = <(String, String?)>[];
   final retried = <String>[];
   final cancelled = <String>[];
   int markAsReadCalls = 0;
@@ -44,6 +45,12 @@ class FakeRoomTimeline implements RoomTimeline {
   }) async {
     _throwIfError();
     replies.add((body, inReplyTo));
+  }
+
+  @override
+  Future<void> sendImage({required String path, String? inReplyTo}) async {
+    _throwIfError();
+    images.add((path, inReplyTo));
   }
 
   @override

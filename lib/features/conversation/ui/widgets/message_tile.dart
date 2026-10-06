@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 
 import '../../../../app/theme.dart';
 import '../../domain/models/timeline_item.dart';
+import 'image_message.dart';
 import 'markdown_text.dart';
 import 'message_labels.dart';
 
@@ -641,6 +642,9 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.image case final image?) {
+      return ImageMessage(image: image, alignEnd: italic);
+    }
     final placeholder = kindPlaceholder(message.kind);
     final base = TextStyle(
       fontFamily: AppFonts.serif,

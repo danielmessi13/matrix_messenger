@@ -59,6 +59,18 @@ pub struct TimelineMessage {
     pub thread: Option<ThreadInfo>,
     pub reply_to: Option<ReplyPreview>,
     pub read_by: Vec<String>,
+    pub image: Option<ImageContent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageContent {
+    pub filename: String,
+    pub caption: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub mimetype: Option<String>,
+    // Opaco para o Dart: só volta para `MatrixClient::load_media`.
+    pub media: String,
 }
 
 // Remetente, tipo e texto só vêm em `Ready`.
@@ -112,6 +124,7 @@ pub enum SendState {
 pub enum TimelineErrorKind {
     RoomNotFound,
     MessageNotFound,
+    InvalidImage,
     Network,
     Unknown,
 }
@@ -201,6 +214,14 @@ impl RoomTimeline {
         self.handle.send_reply(body, &in_reply_to).await
     }
 
+    pub async fn send_image(
+        &self,
+        path: String,
+        in_reply_to: Option<String>,
+    ) -> Result<(), TimelineError> {
+        self.handle.send_image(&path, in_reply_to.as_deref()).await
+    }
+
     pub async fn retry(&self, item_id: String) -> Result<(), TimelineError> {
         self.handle.retry(&item_id).await
     }
@@ -214,7 +235,8 @@ impl RoomTimeline {
     }
 
     pub fn watch_typing(&self, sink: StreamSink<Vec<String>>) {
-        self.handle.watch_typing(move |names| sink.add(names).is_ok());
+        self.handle
+            .watch_typing(move |names| sink.add(names).is_ok());
     }
 
     pub async fn set_typing(&self, typing: bool) -> Result<(), TimelineError> {

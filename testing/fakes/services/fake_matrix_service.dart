@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:matrix_messenger/core/services/matrix_service.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
@@ -96,6 +97,22 @@ class FakeMatrixService implements MatrixService {
   @override
   Future<Result<RoomTimeline>> openTimeline(String roomId) async =>
       openTimelineResult;
+
+  Result<Uint8List> Function(String media, bool thumbnail) loadMediaResult = (
+    media,
+    _,
+  ) => Result.ok(Uint8List.fromList(media.codeUnits));
+
+  final loadMediaCalls = <(String, bool)>[];
+
+  @override
+  Future<Result<Uint8List>> loadMedia(
+    String media, {
+    required bool thumbnail,
+  }) async {
+    loadMediaCalls.add((media, thumbnail));
+    return loadMediaResult(media, thumbnail);
+  }
 
   Result<void> inviteResult = const Result.ok(null);
 

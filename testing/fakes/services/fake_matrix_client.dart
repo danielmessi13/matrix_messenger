@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/src/rust/api/client.dart';
@@ -139,6 +140,22 @@ class FakeMatrixClient implements MatrixClient {
 
   @override
   Future<UserCheck> checkUser({required String userId}) async => userCheck;
+
+  final loadedMedia = <(String, bool)>[];
+
+  Object? loadMediaError;
+
+  @override
+  Future<Uint8List> loadMedia({
+    required String media,
+    required bool thumbnail,
+  }) async {
+    loadedMedia.add((media, thumbnail));
+    if (loadMediaError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+    return Uint8List.fromList(media.codeUnits);
+  }
 
   @override
   void dispose() {

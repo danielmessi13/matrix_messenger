@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `from_sdk`, `new`, `new`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RoomTimeline>>
 abstract class RoomTimeline implements RustOpaqueInterface {
@@ -22,6 +22,8 @@ abstract class RoomTimeline implements RustOpaqueInterface {
 
   Future<void> retry({required String itemId});
 
+  Future<void> sendImage({required String path, String? inReplyTo});
+
   Future<void> sendMarkdown({required String body});
 
   Future<void> sendReply({required String body, required String inReplyTo});
@@ -31,6 +33,45 @@ abstract class RoomTimeline implements RustOpaqueInterface {
   Stream<TimelineSnapshot> watch();
 
   Stream<List<String>> watchTyping();
+}
+
+class ImageContent {
+  final String filename;
+  final String? caption;
+  final int? width;
+  final int? height;
+  final String? mimetype;
+  final String media;
+
+  const ImageContent({
+    required this.filename,
+    this.caption,
+    this.width,
+    this.height,
+    this.mimetype,
+    required this.media,
+  });
+
+  @override
+  int get hashCode =>
+      filename.hashCode ^
+      caption.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      mimetype.hashCode ^
+      media.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImageContent &&
+          runtimeType == other.runtimeType &&
+          filename == other.filename &&
+          caption == other.caption &&
+          width == other.width &&
+          height == other.height &&
+          mimetype == other.mimetype &&
+          media == other.media;
 }
 
 enum MessageKind {
@@ -243,6 +284,7 @@ class TimelineError implements FrbException {
 enum TimelineErrorKind {
   roomNotFound,
   messageNotFound,
+  invalidImage,
   network,
   unknown,
 }
@@ -262,6 +304,7 @@ class TimelineMessage {
   final ThreadInfo? thread;
   final ReplyPreview? replyTo;
   final List<String> readBy;
+  final ImageContent? image;
 
   const TimelineMessage({
     required this.id,
@@ -278,6 +321,7 @@ class TimelineMessage {
     this.thread,
     this.replyTo,
     required this.readBy,
+    this.image,
   });
 
   @override
@@ -295,7 +339,8 @@ class TimelineMessage {
       canReply.hashCode ^
       thread.hashCode ^
       replyTo.hashCode ^
-      readBy.hashCode;
+      readBy.hashCode ^
+      image.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -315,7 +360,8 @@ class TimelineMessage {
           canReply == other.canReply &&
           thread == other.thread &&
           replyTo == other.replyTo &&
-          readBy == other.readBy;
+          readBy == other.readBy &&
+          image == other.image;
 }
 
 class TimelineSnapshot {

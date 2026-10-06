@@ -18,6 +18,8 @@ class MessageInput extends StatefulWidget {
     this.covered = false,
     this.onChanged,
     this.status,
+    this.onAttachImage,
+    this.attaching = false,
   });
 
   final String placeholder;
@@ -41,6 +43,11 @@ class MessageInput extends StatefulWidget {
   final ValueChanged<String>? onChanged;
 
   final Widget? status;
+
+  final VoidCallback? onAttachImage;
+
+  // Imagem a caminho da fila de envio; o "+" espera.
+  final bool attaching;
 
   @override
   State<MessageInput> createState() => _MessageInputState();
@@ -257,6 +264,9 @@ class _MessageInputState extends State<MessageInput> {
                                 dense: narrow,
                                 onWrap: _wrap,
                                 onBullet: _bullet,
+                                onAttachImage: widget.attaching
+                                    ? null
+                                    : widget.onAttachImage,
                               ),
                             const SizedBox(width: 12),
                             Expanded(child: narrow ? const SizedBox() : hint),
@@ -287,6 +297,7 @@ class _FormatTools extends StatelessWidget {
     required this.dense,
     required this.onWrap,
     required this.onBullet,
+    required this.onAttachImage,
   });
 
   final bool enabled;
@@ -296,6 +307,8 @@ class _FormatTools extends StatelessWidget {
   final ValueChanged<String> onWrap;
 
   final VoidCallback onBullet;
+
+  final VoidCallback? onAttachImage;
 
   @override
   Widget build(BuildContext context) {
@@ -343,7 +356,13 @@ class _FormatTools extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 6),
           color: colors.borderStrong,
         ),
-        _Tool(icon: Icons.add, tooltip: 'Em breve', dense: dense),
+        _Tool(
+          key: const Key('attach_image'),
+          icon: Icons.add,
+          tooltip: 'Enviar imagem',
+          dense: dense,
+          onTap: enabled ? onAttachImage : null,
+        ),
         _Tool(
           icon: Icons.alternate_email,
           tooltip: 'Em breve',

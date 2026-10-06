@@ -5,6 +5,7 @@
 
 import '../frb_generated.dart';
 import 'auth.dart';
+import 'media.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
@@ -29,6 +30,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
   String get deviceId;
 
   Future<String> joinRoom({required String target});
+
+  Future<Uint8List> loadMedia({required String media, required bool thumbnail});
 
   static Future<MatrixClient> login({
     required String homeserver,
