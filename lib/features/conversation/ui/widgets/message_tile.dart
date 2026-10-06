@@ -16,6 +16,7 @@ class MessageTile extends StatelessWidget {
     this.thread,
     this.compact = false,
     this.continuation = false,
+    this.continuedBelow = false,
     this.onReply,
     this.onStartThread,
     this.onQuoteTap,
@@ -34,6 +35,8 @@ class MessageTile extends StatelessWidget {
 
   final bool continuation;
 
+  final bool continuedBelow;
+
   final VoidCallback? onReply;
 
   final VoidCallback? onStartThread;
@@ -51,6 +54,7 @@ class MessageTile extends StatelessWidget {
             onQuoteTap: onQuoteTap,
             compact: compact,
             continuation: continuation,
+            continuedBelow: continuedBelow,
             colors: colors,
           )
         : _OtherMessage(
@@ -58,6 +62,7 @@ class MessageTile extends StatelessWidget {
             onQuoteTap: onQuoteTap,
             compact: compact,
             continuation: continuation,
+            continuedBelow: continuedBelow,
             colors: colors,
           );
     return _HoverActions(
@@ -79,6 +84,7 @@ class _OtherMessage extends StatelessWidget {
     required this.onQuoteTap,
     required this.compact,
     required this.continuation,
+    required this.continuedBelow,
     required this.colors,
   });
 
@@ -90,11 +96,14 @@ class _OtherMessage extends StatelessWidget {
 
   final bool continuation;
 
+  final bool continuedBelow;
+
   final AppColors colors;
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
+  Widget build(BuildContext context) => Container(
     constraints: const BoxConstraints(maxWidth: 640),
+    padding: _groupGap(continuation, continuedBelow),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,6 +167,7 @@ class _OwnMessage extends StatelessWidget {
     required this.onQuoteTap,
     required this.compact,
     required this.continuation,
+    required this.continuedBelow,
     required this.colors,
   });
 
@@ -173,13 +183,22 @@ class _OwnMessage extends StatelessWidget {
 
   final bool continuation;
 
+  final bool continuedBelow;
+
   final AppColors colors;
+
+  bool get _showsStatus =>
+      !continuedBelow ||
+      message.sendState == SendState.failed ||
+      message.sendState == SendState.rejected;
 
   @override
   Widget build(BuildContext context) => ConstrainedBox(
     constraints: const BoxConstraints(maxWidth: 640),
     child: Container(
-      padding: const EdgeInsets.only(right: 18),
+      padding:
+          _groupGap(continuation, continuedBelow) +
+          const EdgeInsets.only(right: 18),
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: colors.accent, width: 2)),
       ),
@@ -230,13 +249,15 @@ class _OwnMessage extends StatelessWidget {
               compact: compact,
             ),
           ),
-          const SizedBox(height: 6),
-          _Status(
-            message: message,
-            onRetry: onRetry,
-            onCancel: onCancel,
-            colors: colors,
-          ),
+          if (_showsStatus) ...[
+            const SizedBox(height: 6),
+            _Status(
+              message: message,
+              onRetry: onRetry,
+              onCancel: onCancel,
+              colors: colors,
+            ),
+          ],
         ],
       ),
     ),
@@ -268,7 +289,7 @@ class _QuotedBody extends StatelessWidget {
     if (reply == null) return child;
     final mine = reply.isOwn;
     final line = mine ? colors.accent.withValues(alpha: 0.25) : colors.border;
-    final name = reply.senderName;
+    final name = mine ? 'Você' : reply.senderName;
     return Container(
       key: const Key('message_reply_quote'),
       margin: const EdgeInsets.only(bottom: 2),
@@ -374,6 +395,11 @@ class _QuotedBody extends StatelessWidget {
 }
 
 const _quoteMinWidth = 200.0;
+
+EdgeInsets _groupGap(bool continuation, bool continuedBelow) => EdgeInsets.only(
+  top: continuation ? 3 : 0,
+  bottom: continuedBelow ? 3 : 0,
+);
 
 // O trecho citado não define a largura do cartão: ela vem do nome e da resposta, e o trecho ganha reticências.
 class _NoIntrinsicWidth extends SingleChildRenderObjectWidget {

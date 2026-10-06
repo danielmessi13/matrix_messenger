@@ -59,7 +59,8 @@ class _TimelineViewState extends State<TimelineView>
     final state = widget.state;
     if (state.items != old.state.items ||
         state.paginating != old.state.paginating ||
-        state.reachedStart != old.state.reachedStart) {
+        state.reachedStart != old.state.reachedStart ||
+        state.expandedEventGroups != old.state.expandedEventGroups) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _loadOlderIfNeeded(),
       );
@@ -164,6 +165,7 @@ class _TimelineViewState extends State<TimelineView>
   Widget build(BuildContext context) {
     final colors = context.colors;
     final items = widget.state.items;
+    final rows = groupRoomEvents(items);
     if (items.isEmpty && widget.state.reachedStart) {
       return Center(
         child: Text('Nenhuma mensagem ainda.', style: _italic(colors, 17)),
@@ -187,30 +189,54 @@ class _TimelineViewState extends State<TimelineView>
                     _scroll.hasClients && _scroll.position.maxScrollExtent > 0,
                 onLoadOlder: widget.viewModel.loadOlder,
               ),
-              for (final (i, item) in items.indexed)
+              for (final (i, row) in rows.indexed)
                 Center(
-                  key: switch (item) {
-                    MessageItem(:final id) => keyFor(id),
-                    DateDividerItem(:final day) => ValueKey(day),
-                    RoomEventItem(:final id) => ValueKey(id),
+                  key: switch (row) {
+                    ItemRow(item: MessageItem(:final id)) => keyFor(id),
+                    ItemRow(item: DateDividerItem(:final day)) => ValueKey(day),
+                    ItemRow(item: RoomEventItem(:final id)) => ValueKey(id),
+                    RoomEventGroupRow(:final id) => ValueKey('group_$id'),
                   },
                   child: SizedBox(
                     width: 880,
-                    child: _TimelineEntry(
-                      item: item,
-                      now: widget.now,
-                      viewModel: widget.viewModel,
-                      openThreadId: widget.state.openThreadId,
-                      flashing: item is MessageItem && item.id == flashing,
-                      continuation:
-                          item is MessageItem &&
-                          continuesGroup(i > 0 ? items[i - 1] : null, item),
-                      followsRoomEvent: i > 0 && items[i - 1] is RoomEventItem,
-                      continuedBelow: switch (items.elementAtOrNull(i + 1)) {
-                        final MessageItem next => continuesGroup(item, next),
-                        _ => false,
-                      },
-                    ),
+                    child: switch (row) {
+                      ItemRow(:final item) => _TimelineEntry(
+                        item: item,
+                        now: widget.now,
+                        viewModel: widget.viewModel,
+                        openThreadId: widget.state.openThreadId,
+                        flashing: item is MessageItem && item.id == flashing,
+                        continuation:
+                            item is MessageItem &&
+                            continuesGroup(
+                              i > 0 ? rows[i - 1].last : null,
+                              item,
+                            ),
+                        sameSender:
+                            item is MessageItem &&
+                            sameSenderNearby(
+                              i > 0 ? rows[i - 1].last : null,
+                              item,
+                            ),
+                        continuedBelow: switch (rows
+                            .elementAtOrNull(i + 1)
+                            ?.first) {
+                          final MessageItem next => continuesGroup(item, next),
+                          _ => false,
+                        },
+                      ),
+                      final RoomEventGroupRow group => _RoomEventGroup(
+                        group: group,
+                        expanded: group.events.any(
+                          (event) => widget.state.expandedEventGroups.contains(
+                            event.id,
+                          ),
+                        ),
+                        onToggle: () => widget.viewModel.toggleEventGroup([
+                          for (final event in group.events) event.id,
+                        ]),
+                      ),
+                    },
                   ),
                 ),
             ],
@@ -323,8 +349,8 @@ class _TimelineEntry extends StatelessWidget {
     required this.openThreadId,
     required this.flashing,
     required this.continuation,
+    required this.sameSender,
     required this.continuedBelow,
-    required this.followsRoomEvent,
   });
 
   final TimelineItem item;
@@ -339,16 +365,18 @@ class _TimelineEntry extends StatelessWidget {
 
   final bool continuation;
 
-  final bool continuedBelow;
+  final bool sameSender;
 
-  final bool followsRoomEvent;
+  final bool continuedBelow;
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(
       top: switch (item) {
-        RoomEventItem() => followsRoomEvent ? 4 : 12,
-        _ => continuation ? 0 : 24,
+        RoomEventItem() => 12,
+        _ when continuation => 0,
+        _ when sameSender => 4,
+        _ => 24,
       },
     ),
     child: switch (item) {
@@ -362,15 +390,17 @@ class _TimelineEntry extends StatelessWidget {
       final MessageItem message => MessageHighlight(
         flashing: flashing,
         open: message.eventId != null && message.eventId == openThreadId,
+        alignEnd: message.isOwn,
         padding: EdgeInsets.fromLTRB(
           14,
-          continuation ? 3 : 10,
+          continuation ? 0 : 10,
           14,
-          continuedBelow ? 3 : 10,
+          continuedBelow ? 0 : 10,
         ),
         child: MessageTile(
           message: message,
           continuation: continuation,
+          continuedBelow: continuedBelow,
           onRetry: () => viewModel.retry(message.id),
           onCancel: () => viewModel.cancel(message.id),
           onReply: () => viewModel.startReply(message),
@@ -402,51 +432,142 @@ class _TimelineEntry extends StatelessWidget {
   );
 }
 
+const _roomEventMaxWidth = 560.0;
+
 class _RoomEventLine extends StatelessWidget {
   const _RoomEventLine({required this.event});
 
   final RoomEventItem event;
 
   @override
+  Widget build(BuildContext context) => _RoomEventText(
+    key: Key('room_event_${event.id}'),
+    icon: switch (event.kind) {
+      RoomEventKind.created => Icons.add_circle_outline,
+      RoomEventKind.joined => Icons.login,
+      RoomEventKind.left => Icons.logout,
+      RoomEventKind.invited => Icons.person_add_alt,
+      RoomEventKind.inviteDeclined => Icons.person_remove_alt_1,
+      RoomEventKind.kicked => Icons.person_remove_alt_1,
+      RoomEventKind.banned => Icons.block,
+      RoomEventKind.unbanned => Icons.undo,
+      RoomEventKind.nameChanged => Icons.edit_outlined,
+      RoomEventKind.topicChanged => Icons.notes,
+      RoomEventKind.avatarChanged => Icons.image_outlined,
+      RoomEventKind.encryptionEnabled => Icons.lock_outline,
+      RoomEventKind.displayNameChanged => Icons.badge_outlined,
+    },
+    label: roomEventLabel(event),
+    time: event.timestamp,
+  );
+}
+
+class _RoomEventGroup extends StatelessWidget {
+  const _RoomEventGroup({
+    required this.group,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final RoomEventGroupRow group;
+
+  final bool expanded;
+
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: expanded
+        ? Column(
+            children: [
+              for (final (i, event) in group.events.indexed)
+                Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 4),
+                  child: _RoomEventLine(event: event),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: _RoomEventText(
+                  key: Key('room_event_group_collapse_${group.id}'),
+                  icon: Icons.unfold_less,
+                  label: 'Recolher',
+                  onTap: onToggle,
+                ),
+              ),
+            ],
+          )
+        : _RoomEventText(
+            key: Key('room_event_group_${group.id}'),
+            icon: Icons.unfold_more,
+            label: roomEventGroupLabel(group.events),
+            time: group.last.timestamp,
+            onTap: onToggle,
+          ),
+  );
+}
+
+class _RoomEventText extends StatelessWidget {
+  const _RoomEventText({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.time,
+    this.onTap,
+  });
+
+  final IconData icon;
+
+  final String label;
+
+  final DateTime? time;
+
+  final VoidCallback? onTap;
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final style = TextStyle(fontSize: 13.5, color: colors.textMuted);
-    return Padding(
-      key: Key('room_event_${event.id}'),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    final text = Text.rich(
+      TextSpan(
+        style: TextStyle(fontSize: 13.5, color: colors.textMuted),
         children: [
-          Icon(
-            switch (event.kind) {
-              RoomEventKind.created => Icons.add_circle_outline,
-              RoomEventKind.joined => Icons.login,
-              RoomEventKind.left => Icons.logout,
-              RoomEventKind.invited => Icons.person_add_alt,
-              RoomEventKind.inviteDeclined => Icons.person_remove_alt_1,
-              RoomEventKind.kicked => Icons.person_remove_alt_1,
-              RoomEventKind.banned => Icons.block,
-              RoomEventKind.unbanned => Icons.undo,
-              RoomEventKind.nameChanged => Icons.edit_outlined,
-              RoomEventKind.topicChanged => Icons.notes,
-              RoomEventKind.avatarChanged => Icons.image_outlined,
-              RoomEventKind.encryptionEnabled => Icons.lock_outline,
-              RoomEventKind.displayNameChanged => Icons.badge_outlined,
-            },
-            size: 14,
-            color: colors.textMuted,
-          ),
-          const SizedBox(width: 6),
-          Flexible(child: Text(roomEventLabel(event), style: style)),
-          const SizedBox(width: 8),
-          Text(
-            formatMessageTime(event.timestamp),
-            style: style.copyWith(
-              fontSize: 12,
-              color: colors.textMuted.withValues(alpha: 0.6),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Icon(icon, size: 14, color: colors.textMuted),
             ),
           ),
+          TextSpan(text: label),
+          if (time case final time?)
+            TextSpan(
+              text: '\u00A0\u00A0${formatMessageTime(time)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: colors.textMuted.withValues(alpha: 0.6),
+              ),
+            ),
         ],
+      ),
+      textAlign: TextAlign.center,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _roomEventMaxWidth),
+          child: switch (onTap) {
+            final onTap? => InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: text,
+              ),
+            ),
+            null => text,
+          },
+        ),
       ),
     );
   }

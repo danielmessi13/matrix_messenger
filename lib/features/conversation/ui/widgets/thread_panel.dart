@@ -233,6 +233,7 @@ class _RepliesState extends State<_Replies> with FocusFlash<_Replies> {
                       padding: const EdgeInsets.only(top: 12),
                       child: MessageHighlight(
                         flashing: flashing == reply.id,
+                        alignEnd: reply.isOwn,
                         child: MessageTile(
                           message: reply,
                           compact: true,

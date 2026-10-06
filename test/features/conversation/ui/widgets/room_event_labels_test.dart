@@ -110,4 +110,92 @@ void main() {
       'Você removeu o nome de exibição',
     );
   });
+
+  group('resumo do grupo', () {
+    RoomEventItem event(
+      RoomEventKind kind, {
+      String sender = 'Daniel Messias',
+      bool own = false,
+      String? target,
+      bool targetOwn = false,
+    }) => RoomEventItem(
+      id: '\$e',
+      senderName: sender,
+      isOwn: own,
+      timestamp: DateTime(2026, 10, 4),
+      kind: kind,
+      targetName: target,
+      targetIsOwn: targetOwn,
+    );
+
+    test('um autor: ações por tipo, com contagem, na ordem', () {
+      expect(
+        roomEventGroupLabel([
+          for (var i = 0; i < 12; i++) event(RoomEventKind.topicChanged),
+          event(RoomEventKind.joined),
+        ]),
+        'Daniel Messias mudou o tópico 12 vezes e entrou na sala',
+      );
+      expect(
+        roomEventGroupLabel([
+          event(RoomEventKind.created),
+          event(RoomEventKind.nameChanged),
+          event(RoomEventKind.encryptionEnabled),
+        ]),
+        'Daniel Messias criou a sala, mudou o nome da sala e '
+        'ativou a criptografia de ponta a ponta',
+      );
+    });
+
+    test('o usuário logado vira "Você"', () {
+      expect(
+        roomEventGroupLabel([
+          event(RoomEventKind.joined, own: true),
+          event(RoomEventKind.left, own: true),
+        ]),
+        'Você entrou na sala e saiu da sala',
+      );
+    });
+
+    test('alvo único repete; alvos diferentes viram contagem de pessoas', () {
+      expect(
+        roomEventGroupLabel([
+          event(RoomEventKind.invited, target: 'Ana'),
+          event(RoomEventKind.invited, target: 'Ana'),
+        ]),
+        'Daniel Messias convidou Ana 2 vezes',
+      );
+      expect(
+        roomEventGroupLabel([
+          event(RoomEventKind.invited, target: 'Ana'),
+          event(RoomEventKind.invited, target: 'Bia'),
+          event(RoomEventKind.banned, targetOwn: true),
+        ]),
+        'Daniel Messias convidou 2 pessoas e baniu você',
+      );
+    });
+
+    test('vários autores: só a contagem', () {
+      expect(
+        roomEventGroupLabel([
+          event(RoomEventKind.joined, sender: 'Ana'),
+          event(RoomEventKind.joined, sender: 'Bia'),
+          event(RoomEventKind.joined, sender: 'Ana', own: true),
+        ]),
+        '3 eventos da sala',
+      );
+    });
+
+    test('mais de três tipos: só a contagem', () {
+      expect(
+        roomEventGroupLabel([
+          event(RoomEventKind.created),
+          event(RoomEventKind.nameChanged),
+          event(RoomEventKind.topicChanged),
+          event(RoomEventKind.avatarChanged),
+        ]),
+        '4 eventos da sala',
+      );
+    });
+  });
 }

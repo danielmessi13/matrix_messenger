@@ -216,6 +216,18 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   void cancelReply() => emit(state.copyWith(replyTo: null));
 
+  // Guarda todos os ids: o grupo continua aberto quando ganha eventos em qualquer ponta.
+  void toggleEventGroup(List<String> eventIds) {
+    final expanded = state.expandedEventGroups;
+    emit(
+      state.copyWith(
+        expandedEventGroups: eventIds.any(expanded.contains)
+            ? expanded.difference(eventIds.toSet())
+            : {...expanded, ...eventIds},
+      ),
+    );
+  }
+
   // Cada rodada do goTo só termina com a página no estado (paginação parada).
   Future<void> _loadOlderSettled() async {
     // Se esperou a busca em andamento, o searchMessage reconfere antes de pedir mais.

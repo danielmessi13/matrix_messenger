@@ -21,6 +21,7 @@ final class ConversationState extends Equatable {
     this.replyTo,
     this.focusRequest,
     this.typing = const [],
+    this.expandedEventGroups = const {},
     this.imageSend = ImageSendStatus.idle,
   });
 
@@ -46,6 +47,8 @@ final class ConversationState extends Equatable {
 
   final List<String> typing;
 
+  final Set<String> expandedEventGroups;
+
   final ImageSendStatus imageSend;
 
   // `openThreadId`/`replyTo: null` limpam; sem o argumento, mantêm.
@@ -60,6 +63,7 @@ final class ConversationState extends Equatable {
     Object? replyTo = _unset,
     FocusRequest? focusRequest,
     List<String>? typing,
+    Set<String>? expandedEventGroups,
     ImageSendStatus? imageSend,
   }) => ConversationState(
     status: status ?? this.status,
@@ -76,6 +80,7 @@ final class ConversationState extends Equatable {
         : replyTo as MessageItem?,
     focusRequest: focusRequest ?? this.focusRequest,
     typing: typing ?? this.typing,
+    expandedEventGroups: expandedEventGroups ?? this.expandedEventGroups,
     imageSend: imageSend ?? this.imageSend,
   );
 
@@ -91,6 +96,7 @@ final class ConversationState extends Equatable {
     replyTo,
     focusRequest,
     typing,
+    expandedEventGroups,
     imageSend,
   ];
 }

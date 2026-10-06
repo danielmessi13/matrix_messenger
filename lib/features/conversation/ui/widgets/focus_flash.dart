@@ -66,6 +66,7 @@ class MessageHighlight extends StatelessWidget {
     super.key,
     required this.flashing,
     this.open = false,
+    this.alignEnd = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     required this.child,
   });
@@ -75,6 +76,8 @@ class MessageHighlight extends StatelessWidget {
   // Raiz da thread aberta no painel.
   final bool open;
 
+  final bool alignEnd;
+
   final EdgeInsets padding;
 
   final Widget child;
@@ -82,17 +85,24 @@ class MessageHighlight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // Na mensagem própria o destaque termina na barra lateral, sem atravessá-la.
+    final radius = alignEnd
+        ? const BorderRadius.horizontal(left: Radius.circular(12))
+        : BorderRadius.circular(12);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      padding: padding,
+      margin: alignEnd ? EdgeInsets.only(right: padding.right) : null,
+      padding: alignEnd ? padding.copyWith(right: 0) : padding,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         color: flashing
             ? colors.surfaceHigh
             : open
             ? colors.accent.withValues(alpha: 0.07)
             : Colors.transparent,
-        // Borda sempre presente para destacar sem mexer no layout.
+      ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: radius,
         border: Border.all(
           color: open
               ? colors.accent.withValues(alpha: 0.35)

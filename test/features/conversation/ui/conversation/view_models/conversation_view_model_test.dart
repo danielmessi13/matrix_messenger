@@ -836,4 +836,53 @@ void main() {
       expect(conversation.typingSent, isEmpty);
     });
   });
+
+  group('grupos de eventos de sala', () {
+    RoomEventItem event(String id) => RoomEventItem(
+      id: id,
+      senderName: 'Bob',
+      isOwn: false,
+      timestamp: kDay,
+      kind: RoomEventKind.topicChanged,
+    );
+
+    blocTest<ConversationViewModel, ConversationState>(
+      'abrir e fechar grupos pelos ids dos eventos',
+      build: build,
+      act: (viewModel) => viewModel
+        ..toggleEventGroup(['\$a', '\$b'])
+        ..toggleEventGroup(['\$c', '\$d'])
+        ..toggleEventGroup(['\$z', '\$a', '\$b']),
+      expect: () => const [
+        ConversationState(expandedEventGroups: {'\$a', '\$b'}),
+        ConversationState(expandedEventGroups: {'\$a', '\$b', '\$c', '\$d'}),
+        ConversationState(expandedEventGroups: {'\$c', '\$d'}),
+      ],
+    );
+
+    test('evento novo no fim mantém o grupo aberto', () async {
+      final viewModel = build();
+      await viewModel.open();
+      conversation.snapshots.add(
+        ConversationSnapshot(
+          items: [kOtherMessage, event('\$a'), event('\$b')],
+          reachedStart: true,
+        ),
+      );
+      await flush();
+      viewModel.toggleEventGroup(['\$a', '\$b']);
+
+      conversation.snapshots.add(
+        ConversationSnapshot(
+          items: [kOtherMessage, event('\$a'), event('\$b'), event('\$c')],
+          reachedStart: true,
+        ),
+      );
+      await flush();
+
+      expect(viewModel.state.items, hasLength(4));
+      expect(viewModel.state.expandedEventGroups, {'\$a', '\$b'});
+      await viewModel.close();
+    });
+  });
 }

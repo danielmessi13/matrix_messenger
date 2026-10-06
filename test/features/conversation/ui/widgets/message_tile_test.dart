@@ -16,6 +16,7 @@ void main() {
     bool succeeds = true,
     bool compact = false,
     bool continuation = false,
+    bool continuedBelow = false,
     VoidCallback? onReply,
     VoidCallback? onStartThread,
     ValueChanged<String>? onQuoteTap,
@@ -34,6 +35,7 @@ void main() {
               message: message,
               compact: compact,
               continuation: continuation,
+              continuedBelow: continuedBelow,
               onReply: onReply,
               onStartThread: onStartThread,
               onQuoteTap: onQuoteTap,
@@ -534,6 +536,41 @@ void main() {
     );
   });
 
+  testWidgets('citação de mensagem minha mostra "Você" no lugar do nome', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      MessageItem(
+        id: '\$2',
+        senderId: '@bob:b.c',
+        senderName: 'Bob',
+        isOwn: false,
+        timestamp: DateTime(2026, 10, 4, 10, 21),
+        kind: MessageKind.text,
+        body: 'valeu',
+        replyTo: const ReplyPreview(
+          eventId: '\$1',
+          state: ReplyState.ready,
+          isOwn: true,
+          senderName: 'Alice',
+          kind: MessageKind.text,
+          body: 'subi agora',
+        ),
+      ),
+    );
+
+    final quote = find.byKey(const Key('message_reply_quote'));
+    expect(
+      find.descendant(of: quote, matching: find.text('Você')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: quote, matching: find.text('Alice')),
+      findsNothing,
+    );
+  });
+
   testWidgets('mensagem sem resposta não mostra citação', (tester) async {
     await pump(tester, kOtherMessage);
 
@@ -594,5 +631,19 @@ void main() {
     await hover(tester, find.textContaining('A integração'));
 
     expect(find.byKey(const Key('message_time_\$other')), findsNothing);
+  });
+
+  testWidgets('própria com continuação abaixo deixa o status para a última', (
+    tester,
+  ) async {
+    await pump(tester, own(SendState.sent), continuedBelow: true);
+    expect(find.text('Enviada'), findsNothing);
+
+    await pump(tester, own(SendState.sending), continuedBelow: true);
+    expect(find.text('Enviando…'), findsNothing);
+
+    await pump(tester, own(SendState.failed), continuedBelow: true);
+    expect(find.text('Não enviada'), findsOneWidget);
+    expect(find.byKey(const Key('message_retry')), findsOneWidget);
   });
 }

@@ -11,6 +11,7 @@ import 'package:matrix_messenger/features/conversation/data/repositories/convers
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_view_model.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/conversation_pane.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/message_labels.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 
@@ -1181,7 +1182,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('room_event_\$join')), findsOneWidget);
-    expect(find.text('Ana entrou na sala'), findsOneWidget);
+    expect(find.textContaining('Ana entrou na sala'), findsOneWidget);
     expect(find.text('Bob'), findsNWidgets(2));
   });
 
@@ -1203,7 +1204,235 @@ void main() {
     );
 
     expect(find.byKey(const Key('room_event_\$create')), findsOneWidget);
-    expect(find.text('Você criou a sala'), findsOneWidget);
+    expect(find.textContaining('Você criou a sala'), findsOneWidget);
     expect(find.text('Nenhuma mensagem ainda.'), findsNothing);
+  });
+
+  testWidgets('minhas mensagens seguidas formam um grupo com status no fim', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        DateDividerItem(kDay),
+        msg(0, own: true, id: r'$a'),
+        msg(0, own: true, id: r'$b'),
+        msg(0, own: true, id: r'$c'),
+      ], reachedStart: true),
+    );
+
+    expect(find.text('VOCÊ'), findsOneWidget);
+    expect(find.text('Enviada'), findsOneWidget);
+    final a = tester.getRect(find.byKey(const Key(r'message_$a')));
+    final b = tester.getRect(find.byKey(const Key(r'message_$b')));
+    final c = tester.getRect(find.byKey(const Key(r'message_$c')));
+    expect(b.top, a.bottom);
+    expect(c.top, b.bottom);
+    expect(
+      tester.getTopLeft(find.text('Enviada')).dy,
+      greaterThan(tester.getTopLeft(find.text('mensagem 0').last).dy),
+    );
+  });
+
+  group('evento de sala com texto longo', () {
+    RoomEventItem topic(String value) => RoomEventItem(
+      id: r'$topic',
+      senderName: 'Daniel Messias',
+      isOwn: false,
+      timestamp: kDay.add(const Duration(hours: 2, minutes: 6)),
+      kind: RoomEventKind.topicChanged,
+      value: value,
+    );
+
+    Future<Rect> showTopic(WidgetTester tester, String value) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([topic(value)], reachedStart: true));
+      expect(tester.takeException(), isNull);
+      return tester.getRect(
+        find
+            .descendant(
+              of: find.byKey(const Key(r'room_event_$topic')),
+              matching: find.byType(RichText),
+            )
+            .first,
+      );
+    }
+
+    void expectCenteredAndWrapped(WidgetTester tester, Rect text) {
+      final list = tester.getRect(find.byKey(const Key('timeline_list')));
+      expect(text.width, lessThanOrEqualTo(560));
+      expect(text.center.dx, closeTo(list.center.dx, 1));
+      final icon = tester.getRect(find.byIcon(Icons.notes));
+      expect(icon.left, greaterThanOrEqualTo(text.left));
+      expect(text.height, greaterThan(icon.height * 2));
+    }
+
+    testWidgets('fica centralizado e a hora segue o texto', (tester) async {
+      final text = await showTopic(tester, 'palavra ' * 40);
+
+      expectCenteredAndWrapped(tester, text);
+      final line = tester.widget<RichText>(
+        find
+            .descendant(
+              of: find.byKey(const Key(r'room_event_$topic')),
+              matching: find.byType(RichText),
+            )
+            .first,
+      );
+      expect(
+        line.text.toPlainText(),
+        endsWith('”\u00A0\u00A0${formatMessageTime(topic('').timestamp)}'),
+      );
+    });
+
+    testWidgets('tópico sem espaços quebra dentro do bloco', (tester) async {
+      final text = await showTopic(tester, 'asd' * 60);
+
+      expectCenteredAndWrapped(tester, text);
+    });
+  });
+
+  group('eventos de sala seguidos', () {
+    RoomEventItem topic(int i) => RoomEventItem(
+      id: '\$t$i',
+      senderName: 'Daniel Messias',
+      isOwn: false,
+      timestamp: kDay.add(Duration(minutes: 10 + i)),
+      kind: RoomEventKind.topicChanged,
+      value: 'tópico $i',
+    );
+
+    final events = [for (var i = 0; i < 3; i++) topic(i)];
+    const summary = Key(r'room_event_group_$t0');
+    const collapse = Key(r'room_event_group_collapse_$t0');
+
+    testWidgets('começam recolhidos num resumo com a hora do último', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events, msg(20)]));
+
+      expect(find.byKey(summary), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Daniel Messias mudou o tópico 3 vezes'
+          '\u00A0\u00A0${formatMessageTime(events.last.timestamp)}',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key(r'room_event_$t0')), findsNothing);
+      expect(find.text('Bob'), findsNWidgets(2));
+    });
+
+    testWidgets('expandir mostra cada evento e Recolher volta ao resumo', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events, msg(20)]));
+
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      for (final e in events) {
+        expect(find.byKey(Key('room_event_${e.id}')), findsOneWidget);
+      }
+      expect(find.byKey(summary), findsNothing);
+      expect(
+        tester.getTopLeft(find.byKey(collapse)).dy,
+        greaterThan(
+          tester.getBottomLeft(find.byKey(const Key(r'room_event_$t2'))).dy,
+        ),
+      );
+
+      await tester.tap(find.byKey(collapse));
+      await tester.pump();
+
+      expect(find.byKey(summary), findsOneWidget);
+      expect(find.byKey(const Key(r'room_event_$t0')), findsNothing);
+    });
+
+    testWidgets('evento novo no fim mantém o grupo aberto', (tester) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events]));
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      await show(tester, page([msg(0), ...events, topic(3)]));
+
+      expect(find.byKey(const Key(r'room_event_$t3')), findsOneWidget);
+      expect(find.byKey(collapse), findsOneWidget);
+    });
+
+    testWidgets('evento antigo no começo mantém o grupo aberto', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([...events, msg(20)]));
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      final older = RoomEventItem(
+        id: r'$antes',
+        senderName: 'Daniel Messias',
+        isOwn: false,
+        timestamp: kDay.add(const Duration(minutes: 5)),
+        kind: RoomEventKind.topicChanged,
+        value: 'tópico antigo',
+      );
+      await show(tester, page([older, ...events, msg(20)]));
+
+      expect(find.byKey(const Key(r'room_event_$antes')), findsOneWidget);
+      expect(
+        find.byKey(const Key(r'room_event_group_collapse_$antes')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('expandir lendo mais acima não move o que está embaixo', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom, size: const Size(1440, 500));
+      await show(
+        tester,
+        page([
+          for (var i = 0; i < 10; i++) msg(i),
+          ...events,
+          for (var i = 20; i < 40; i++) msg(i),
+        ], reachedStart: true),
+      );
+      await tester.dragUntilVisible(
+        find.byKey(summary),
+        find.byKey(const Key('timeline_list')),
+        const Offset(0, 200),
+      );
+      await tester.pump();
+      final below = find.text('mensagem 20');
+      final before = tester.getTopLeft(below).dy;
+      final summaryBottom = tester.getBottomLeft(find.byKey(summary)).dy;
+
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      expect(tester.getTopLeft(below).dy, before);
+      expect(
+        tester.getBottomLeft(find.byKey(collapse)).dy,
+        closeTo(summaryBottom, 1),
+      );
+    });
+
+    testWidgets('trocar de sala recolhe de novo', (tester) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events]));
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      await pump(tester, kDirectRoom);
+      await show(tester, page([msg(0), ...events]));
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events]));
+
+      expect(find.byKey(summary), findsOneWidget);
+    });
   });
 }
