@@ -27,7 +27,7 @@
 
 // Section: imports
 
-use crate::api::auth::*;
+use crate::api::client::*;
 use crate::api::oidc::*;
 use crate::api::timeline::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1442733194;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1683633248;
 
 // Section: executor
 
@@ -50,7 +50,7 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
-fn wire__crate__api__auth__MatrixClient_accept_invite_impl(
+fn wire__crate__api__client__MatrixClient_accept_invite_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -97,7 +97,7 @@ fn wire__crate__api__auth__MatrixClient_accept_invite_impl(
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = crate::api::auth::MatrixClient::accept_invite(
+                        let output_ok = crate::api::client::MatrixClient::accept_invite(
                             &*api_that_guard,
                             api_room_id,
                         )
@@ -110,7 +110,7 @@ fn wire__crate__api__auth__MatrixClient_accept_invite_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_decline_invite_impl(
+fn wire__crate__api__client__MatrixClient_decline_invite_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -157,7 +157,7 @@ fn wire__crate__api__auth__MatrixClient_decline_invite_impl(
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = crate::api::auth::MatrixClient::decline_invite(
+                        let output_ok = crate::api::client::MatrixClient::decline_invite(
                             &*api_that_guard,
                             api_room_id,
                         )
@@ -170,7 +170,7 @@ fn wire__crate__api__auth__MatrixClient_decline_invite_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_device_id_impl(
+fn wire__crate__api__client__MatrixClient_device_id_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
     data_len_: i32,
@@ -210,14 +210,15 @@ fn wire__crate__api__auth__MatrixClient_device_id_impl(
                     }
                 }
                 let api_that_guard = api_that_guard.unwrap();
-                let output_ok =
-                    Ok::<_, ()>(crate::api::auth::MatrixClient::device_id(&*api_that_guard))?;
+                let output_ok = Ok::<_, ()>(crate::api::client::MatrixClient::device_id(
+                    &*api_that_guard,
+                ))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_login_impl(
+fn wire__crate__api__client__MatrixClient_login_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -247,7 +248,7 @@ fn wire__crate__api__auth__MatrixClient_login_impl(
             move |context| async move {
                 transform_result_sse::<_, crate::api::auth::AuthError>(
                     (move || async move {
-                        let output_ok = crate::api::auth::MatrixClient::login(
+                        let output_ok = crate::api::client::MatrixClient::login(
                             api_homeserver,
                             api_username,
                             api_password,
@@ -262,7 +263,7 @@ fn wire__crate__api__auth__MatrixClient_login_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_logout_impl(
+fn wire__crate__api__client__MatrixClient_logout_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -309,7 +310,7 @@ fn wire__crate__api__auth__MatrixClient_logout_impl(
                         }
                         let api_that_guard = api_that_guard.unwrap();
                         let output_ok =
-                            crate::api::auth::MatrixClient::logout(&*api_that_guard).await?;
+                            crate::api::client::MatrixClient::logout(&*api_that_guard).await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -318,7 +319,7 @@ fn wire__crate__api__auth__MatrixClient_logout_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_open_timeline_impl(
+fn wire__crate__api__client__MatrixClient_open_timeline_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -365,7 +366,7 @@ fn wire__crate__api__auth__MatrixClient_open_timeline_impl(
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = crate::api::auth::MatrixClient::open_timeline(
+                        let output_ok = crate::api::client::MatrixClient::open_timeline(
                             &*api_that_guard,
                             api_room_id,
                         )
@@ -378,7 +379,7 @@ fn wire__crate__api__auth__MatrixClient_open_timeline_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_recover_impl(
+fn wire__crate__api__client__MatrixClient_recover_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -425,7 +426,7 @@ fn wire__crate__api__auth__MatrixClient_recover_impl(
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = crate::api::auth::MatrixClient::recover(
+                        let output_ok = crate::api::client::MatrixClient::recover(
                             &*api_that_guard,
                             api_recovery_key,
                         )
@@ -438,7 +439,7 @@ fn wire__crate__api__auth__MatrixClient_recover_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_restore_session_impl(
+fn wire__crate__api__client__MatrixClient_restore_session_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -466,7 +467,7 @@ fn wire__crate__api__auth__MatrixClient_restore_session_impl(
                 transform_result_sse::<_, crate::api::auth::AuthError>(
                     (move || async move {
                         let output_ok =
-                            crate::api::auth::MatrixClient::restore_session(api_data_dir).await?;
+                            crate::api::client::MatrixClient::restore_session(api_data_dir).await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -475,7 +476,7 @@ fn wire__crate__api__auth__MatrixClient_restore_session_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_session_events_impl(
+fn wire__crate__api__client__MatrixClient_session_events_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -501,7 +502,7 @@ fn wire__crate__api__auth__MatrixClient_session_events_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MatrixClient>,
             >>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
-                crate::api::auth::SessionEvent,
+                crate::api::client::SessionEvent,
                 flutter_rust_bridge::for_generated::SseCodec,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -522,7 +523,10 @@ fn wire__crate__api__auth__MatrixClient_session_events_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok = Ok::<_, ()>({
-                        crate::api::auth::MatrixClient::session_events(&*api_that_guard, api_sink);
+                        crate::api::client::MatrixClient::session_events(
+                            &*api_that_guard,
+                            api_sink,
+                        );
                     })?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -530,7 +534,7 @@ fn wire__crate__api__auth__MatrixClient_session_events_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_session_saved_impl(
+fn wire__crate__api__client__MatrixClient_session_saved_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
     data_len_: i32,
@@ -570,7 +574,7 @@ fn wire__crate__api__auth__MatrixClient_session_saved_impl(
                     }
                 }
                 let api_that_guard = api_that_guard.unwrap();
-                let output_ok = Ok::<_, ()>(crate::api::auth::MatrixClient::session_saved(
+                let output_ok = Ok::<_, ()>(crate::api::client::MatrixClient::session_saved(
                     &*api_that_guard,
                 ))?;
                 std::result::Result::Ok(output_ok)
@@ -578,7 +582,7 @@ fn wire__crate__api__auth__MatrixClient_session_saved_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_user_id_impl(
+fn wire__crate__api__client__MatrixClient_user_id_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
     data_len_: i32,
@@ -619,13 +623,13 @@ fn wire__crate__api__auth__MatrixClient_user_id_impl(
                 }
                 let api_that_guard = api_that_guard.unwrap();
                 let output_ok =
-                    Ok::<_, ()>(crate::api::auth::MatrixClient::user_id(&*api_that_guard))?;
+                    Ok::<_, ()>(crate::api::client::MatrixClient::user_id(&*api_that_guard))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_watch_recovery_impl(
+fn wire__crate__api__client__MatrixClient_watch_recovery_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -672,7 +676,10 @@ fn wire__crate__api__auth__MatrixClient_watch_recovery_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok = Ok::<_, ()>({
-                        crate::api::auth::MatrixClient::watch_recovery(&*api_that_guard, api_sink);
+                        crate::api::client::MatrixClient::watch_recovery(
+                            &*api_that_guard,
+                            api_sink,
+                        );
                     })?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -680,7 +687,7 @@ fn wire__crate__api__auth__MatrixClient_watch_recovery_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_watch_rooms_impl(
+fn wire__crate__api__client__MatrixClient_watch_rooms_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -727,7 +734,7 @@ fn wire__crate__api__auth__MatrixClient_watch_rooms_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok = Ok::<_, ()>({
-                        crate::api::auth::MatrixClient::watch_rooms(&*api_that_guard, api_sink);
+                        crate::api::client::MatrixClient::watch_rooms(&*api_that_guard, api_sink);
                     })?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -735,7 +742,7 @@ fn wire__crate__api__auth__MatrixClient_watch_rooms_impl(
         },
     )
 }
-fn wire__crate__api__auth__MatrixClient_watch_sync_status_impl(
+fn wire__crate__api__client__MatrixClient_watch_sync_status_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -782,7 +789,7 @@ fn wire__crate__api__auth__MatrixClient_watch_sync_status_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok = Ok::<_, ()>({
-                        crate::api::auth::MatrixClient::watch_sync_status(
+                        crate::api::client::MatrixClient::watch_sync_status(
                             &*api_that_guard,
                             api_sink,
                         );
@@ -1547,7 +1554,7 @@ impl SseDecode
 }
 
 impl SseDecode
-    for StreamSink<crate::api::auth::SessionEvent, flutter_rust_bridge::for_generated::SseCodec>
+    for StreamSink<crate::api::client::SessionEvent, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1971,12 +1978,12 @@ impl SseDecode for crate::api::timeline::SendState {
     }
 }
 
-impl SseDecode for crate::api::auth::SessionEvent {
+impl SseDecode for crate::api::client::SessionEvent {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <i32>::sse_decode(deserializer);
         return match inner {
-            0 => crate::api::auth::SessionEvent::Revoked,
+            0 => crate::api::client::SessionEvent::Revoked,
             _ => unreachable!("Invalid variant for SessionEvent: {}", inner),
         };
     }
@@ -2134,49 +2141,52 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => wire__crate__api__auth__MatrixClient_accept_invite_impl(
+        1 => wire__crate__api__client__MatrixClient_accept_invite_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        2 => wire__crate__api__auth__MatrixClient_decline_invite_impl(
+        2 => wire__crate__api__client__MatrixClient_decline_invite_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        4 => wire__crate__api__auth__MatrixClient_login_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__auth__MatrixClient_logout_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__auth__MatrixClient_open_timeline_impl(
+        4 => wire__crate__api__client__MatrixClient_login_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__client__MatrixClient_logout_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__client__MatrixClient_open_timeline_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        7 => wire__crate__api__auth__MatrixClient_recover_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__auth__MatrixClient_restore_session_impl(
+        7 => wire__crate__api__client__MatrixClient_recover_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__client__MatrixClient_restore_session_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__auth__MatrixClient_session_events_impl(
+        9 => wire__crate__api__client__MatrixClient_session_events_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__auth__MatrixClient_watch_recovery_impl(
+        12 => wire__crate__api__client__MatrixClient_watch_recovery_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        13 => {
-            wire__crate__api__auth__MatrixClient_watch_rooms_impl(port, ptr, rust_vec_len, data_len)
-        }
-        14 => wire__crate__api__auth__MatrixClient_watch_sync_status_impl(
+        13 => wire__crate__api__client__MatrixClient_watch_rooms_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        14 => wire__crate__api__client__MatrixClient_watch_sync_status_impl(
             port,
             ptr,
             rust_vec_len,
@@ -2231,9 +2241,11 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        3 => wire__crate__api__auth__MatrixClient_device_id_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__auth__MatrixClient_session_saved_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__auth__MatrixClient_user_id_impl(ptr, rust_vec_len, data_len),
+        3 => wire__crate__api__client__MatrixClient_device_id_impl(ptr, rust_vec_len, data_len),
+        10 => {
+            wire__crate__api__client__MatrixClient_session_saved_impl(ptr, rust_vec_len, data_len)
+        }
+        11 => wire__crate__api__client__MatrixClient_user_id_impl(ptr, rust_vec_len, data_len),
         15 => wire__crate__api__oidc__OidcLogin_authorization_url_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
@@ -2616,7 +2628,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::timeline::SendState>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::auth::SessionEvent {
+impl flutter_rust_bridge::IntoDart for crate::api::client::SessionEvent {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
             Self::Revoked => 0.into_dart(),
@@ -2625,13 +2637,13 @@ impl flutter_rust_bridge::IntoDart for crate::api::auth::SessionEvent {
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::auth::SessionEvent
+    for crate::api::client::SessionEvent
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::auth::SessionEvent>
-    for crate::api::auth::SessionEvent
+impl flutter_rust_bridge::IntoIntoDart<crate::api::client::SessionEvent>
+    for crate::api::client::SessionEvent
 {
-    fn into_into_dart(self) -> crate::api::auth::SessionEvent {
+    fn into_into_dart(self) -> crate::api::client::SessionEvent {
         self
     }
 }
@@ -2884,7 +2896,7 @@ impl SseEncode
 }
 
 impl SseEncode
-    for StreamSink<crate::api::auth::SessionEvent, flutter_rust_bridge::for_generated::SseCodec>
+    for StreamSink<crate::api::client::SessionEvent, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3275,12 +3287,12 @@ impl SseEncode for crate::api::timeline::SendState {
     }
 }
 
-impl SseEncode for crate::api::auth::SessionEvent {
+impl SseEncode for crate::api::client::SessionEvent {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(
             match self {
-                crate::api::auth::SessionEvent::Revoked => 0,
+                crate::api::client::SessionEvent::Revoked => 0,
                 _ => {
                     unimplemented!("");
                 }
@@ -3417,7 +3429,7 @@ mod io {
     // Section: imports
 
     use super::*;
-    use crate::api::auth::*;
+    use crate::api::client::*;
     use crate::api::oidc::*;
     use crate::api::timeline::*;
     use flutter_rust_bridge::for_generated::byteorder::{
@@ -3484,7 +3496,7 @@ mod web {
     // Section: imports
 
     use super::*;
-    use crate::api::auth::*;
+    use crate::api::client::*;
     use crate::api::oidc::*;
     use crate::api::timeline::*;
     use flutter_rust_bridge::for_generated::byteorder::{

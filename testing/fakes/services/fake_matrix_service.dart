@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:matrix_messenger/core/services/matrix_service.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
-import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
 import 'package:matrix_messenger/src/rust/api/timeline.dart';

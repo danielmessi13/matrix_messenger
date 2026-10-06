@@ -4,6 +4,7 @@ import '../../../../core/services/local_storage_exception.dart';
 import '../../../../core/services/matrix_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../src/rust/api/auth.dart';
+import '../../../../src/rust/api/client.dart';
 import '../../domain/models/auth_failure.dart';
 import '../../domain/models/user_session.dart';
 import 'auth_repository.dart';

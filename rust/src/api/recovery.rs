@@ -8,6 +8,8 @@ use matrix_sdk::{
 };
 use tokio::runtime::Handle;
 
+use crate::{api::client::MatrixClient, frb_generated::StreamSink};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecoveryStatus {
     Unknown,
@@ -83,6 +85,18 @@ pub(crate) fn watch(
             }
         }
     });
+}
+
+impl MatrixClient {
+    pub fn watch_recovery(&self, sink: StreamSink<RecoveryStatus>) {
+        watch(&self.client, &self.runtime, move |status| {
+            sink.add(status).is_ok()
+        });
+    }
+
+    pub async fn recover(&self, recovery_key: String) -> Result<(), RecoveryError> {
+        recover(&self.client, &recovery_key).await
+    }
 }
 
 #[cfg(test)]

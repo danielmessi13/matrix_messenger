@@ -68,3 +68,20 @@ where
     }
     panic!("condição não atingida em 5 s");
 }
+
+// A variável de ambiente tem prioridade sobre o .env da raiz do app.
+pub(crate) fn env_var(name: &str) -> String {
+    std::env::var(name)
+        .ok()
+        .or_else(|| dotenv_value(name))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| panic!("defina {name} no ambiente ou no .env"))
+}
+
+fn dotenv_value(name: &str) -> Option<String> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.env");
+    std::fs::read_to_string(path).ok()?.lines().find_map(|line| {
+        let (key, value) = line.split_once('=')?;
+        (key.trim() == name).then(|| value.trim().to_owned())
+    })
+}

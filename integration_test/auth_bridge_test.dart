@@ -7,6 +7,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:matrix_messenger/app/app.dart';
 import 'package:matrix_messenger/config/dependencies.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/oidc.dart';
 import 'package:matrix_messenger/src/rust/frb_generated.dart';
 

@@ -1,5 +1,5 @@
 import 'package:matrix_messenger/core/services/matrix_bridge.dart';
-import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/oidc.dart';
 
 import '../../models/user_session.dart';

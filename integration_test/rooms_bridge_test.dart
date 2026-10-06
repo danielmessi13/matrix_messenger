@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
 import 'package:matrix_messenger/src/rust/frb_generated.dart';
 

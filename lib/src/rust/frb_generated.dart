@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/auth.dart';
+import 'api/client.dart';
 import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';
@@ -77,7 +78,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1442733194;
+  int get rustContentHash => 1683633248;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -89,58 +90,58 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
-  Future<void> crateApiAuthMatrixClientAcceptInvite({
+  Future<void> crateApiClientMatrixClientAcceptInvite({
     required MatrixClient that,
     required String roomId,
   });
 
-  Future<void> crateApiAuthMatrixClientDeclineInvite({
+  Future<void> crateApiClientMatrixClientDeclineInvite({
     required MatrixClient that,
     required String roomId,
   });
 
-  String crateApiAuthMatrixClientDeviceId({required MatrixClient that});
+  String crateApiClientMatrixClientDeviceId({required MatrixClient that});
 
-  Future<MatrixClient> crateApiAuthMatrixClientLogin({
+  Future<MatrixClient> crateApiClientMatrixClientLogin({
     required String homeserver,
     required String username,
     required String password,
     required String dataDir,
   });
 
-  Future<void> crateApiAuthMatrixClientLogout({required MatrixClient that});
+  Future<void> crateApiClientMatrixClientLogout({required MatrixClient that});
 
-  Future<RoomTimeline> crateApiAuthMatrixClientOpenTimeline({
+  Future<RoomTimeline> crateApiClientMatrixClientOpenTimeline({
     required MatrixClient that,
     required String roomId,
   });
 
-  Future<void> crateApiAuthMatrixClientRecover({
+  Future<void> crateApiClientMatrixClientRecover({
     required MatrixClient that,
     required String recoveryKey,
   });
 
-  Future<MatrixClient?> crateApiAuthMatrixClientRestoreSession({
+  Future<MatrixClient?> crateApiClientMatrixClientRestoreSession({
     required String dataDir,
   });
 
-  Stream<SessionEvent> crateApiAuthMatrixClientSessionEvents({
+  Stream<SessionEvent> crateApiClientMatrixClientSessionEvents({
     required MatrixClient that,
   });
 
-  bool crateApiAuthMatrixClientSessionSaved({required MatrixClient that});
+  bool crateApiClientMatrixClientSessionSaved({required MatrixClient that});
 
-  String crateApiAuthMatrixClientUserId({required MatrixClient that});
+  String crateApiClientMatrixClientUserId({required MatrixClient that});
 
-  Stream<RecoveryStatus> crateApiAuthMatrixClientWatchRecovery({
+  Stream<RecoveryStatus> crateApiClientMatrixClientWatchRecovery({
     required MatrixClient that,
   });
 
-  Stream<List<RoomSummary>> crateApiAuthMatrixClientWatchRooms({
+  Stream<List<RoomSummary>> crateApiClientMatrixClientWatchRooms({
     required MatrixClient that,
   });
 
-  Stream<SyncStatus> crateApiAuthMatrixClientWatchSyncStatus({
+  Stream<SyncStatus> crateApiClientMatrixClientWatchSyncStatus({
     required MatrixClient that,
   });
 
@@ -223,7 +224,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  Future<void> crateApiAuthMatrixClientAcceptInvite({
+  Future<void> crateApiClientMatrixClientAcceptInvite({
     required MatrixClient that,
     required String roomId,
   }) {
@@ -247,21 +248,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_invite_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientAcceptInviteConstMeta,
+        constMeta: kCrateApiClientMatrixClientAcceptInviteConstMeta,
         argValues: [that, roomId],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientAcceptInviteConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientAcceptInviteConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_accept_invite",
         argNames: ["that", "roomId"],
       );
 
   @override
-  Future<void> crateApiAuthMatrixClientDeclineInvite({
+  Future<void> crateApiClientMatrixClientDeclineInvite({
     required MatrixClient that,
     required String roomId,
   }) {
@@ -285,21 +286,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_invite_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientDeclineInviteConstMeta,
+        constMeta: kCrateApiClientMatrixClientDeclineInviteConstMeta,
         argValues: [that, roomId],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientDeclineInviteConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientDeclineInviteConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_decline_invite",
         argNames: ["that", "roomId"],
       );
 
   @override
-  String crateApiAuthMatrixClientDeviceId({required MatrixClient that}) {
+  String crateApiClientMatrixClientDeviceId({required MatrixClient that}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -314,21 +315,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_String,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiAuthMatrixClientDeviceIdConstMeta,
+        constMeta: kCrateApiClientMatrixClientDeviceIdConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientDeviceIdConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientDeviceIdConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_device_id",
         argNames: ["that"],
       );
 
   @override
-  Future<MatrixClient> crateApiAuthMatrixClientLogin({
+  Future<MatrixClient> crateApiClientMatrixClientLogin({
     required String homeserver,
     required String username,
     required String password,
@@ -354,21 +355,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient,
           decodeErrorData: sse_decode_auth_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientLoginConstMeta,
+        constMeta: kCrateApiClientMatrixClientLoginConstMeta,
         argValues: [homeserver, username, password, dataDir],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientLoginConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientLoginConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_login",
         argNames: ["homeserver", "username", "password", "dataDir"],
       );
 
   @override
-  Future<void> crateApiAuthMatrixClientLogout({required MatrixClient that}) {
+  Future<void> crateApiClientMatrixClientLogout({required MatrixClient that}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -388,21 +389,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_auth_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientLogoutConstMeta,
+        constMeta: kCrateApiClientMatrixClientLogoutConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientLogoutConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientLogoutConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_logout",
         argNames: ["that"],
       );
 
   @override
-  Future<RoomTimeline> crateApiAuthMatrixClientOpenTimeline({
+  Future<RoomTimeline> crateApiClientMatrixClientOpenTimeline({
     required MatrixClient that,
     required String roomId,
   }) {
@@ -427,21 +428,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline,
           decodeErrorData: sse_decode_timeline_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientOpenTimelineConstMeta,
+        constMeta: kCrateApiClientMatrixClientOpenTimelineConstMeta,
         argValues: [that, roomId],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientOpenTimelineConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientOpenTimelineConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_open_timeline",
         argNames: ["that", "roomId"],
       );
 
   @override
-  Future<void> crateApiAuthMatrixClientRecover({
+  Future<void> crateApiClientMatrixClientRecover({
     required MatrixClient that,
     required String recoveryKey,
   }) {
@@ -465,21 +466,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_recovery_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientRecoverConstMeta,
+        constMeta: kCrateApiClientMatrixClientRecoverConstMeta,
         argValues: [that, recoveryKey],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientRecoverConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientRecoverConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_recover",
         argNames: ["that", "recoveryKey"],
       );
 
   @override
-  Future<MatrixClient?> crateApiAuthMatrixClientRestoreSession({
+  Future<MatrixClient?> crateApiClientMatrixClientRestoreSession({
     required String dataDir,
   }) {
     return handler.executeNormal(
@@ -499,21 +500,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               sse_decode_opt_box_autoadd_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient,
           decodeErrorData: sse_decode_auth_error,
         ),
-        constMeta: kCrateApiAuthMatrixClientRestoreSessionConstMeta,
+        constMeta: kCrateApiClientMatrixClientRestoreSessionConstMeta,
         argValues: [dataDir],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientRestoreSessionConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientRestoreSessionConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_restore_session",
         argNames: ["dataDir"],
       );
 
   @override
-  Stream<SessionEvent> crateApiAuthMatrixClientSessionEvents({
+  Stream<SessionEvent> crateApiClientMatrixClientSessionEvents({
     required MatrixClient that,
   }) {
     final sink = RustStreamSink<SessionEvent>();
@@ -538,7 +539,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeSuccessData: sse_decode_unit,
             decodeErrorData: null,
           ),
-          constMeta: kCrateApiAuthMatrixClientSessionEventsConstMeta,
+          constMeta: kCrateApiClientMatrixClientSessionEventsConstMeta,
           argValues: [that, sink],
           apiImpl: this,
         ),
@@ -547,14 +548,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return sink.stream;
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientSessionEventsConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientSessionEventsConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_session_events",
         argNames: ["that", "sink"],
       );
 
   @override
-  bool crateApiAuthMatrixClientSessionSaved({required MatrixClient that}) {
+  bool crateApiClientMatrixClientSessionSaved({required MatrixClient that}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -569,21 +570,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_bool,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiAuthMatrixClientSessionSavedConstMeta,
+        constMeta: kCrateApiClientMatrixClientSessionSavedConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientSessionSavedConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientSessionSavedConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_session_saved",
         argNames: ["that"],
       );
 
   @override
-  String crateApiAuthMatrixClientUserId({required MatrixClient that}) {
+  String crateApiClientMatrixClientUserId({required MatrixClient that}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -598,21 +599,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_String,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiAuthMatrixClientUserIdConstMeta,
+        constMeta: kCrateApiClientMatrixClientUserIdConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientUserIdConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientUserIdConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_user_id",
         argNames: ["that"],
       );
 
   @override
-  Stream<RecoveryStatus> crateApiAuthMatrixClientWatchRecovery({
+  Stream<RecoveryStatus> crateApiClientMatrixClientWatchRecovery({
     required MatrixClient that,
   }) {
     final sink = RustStreamSink<RecoveryStatus>();
@@ -637,7 +638,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeSuccessData: sse_decode_unit,
             decodeErrorData: null,
           ),
-          constMeta: kCrateApiAuthMatrixClientWatchRecoveryConstMeta,
+          constMeta: kCrateApiClientMatrixClientWatchRecoveryConstMeta,
           argValues: [that, sink],
           apiImpl: this,
         ),
@@ -646,14 +647,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return sink.stream;
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientWatchRecoveryConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientWatchRecoveryConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_watch_recovery",
         argNames: ["that", "sink"],
       );
 
   @override
-  Stream<List<RoomSummary>> crateApiAuthMatrixClientWatchRooms({
+  Stream<List<RoomSummary>> crateApiClientMatrixClientWatchRooms({
     required MatrixClient that,
   }) {
     final sink = RustStreamSink<List<RoomSummary>>();
@@ -678,7 +679,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeSuccessData: sse_decode_unit,
             decodeErrorData: null,
           ),
-          constMeta: kCrateApiAuthMatrixClientWatchRoomsConstMeta,
+          constMeta: kCrateApiClientMatrixClientWatchRoomsConstMeta,
           argValues: [that, sink],
           apiImpl: this,
         ),
@@ -687,14 +688,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return sink.stream;
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientWatchRoomsConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientWatchRoomsConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_watch_rooms",
         argNames: ["that", "sink"],
       );
 
   @override
-  Stream<SyncStatus> crateApiAuthMatrixClientWatchSyncStatus({
+  Stream<SyncStatus> crateApiClientMatrixClientWatchSyncStatus({
     required MatrixClient that,
   }) {
     final sink = RustStreamSink<SyncStatus>();
@@ -719,7 +720,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeSuccessData: sse_decode_unit,
             decodeErrorData: null,
           ),
-          constMeta: kCrateApiAuthMatrixClientWatchSyncStatusConstMeta,
+          constMeta: kCrateApiClientMatrixClientWatchSyncStatusConstMeta,
           argValues: [that, sink],
           apiImpl: this,
         ),
@@ -728,7 +729,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return sink.stream;
   }
 
-  TaskConstMeta get kCrateApiAuthMatrixClientWatchSyncStatusConstMeta =>
+  TaskConstMeta get kCrateApiClientMatrixClientWatchSyncStatusConstMeta =>
       const TaskConstMeta(
         debugName: "MatrixClient_watch_sync_status",
         argNames: ["that", "sink"],
@@ -3047,53 +3048,55 @@ class MatrixClientImpl extends RustOpaque implements MatrixClient {
   );
 
   Future<void> acceptInvite({required String roomId}) => RustLib.instance.api
-      .crateApiAuthMatrixClientAcceptInvite(that: this, roomId: roomId);
+      .crateApiClientMatrixClientAcceptInvite(that: this, roomId: roomId);
 
   Future<void> declineInvite({required String roomId}) => RustLib.instance.api
-      .crateApiAuthMatrixClientDeclineInvite(that: this, roomId: roomId);
+      .crateApiClientMatrixClientDeclineInvite(that: this, roomId: roomId);
 
-  String get deviceId => RustLib.instance.api.crateApiAuthMatrixClientDeviceId(
-    that: this,
-  );
+  String get deviceId =>
+      RustLib.instance.api.crateApiClientMatrixClientDeviceId(
+        that: this,
+      );
 
-  Future<void> logout() => RustLib.instance.api.crateApiAuthMatrixClientLogout(
-    that: this,
-  );
+  Future<void> logout() =>
+      RustLib.instance.api.crateApiClientMatrixClientLogout(
+        that: this,
+      );
 
   Future<RoomTimeline> openTimeline({required String roomId}) => RustLib
       .instance
       .api
-      .crateApiAuthMatrixClientOpenTimeline(that: this, roomId: roomId);
+      .crateApiClientMatrixClientOpenTimeline(that: this, roomId: roomId);
 
   Future<void> recover({required String recoveryKey}) => RustLib.instance.api
-      .crateApiAuthMatrixClientRecover(that: this, recoveryKey: recoveryKey);
+      .crateApiClientMatrixClientRecover(that: this, recoveryKey: recoveryKey);
 
   Stream<SessionEvent> sessionEvents() =>
-      RustLib.instance.api.crateApiAuthMatrixClientSessionEvents(
+      RustLib.instance.api.crateApiClientMatrixClientSessionEvents(
         that: this,
       );
 
   bool get sessionSaved =>
-      RustLib.instance.api.crateApiAuthMatrixClientSessionSaved(
+      RustLib.instance.api.crateApiClientMatrixClientSessionSaved(
         that: this,
       );
 
-  String get userId => RustLib.instance.api.crateApiAuthMatrixClientUserId(
+  String get userId => RustLib.instance.api.crateApiClientMatrixClientUserId(
     that: this,
   );
 
   Stream<RecoveryStatus> watchRecovery() =>
-      RustLib.instance.api.crateApiAuthMatrixClientWatchRecovery(
+      RustLib.instance.api.crateApiClientMatrixClientWatchRecovery(
         that: this,
       );
 
   Stream<List<RoomSummary>> watchRooms() =>
-      RustLib.instance.api.crateApiAuthMatrixClientWatchRooms(
+      RustLib.instance.api.crateApiClientMatrixClientWatchRooms(
         that: this,
       );
 
   Stream<SyncStatus> watchSyncStatus() =>
-      RustLib.instance.api.crateApiAuthMatrixClientWatchSyncStatus(
+      RustLib.instance.api.crateApiClientMatrixClientWatchSyncStatus(
         that: this,
       );
 }

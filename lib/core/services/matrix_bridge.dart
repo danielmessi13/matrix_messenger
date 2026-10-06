@@ -1,4 +1,4 @@
-import '../../src/rust/api/auth.dart';
+import '../../src/rust/api/client.dart';
 import '../../src/rust/api/oidc.dart';
 
 // As funções estáticas do Rust ficam aqui para o MatrixService poder ser testado sem a ponte.

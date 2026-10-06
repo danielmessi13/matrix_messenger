@@ -17,7 +17,10 @@ use tokio::{
 use url::Url;
 
 use crate::{
-    api::auth::{finish_new_login, remove_failed_store, AuthError, AuthErrorKind, MatrixClient},
+    api::{
+        auth::{finish_new_login, remove_failed_store, AuthError, AuthErrorKind},
+        client::MatrixClient,
+    },
     client_builder::client_builder,
     oidc_callback::CallbackServer,
     session_store,

@@ -7,6 +7,7 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/auth.dart';
+import 'api/client.dart';
 import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';

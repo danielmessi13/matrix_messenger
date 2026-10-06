@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/oidc.dart';
 
 class FakeOidcLogin implements OidcLogin {

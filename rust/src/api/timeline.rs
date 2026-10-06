@@ -122,7 +122,7 @@ use std::mem::ManuallyDrop;
 use flutter_rust_bridge::frb;
 use tokio::runtime::Handle;
 
-use crate::{frb_generated::StreamSink, timeline::TimelineHandle};
+use crate::{api::client::MatrixClient, frb_generated::StreamSink, timeline::TimelineHandle};
 
 #[frb(opaque)]
 pub struct RoomTimeline {
@@ -170,5 +170,83 @@ impl RoomTimeline {
 
     pub async fn open_thread(&self, root_event_id: String) -> Result<RoomTimeline, TimelineError> {
         Ok(Self::new(self.handle.open_thread(&root_event_id).await?))
+    }
+}
+
+impl MatrixClient {
+    pub async fn open_timeline(&self, room_id: String) -> Result<RoomTimeline, TimelineError> {
+        let room = self
+            .find_room(&room_id)
+            .ok_or_else(|| TimelineError::new(TimelineErrorKind::RoomNotFound, room_id))?;
+        let handle = TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone()).await?;
+        Ok(RoomTimeline::new(handle))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::test_support::{env_var, offline_client, temp_data_dir};
+
+    #[tokio::test]
+    async fn open_timeline_of_unknown_room_is_room_not_found() {
+        let store_path = std::path::PathBuf::from(temp_data_dir("timeline_unknown")).join("store");
+        let client = MatrixClient::new(
+            offline_client(&store_path).await,
+            temp_data_dir("timeline_unknown_data"),
+            None,
+        );
+
+        for room_id in ["!naoexiste:b.c", "isto não é um id"] {
+            let error = client.open_timeline(room_id.to_owned()).await.err().unwrap();
+            assert_eq!(error.kind, TimelineErrorKind::RoomNotFound, "{room_id}");
+        }
+    }
+
+    /// Requer MATRIX_HOMESERVER, MATRIX_USERNAME e MATRIX_PASSWORD e uma sala na conta.
+    #[tokio::test]
+    #[ignore]
+    async fn timeline_send_with_real_account() {
+        let client = MatrixClient::login(
+            env_var("MATRIX_HOMESERVER"),
+            env_var("MATRIX_USERNAME"),
+            env_var("MATRIX_PASSWORD"),
+            temp_data_dir("real_timeline"),
+        )
+        .await
+        .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
+        let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
+        client.room_sync().watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
+        let rooms = tokio::time::timeout(Duration::from_secs(60), rooms_rx.recv())
+            .await
+            .expect("lista em até 60 s")
+            .expect("sync encerrado");
+        let room = rooms.iter().find(|room| !room.is_invite).expect("uma sala na conta");
+
+        let timeline = client.open_timeline(room.id.clone()).await.unwrap();
+        timeline
+            .handle
+            .send_markdown("teste do **matrix_messenger**".to_owned())
+            .await
+            .unwrap();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        timeline.handle.watch(move |snapshot| tx.send(snapshot).is_ok());
+        loop {
+            let snapshot = tokio::time::timeout(Duration::from_secs(30), rx.recv())
+                .await
+                .expect("snapshot em até 30 s")
+                .expect("timeline encerrada");
+            let sent = snapshot.items.iter().filter_map(|entry| entry.message.as_ref()).any(|m| {
+                m.is_own && m.send_state == SendState::Sent && m.body.as_deref() == Some("teste do **matrix_messenger**")
+            });
+            if sent {
+                break;
+            }
+        }
+
+        drop(timeline);
+        client.logout().await.unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
     }
 }
