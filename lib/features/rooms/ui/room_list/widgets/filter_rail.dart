@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../app/theme.dart';
+import '../../../../../core/ui/animated_pane.dart';
 import '../../../../../core/ui/pane_toggle_button.dart';
 import '../../../domain/models/room_filter.dart';
 import 'room_labels.dart';
+
+const kFilterRailWidth = 250.0;
+
+const kFilterRailCompactWidth = 88.0;
 
 class FilterRail extends StatelessWidget {
   const FilterRail({
@@ -26,16 +31,56 @@ class FilterRail extends StatelessWidget {
   final VoidCallback onToggle;
 
   @override
+  Widget build(BuildContext context) => AnimatedPane(
+    expanded: expanded,
+    expandedWidth: kFilterRailWidth,
+    compactWidth: kFilterRailCompactWidth,
+    decoration: BoxDecoration(
+      border: Border(right: BorderSide(color: context.colors.border)),
+    ),
+    expandedChild: _RailContent(
+      expanded: true,
+      selected: selected,
+      unreadByFilter: unreadByFilter,
+      onSelect: onSelect,
+      onToggle: onToggle,
+    ),
+    compactChild: _RailContent(
+      expanded: false,
+      selected: selected,
+      unreadByFilter: unreadByFilter,
+      onSelect: onSelect,
+      onToggle: onToggle,
+    ),
+  );
+}
+
+class _RailContent extends StatelessWidget {
+  const _RailContent({
+    required this.expanded,
+    required this.selected,
+    required this.unreadByFilter,
+    required this.onSelect,
+    required this.onToggle,
+  });
+
+  final bool expanded;
+
+  final RoomFilter selected;
+
+  final Map<RoomFilter, int> unreadByFilter;
+
+  final ValueChanged<RoomFilter> onSelect;
+
+  final VoidCallback onToggle;
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
-      width: expanded ? 250 : 88,
+    return Padding(
       padding: expanded
           ? const EdgeInsets.all(20)
           : const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: colors.border)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

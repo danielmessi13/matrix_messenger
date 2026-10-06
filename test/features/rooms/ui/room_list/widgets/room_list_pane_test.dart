@@ -160,4 +160,64 @@ void main() {
     expect(find.byKey(Key('room_avatar_${kTeamRoom.id}')), findsOneWidget);
     expect(find.text('Caixa de entrada'), findsNothing);
   });
+
+  double paneWidth(WidgetTester tester) =>
+      tester.getSize(find.byType(RoomListPane)).width;
+
+  const lonely = Room(id: '!so:matrix.org', name: 'só', unreadMessages: 1);
+
+  testWidgets('recolhida e sem salas no filtro, a barra some', (tester) async {
+    await pump(
+      tester,
+      const RoomListState(rooms: [lonely], loaded: true),
+      expanded: false,
+    );
+    expect(paneWidth(tester), kRoomListCompactWidth);
+
+    await pump(
+      tester,
+      const RoomListState(
+        rooms: [lonely],
+        loaded: true,
+        filter: RoomFilter.direct,
+      ),
+      expanded: false,
+    );
+    await tester.pumpAndSettle();
+    expect(paneWidth(tester), 0);
+
+    await pump(
+      tester,
+      const RoomListState(rooms: [lonely], loaded: true),
+      expanded: false,
+    );
+    await tester.pumpAndSettle();
+    expect(paneWidth(tester), kRoomListCompactWidth);
+  });
+
+  testWidgets('expandida e sem salas no filtro, a barra fica', (tester) async {
+    await pump(
+      tester,
+      const RoomListState(
+        rooms: [lonely],
+        loaded: true,
+        filter: RoomFilter.direct,
+      ),
+    );
+
+    expect(paneWidth(tester), kRoomListWidth);
+    expect(find.text('Nenhuma conversa encontrada.'), findsOneWidget);
+  });
+
+  testWidgets('recolhida com busca sem resultado, a barra fica', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const RoomListState(rooms: [lonely], loaded: true, query: 'xyz'),
+      expanded: false,
+    );
+
+    expect(paneWidth(tester), kRoomListCompactWidth);
+  });
 }

@@ -16,6 +16,7 @@ enum RoomFilter {
   };
 
   int unreadOf(Room room) => switch (this) {
+    mentions => room.unreadMentions,
     threads => room.unreadThreadReplies,
     _ => room.unreadMessages,
   };
