@@ -6,6 +6,7 @@
 import '../frb_generated.dart';
 import 'auth.dart';
 import 'media.dart';
+import 'notifications.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
@@ -82,6 +83,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
   Future<String> setupRecovery();
 
   String get userId;
+
+  Stream<RoomNotification> watchNotifications();
 
   Stream<RecentThreadsSnapshot> watchRecentThreads();
 
