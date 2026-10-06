@@ -6,7 +6,7 @@ Cliente de mensageria desktop para macOS, Windows e Linux, feito em Flutter, que
 
 - **O que é:** cliente Matrix desktop. Flutter na interface (MVVM com Cubit), Rust com o Matrix Rust SDK na comunicação, ligados pelo Flutter Rust Bridge.
 - **Para avaliar:** `docker compose -f docker/docker-compose.yml up -d`, [baixe o app](#baixar-o-app) e entre em `http://localhost:8008` com `avaliador` / `avaliador123`.
-- **O que tem:** login com senha ou navegador, sessão salva no cofre do sistema, lista de salas em tempo real, conversa com markdown, imagens, respostas, threads e reações, criação e gerenciamento de salas, recuperação do histórico cifrado.
+- **O que tem:** login com senha ou navegador, sessão salva no cofre do sistema, lista de salas em tempo real, conversa com markdown, imagens, respostas, threads e reações, notificações do sistema, criação e gerenciamento de salas, backup e recuperação do histórico cifrado.
 - **Onde ler mais:** [decisões técnicas](docs/decisoes-tecnicas.md) e [limitações](docs/limitacoes.md).
 
 ## Sumário
@@ -66,7 +66,7 @@ Os pacotes não são assinados com certificado pago, então cada sistema avisa n
 
 3. Abra o **matrix_messenger** pelos Aplicativos.
 
-O macOS pode pedir a senha do Keychain na primeira vez que o app salva a sessão. Escolha **Sempre permitir**.
+O macOS pode pedir a senha do Keychain na primeira vez que o app salva a sessão. Escolha **Sempre permitir**. Depois do login, ele também pede permissão para mostrar notificações.
 
 ### Windows
 
@@ -99,17 +99,19 @@ O sistema precisa ter o GTK 3 (`libgtk-3-0`), presente na maioria das distribui�
 | Autenticação em um homeserver Matrix | Login com usuário e senha ou pelo navegador (OIDC), com erros tipados vindos do Rust e mensagens específicas para cada um |
 | Listagem e seleção de salas | Lista em tempo real pelo sliding sync, com filtros (caixa de entrada, menções, threads, salas e conversas diretas), contagem de não lidas e prévia da última mensagem |
 | Visualização e envio de mensagens | Timeline com paginação do histórico, envio em markdown, imagens, respostas, threads e reações |
-| Atualização das conversas | Sync contínuo em segundo plano, indicador de digitação, confirmação de leitura, modo offline com os dados salvos |
+| Atualização das conversas | Sync contínuo em segundo plano, notificações do sistema para mensagens e convites, indicador de digitação, confirmação de leitura, modo offline com os dados salvos |
 | Encerramento e restauração da sessão | Sessão guardada no cofre do sistema operacional (Keychain, Credential Manager ou Secret Service) e restaurada sem rede; logout encerra o dispositivo no servidor; aviso quando a sessão é revogada em outro lugar |
 
 ### Além do escopo
 
+- Notificações do sistema para mensagens e convites, seguindo as regras de notificação da conta; o clique abre a sala.
 - Busca de mensagens no servidor, com atalho Cmd/Ctrl+K.
 - Criar sala (nome, tópico, visibilidade, convites), entrar por link ou ID e copiar o link de salas públicas.
 - Aceitar e recusar convites; convidar pessoas e sair de uma sala pelo cabeçalho da conversa.
 - Threads recentes no filtro Threads, com a thread aberta num painel ao lado da conversa.
-- Recuperação do histórico cifrado com a chave de recuperação da conta.
+- Recuperação do histórico cifrado com a chave de recuperação da conta e, em conta sem backup, configuração do backup com uma chave nova gerada pelo app.
 - Lista de salas e filtros recolhíveis, com animação.
+- Homeserver Synapse local em Docker, com usuários, salas e mensagens de exemplo.
 - Builds de macOS, Windows e Linux gerados pelo CI ao criar uma tag.
 
 ## Pré-requisitos
@@ -301,13 +303,16 @@ matrix_messenger/
 │   │   ├── home/             # Moldura da tela principal
 │   │   ├── rooms/            # Lista, busca, nova sala, convites, entrar, convidar e sair
 │   │   ├── conversation/     # Timeline, envio, imagens, respostas, threads e reações
-│   │   └── recovery/         # Chave de recuperação do histórico cifrado
+│   │   ├── threads/          # Threads recentes
+│   │   ├── notifications/    # Notificações do sistema
+│   │   └── recovery/         # Configuração e chave de recuperação do histórico cifrado
 │   └── src/rust/             # Código gerado pelo FRB (não editar à mão)
 ├── rust/src/
 │   ├── api/                  # Funções expostas ao Dart (client, auth, oidc, rooms, timeline…)
 │   ├── session_store.rs      # Sessão no cofre do sistema operacional
 │   ├── room_list.rs          # Lista de salas sobre o SyncService
 │   ├── timeline.rs           # Conversa sobre a Timeline do matrix-sdk-ui
+│   ├── notifications.rs      # Notificações pelas regras de push do SDK
 │   └── …
 ├── rust_builder/             # Plugin (Cargokit) que compila o Rust no build do Flutter
 ├── docker/                   # Synapse local e seed
@@ -327,7 +332,8 @@ O registro completo, com as alternativas consideradas, está em [docs/decisoes-t
 - **Lista inteira pela ponte, filtros no Dart.** Os filtros mudam a cada clique e não precisam de ida e volta ao Rust. As atualizações do sliding sync são agrupadas numa janela de 100 ms.
 - **Erros tipados e convertidos no repository.** O Rust devolve enums de erro, e o repository converte para falhas de domínio com `switch` exaustivo: um erro novo no Rust não compila até alguém decidir como mostrá-lo.
 - **Paginação decidida pela tela.** Cada busca pede 20 eventos, e quem decide pedir mais é a tela. Uma janela de exibição no ViewModel evita que o histórico cresça aos saltos quando o cache do SDK entrega blocos grandes.
-- **Histórico cifrado pela chave de recuperação.** O SDK baixa do backup só a chave da mensagem que falhou (`AfterDecryptionFailure`) e a timeline decifra de novo sozinha.
+- **Histórico cifrado pela chave de recuperação.** O SDK baixa do backup só a chave da mensagem que falhou (`AfterDecryptionFailure`) e a timeline decifra de novo sozinha. Em conta sem backup, o app cria o cross-signing e o backup e mostra a chave nova uma única vez.
+- **Notificações pelas regras de push do SDK.** O handler de notificações do SDK aplica as regras da conta (salas silenciadas, menções), o Rust descarta o histórico do primeiro sync e eventos reentregues, e o Dart só omite a notificação quando a sala está aberta com a janela em foco. Cada sala ocupa uma notificação, que a mensagem seguinte substitui.
 - **SQLite embutido (`bundled-sqlite`).** Os três sistemas usam a mesma versão, sem depender do SQLite instalado.
 
 ## Testes
@@ -390,8 +396,14 @@ flutter test integration_test/conversation_bridge_test.dart -d macos --dart-defi
 - Sala pública criada no app não tem alias (`#nome:servidor`) nem entra no diretório do servidor.
 - Espaços não são tratados.
 
+**Notificações**
+
+- Só chegam com o app aberto: não há push do servidor, então mensagens recebidas com o app fechado não notificam.
+- Sem contador no ícone do app.
+
 **Criptografia**
 
 - Histórico cifrado só volta com a chave de recuperação. Sem ela, mensagens anteriores ao login aparecem como "Mensagem criptografada".
+- Se o servidor exigir a senha (UIA) para criar o cross-signing, a configuração do backup mostra o erro e fica para outro cliente. O Synapse local não exige.
 
 A lista completa, com o caminho para resolver vários itens, está em [docs/limitacoes.md](docs/limitacoes.md).
