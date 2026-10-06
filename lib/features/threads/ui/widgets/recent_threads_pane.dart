@@ -23,6 +23,8 @@ class RecentThreadsPane extends StatelessWidget {
     required this.onSelect,
     required this.onRetry,
     required this.onToggle,
+    this.header,
+    this.compactHeader,
   });
 
   final bool expanded;
@@ -42,6 +44,10 @@ class RecentThreadsPane extends StatelessWidget {
   final VoidCallback onRetry;
 
   final VoidCallback onToggle;
+
+  final Widget? header;
+
+  final Widget? compactHeader;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +76,7 @@ class RecentThreadsPane extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Header(onToggle: onToggle),
+          ?header,
           Expanded(
             child: _Body(
               status: state.status,
@@ -85,6 +92,7 @@ class RecentThreadsPane extends StatelessWidget {
         entries: entries,
         onSelect: onSelect,
         onToggle: onToggle,
+        header: compactHeader,
       ),
     );
   }
@@ -304,6 +312,7 @@ class _Collapsed extends StatelessWidget {
     required this.entries,
     required this.onSelect,
     required this.onToggle,
+    this.header,
   });
 
   final List<_Entry> entries;
@@ -312,43 +321,50 @@ class _Collapsed extends StatelessWidget {
 
   final VoidCallback onToggle;
 
+  final Widget? header;
+
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Expanded(
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          itemCount: entries.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final (:thread, :room, :selected) = entries[index];
-            return Center(
-              child: KeyedSubtree(
-                key: Key(
-                  'thread_avatar_${thread.roomId}_${thread.rootEventId}',
+  Widget build(BuildContext context) {
+    final header = this.header;
+    final offset = header == null ? 0 : 1;
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            itemCount: entries.length + offset,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              if (header != null && index == 0) return Center(child: header);
+              final (:thread, :room, :selected) = entries[index - offset];
+              return Center(
+                child: KeyedSubtree(
+                  key: Key(
+                    'thread_avatar_${thread.roomId}_${thread.rootEventId}',
+                  ),
+                  child: RoomAvatarTile(
+                    room: room,
+                    selected: selected,
+                    unread: 0,
+                    onTap: () => onSelect(thread),
+                    tooltip:
+                        '${roomListLabel(room)}\n${threadRootPreview(thread.root)}',
+                  ),
                 ),
-                child: RoomAvatarTile(
-                  room: room,
-                  selected: selected,
-                  unread: 0,
-                  onTap: () => onSelect(thread),
-                  tooltip:
-                      '${roomListLabel(room)}\n${threadRootPreview(thread.root)}',
-                ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
-      Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: PaneToggleButton(
-          key: const Key('toggle_room_list'),
-          pointsLeft: false,
-          tooltip: 'Expandir lista',
-          onPressed: onToggle,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: PaneToggleButton(
+            key: const Key('toggle_room_list'),
+            pointsLeft: false,
+            tooltip: 'Expandir lista',
+            onPressed: onToggle,
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }

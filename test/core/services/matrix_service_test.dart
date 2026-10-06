@@ -299,6 +299,42 @@ void main() {
     expect(await service.watchRecovery().toList(), isEmpty);
   });
 
+  test('setupRecovery devolve a chave do Rust', () async {
+    final client = FakeMatrixClient.of(kUserSession);
+    bridge.loginClient = client;
+    await login();
+
+    final result = await service.setupRecovery();
+
+    expect(client.setupRecoveryCalls, 1);
+    expect((result as Ok<String>).value, client.setupRecoveryKey);
+  });
+
+  test('setupRecovery devolve o RecoveryError do Rust', () async {
+    final client = FakeMatrixClient.of(kUserSession);
+    client.setupRecoveryError = const RecoveryError(
+      kind: RecoveryErrorKind.authRequired,
+      message: 'UIA',
+    );
+    bridge.loginClient = client;
+    await login();
+
+    final result = await service.setupRecovery();
+
+    expect(
+      (result as Error<String>).error,
+      isA<RecoveryError>().having(
+        (e) => e.kind,
+        'kind',
+        RecoveryErrorKind.authRequired,
+      ),
+    );
+  });
+
+  test('sem cliente, setupRecovery é erro', () async {
+    expect(await service.setupRecovery(), isA<Error<String>>());
+  });
+
   test('repassa keepSignedIn para a ponte nos dois logins', () async {
     await service.login(
       homeserver: 'matrix.org',

@@ -9,8 +9,10 @@ import '../../../auth/ui/logout/view_models/logout_view_model.dart';
 import '../../../auth/ui/logout/widgets/user_menu.dart';
 import '../../../conversation/ui/widgets/conversation_pane.dart';
 import '../../../recovery/data/repositories/recovery_repository.dart';
+import '../../../recovery/ui/view_models/recovery_state.dart';
 import '../../../recovery/ui/view_models/recovery_view_model.dart';
-import '../../../recovery/ui/widgets/recovery_banner.dart';
+import '../../../recovery/ui/widgets/recovery_card.dart';
+import '../../../recovery/ui/widgets/recovery_collapsed_button.dart';
 import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/failed_invite.dart';
 import '../../../rooms/domain/models/new_room.dart';
@@ -144,9 +146,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             invites: home.failedInvites,
                             onDismiss: widget.viewModel.dismissFailedInvites,
                           ),
-                        RecoveryBanner(
-                          viewModel: context.read<RecoveryViewModel>(),
-                        ),
                         Expanded(
                           child: _Panes(
                             home: home,
@@ -306,70 +305,85 @@ class _Panes extends StatelessWidget {
   final DateTime now;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) {
-      final panes = visiblePanes(home, box.maxWidth);
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FilterRail(
-            expanded: panes.filters,
-            selected: list.filter,
-            unreadByFilter: list.unreadByFilter,
-            onSelect: roomListViewModel.selectFilter,
-            onToggle: panes.filters
-                ? viewModel.toggleFilters
-                : () => viewModel.expandFilters(width: box.maxWidth),
-          ),
-          // O filtro decide antes da busca: com Threads a lista de threads fica.
-          if (list.filter == RoomFilter.threads)
-            BlocBuilder<RecentThreadsViewModel, RecentThreadsState>(
-              bloc: recentThreadsViewModel,
-              builder: (context, threads) => RecentThreadsPane(
-                expanded: panes.list,
-                state: threads,
-                rooms: list.rooms,
-                selectedRoomId: list.selectedRoomId,
-                openThreadId: home.openThreadId,
-                now: now,
-                onSelect: (thread) => roomListViewModel.selectThread(
-                  thread.roomId,
-                  thread.rootEventId,
+  Widget build(BuildContext context) {
+    final recovery = context.read<RecoveryViewModel>();
+    // Sem o "!", a lista recolhida some quando não há salas.
+    final showCard = context.select(
+      (RecoveryViewModel viewModel) =>
+          viewModel.state.card != RecoveryCardKind.none,
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final panes = visiblePanes(home, box.maxWidth);
+        void expandList() => viewModel.expandRoomList(width: box.maxWidth);
+        final compactHeader = showCard
+            ? RecoveryCollapsedButton(
+                viewModel: recovery,
+                onPressed: expandList,
+              )
+            : null;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FilterRail(
+              expanded: panes.filters,
+              selected: list.filter,
+              unreadByFilter: list.unreadByFilter,
+              onSelect: roomListViewModel.selectFilter,
+              onToggle: panes.filters
+                  ? viewModel.toggleFilters
+                  : () => viewModel.expandFilters(width: box.maxWidth),
+            ),
+            // O filtro decide antes da busca: com Threads a lista de threads fica.
+            if (list.filter == RoomFilter.threads)
+              BlocBuilder<RecentThreadsViewModel, RecentThreadsState>(
+                bloc: recentThreadsViewModel,
+                builder: (context, threads) => RecentThreadsPane(
+                  expanded: panes.list,
+                  state: threads,
+                  rooms: list.rooms,
+                  selectedRoomId: list.selectedRoomId,
+                  openThreadId: home.openThreadId,
+                  now: now,
+                  onSelect: (thread) => roomListViewModel.selectThread(
+                    thread.roomId,
+                    thread.rootEventId,
+                  ),
+                  onRetry: recentThreadsViewModel.retry,
+                  onToggle: panes.list ? viewModel.toggleRoomList : expandList,
+                  header: RecoveryCard(viewModel: recovery),
+                  compactHeader: compactHeader,
                 ),
-                onRetry: recentThreadsViewModel.retry,
-                onToggle: panes.list
-                    ? viewModel.toggleRoomList
-                    : () => viewModel.expandRoomList(width: box.maxWidth),
+              )
+            else
+              RoomListPane(
+                expanded: panes.list,
+                state: list,
+                now: now,
+                onSelect: roomListViewModel.selectRoom,
+                onToggle: panes.list ? viewModel.toggleRoomList : expandList,
+                header: RecoveryCard(viewModel: recovery),
+                compactHeader: compactHeader,
+                onOpenMessage: roomListViewModel.openMessage,
+                onLoadMoreMessages: roomListViewModel.loadMoreMessages,
+                onRetryMessages: roomListViewModel.retryMessageSearch,
               ),
-            )
-          else
-            RoomListPane(
-              expanded: panes.list,
-              state: list,
-              now: now,
-              onSelect: roomListViewModel.selectRoom,
-              onToggle: panes.list
-                  ? viewModel.toggleRoomList
-                  : () => viewModel.expandRoomList(width: box.maxWidth),
-              onOpenMessage: roomListViewModel.openMessage,
-              onLoadMoreMessages: roomListViewModel.loadMoreMessages,
-              onRetryMessages: roomListViewModel.retryMessageSearch,
+            Expanded(
+              child: ConversationPane(
+                room: list.selectedRoom,
+                ownUserId: home.session.userId,
+                now: now,
+                focus: list.focus,
+                threadRequest: list.threadRequest,
+                onThreadOpenChanged: viewModel.threadVisibilityChanged,
+                onOpenThreadChanged: viewModel.openThreadChanged,
+              ),
             ),
-          Expanded(
-            child: ConversationPane(
-              room: list.selectedRoom,
-              ownUserId: home.session.userId,
-              now: now,
-              focus: list.focus,
-              threadRequest: list.threadRequest,
-              onThreadOpenChanged: viewModel.threadVisibilityChanged,
-              onOpenThreadChanged: viewModel.openThreadChanged,
-            ),
-          ),
-        ],
-      );
-    },
-  );
+          ],
+        );
+      },
+    );
+  }
 }
 
 // Com a thread aberta, recolhe lista e filtros que tirariam o espaço dela ao lado da conversa.

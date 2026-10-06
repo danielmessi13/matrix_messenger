@@ -603,19 +603,41 @@ void main() {
   });
 
   testWidgets(
-    'mostra o banner de recuperação quando o backup está incompleto',
+    'mostra o cartão de recuperação quando o backup está incompleto',
     (
       tester,
     ) async {
       await pumpScreen(tester);
-      expect(find.byKey(const Key('recovery_banner')), findsNothing);
+      expect(find.byKey(const Key('recovery_card')), findsNothing);
 
       recoveryRepository.statusController.add(RecoveryStatus.incomplete);
       await tester.pump();
 
-      expect(find.byKey(const Key('recovery_banner')), findsOneWidget);
+      expect(find.byKey(const Key('recovery_card')), findsOneWidget);
     },
   );
+
+  testWidgets('conta sem backup mostra o cartão de configurar', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    recoveryRepository.statusController.add(RecoveryStatus.disabled);
+    await tester.pump();
+
+    expect(find.text('Proteja suas mensagens'), findsOneWidget);
+  });
+
+  testWidgets('o cartão de recuperação continua com o filtro Threads', (
+    tester,
+  ) async {
+    await showThreads(tester);
+    recoveryRepository.statusController.add(RecoveryStatus.incomplete);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Threads recentes'), findsOneWidget);
+    expect(find.byKey(const Key('recovery_card')), findsOneWidget);
+  });
 
   double roomListWidth(WidgetTester tester) =>
       tester.getSize(find.byType(RoomListPane)).width;

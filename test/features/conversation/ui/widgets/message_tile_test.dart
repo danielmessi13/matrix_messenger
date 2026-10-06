@@ -319,6 +319,30 @@ void main() {
     },
   );
 
+  testWidgets('tooltip de Reagir no menu do hover abre sem erro', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReply: () {},
+      onReact: (_) async => true,
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.textContaining('A integração')));
+    await tester.pump();
+
+    await mouse.moveTo(
+      tester.getCenter(find.byKey(const Key('reaction_picker_\$other'))),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Reagir'), findsOneWidget);
+  });
+
   testWidgets('botão do menu destaca o fundo e o texto no hover', (
     tester,
   ) async {
@@ -784,7 +808,22 @@ void main() {
     expect(find.byType(ReactionChips), findsNothing);
   });
 
-  testWidgets('hover mostra as rápidas e elas chamam onReact', (tester) async {
+  testWidgets('hover não tem rápidas e só o botão do seletor', (tester) async {
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReact: (_) async => true,
+    );
+
+    await hover(tester, find.textContaining('A integração'));
+
+    for (final emoji in ['👍', '❤️', '😂', '😮', '😢', '🎉']) {
+      expect(find.byKey(Key('quick_reaction_\$other_$emoji')), findsNothing);
+    }
+    expect(find.byKey(const Key('reaction_picker_\$other')), findsOneWidget);
+  });
+
+  testWidgets('escolher no seletor completo chama onReact', (tester) async {
     final keys = <String>[];
     await pump(
       tester,
@@ -796,21 +835,19 @@ void main() {
     );
 
     await hover(tester, find.textContaining('A integração'));
-    for (final emoji in ['👍', '❤️', '😂', '😮', '😢', '🎉']) {
-      expect(find.byKey(Key('quick_reaction_\$other_$emoji')), findsOneWidget);
-    }
-    await tester.tap(find.byKey(const Key('quick_reaction_\$other_❤️')));
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('reaction_picker_\$other')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😀').first);
+    await tester.pumpAndSettle();
 
-    expect(keys, ['❤️']);
+    expect(keys, ['😀']);
   });
 
-  testWidgets('sem canReact o hover não mostra reações', (tester) async {
+  testWidgets('sem canReact o hover não mostra o seletor', (tester) async {
     await pump(tester, kOtherMessage, onReact: (_) async => true);
 
     await hover(tester, find.textContaining('A integração'));
 
-    expect(find.byKey(const Key('quick_reaction_\$other_👍')), findsNothing);
     expect(find.byKey(const Key('reaction_picker_\$other')), findsNothing);
   });
 
@@ -834,12 +871,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('reaction_picker')), findsOneWidget);
-    expect(find.byKey(const Key('quick_reaction_\$other_👍')), findsOneWidget);
+    expect(
+      find.byKey(const Key('reaction_picker_\$other')),
+      findsOneWidget,
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('quick_reaction_\$other_👍')), findsNothing);
+    expect(find.byKey(const Key('reaction_picker_\$other')), findsNothing);
   });
 
   testWidgets('chip + abre o seletor e escolher reage', (tester) async {

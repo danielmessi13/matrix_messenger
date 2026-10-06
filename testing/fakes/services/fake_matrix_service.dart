@@ -113,6 +113,16 @@ class FakeMatrixService implements MatrixService {
     return recoverResult;
   }
 
+  Result<String> setupRecoveryResult = const Result.ok('EsTx 1234');
+
+  int setupRecoveryCalls = 0;
+
+  @override
+  Future<Result<String>> setupRecovery() async {
+    setupRecoveryCalls++;
+    return setupRecoveryResult;
+  }
+
   @override
   Future<Result<RoomTimeline>> openTimeline(String roomId) async =>
       openTimelineResult;

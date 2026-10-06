@@ -20,6 +20,7 @@ class RoomListExpanded extends StatelessWidget {
     required this.onOpenMessage,
     required this.onLoadMoreMessages,
     required this.onRetryMessages,
+    this.header,
   });
 
   final RoomListState state;
@@ -36,12 +37,15 @@ class RoomListExpanded extends StatelessWidget {
 
   final VoidCallback onRetryMessages;
 
+  final Widget? header;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _Header(state: state, onToggle: onToggle),
       if (_bannerText() case final text?) _SyncBanner(text: text),
+      ?header,
       Expanded(
         child: state.searching
             ? MessageResults(

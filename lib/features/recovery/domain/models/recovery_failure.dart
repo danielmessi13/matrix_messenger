@@ -1,4 +1,10 @@
-enum RecoveryFailureType { invalidKey, network, unknown }
+enum RecoveryFailureType {
+  invalidKey,
+  network,
+  backupExists,
+  authRequired,
+  unknown,
+}
 
 class RecoveryFailure implements Exception {
   const RecoveryFailure(this.type, [this.details]);

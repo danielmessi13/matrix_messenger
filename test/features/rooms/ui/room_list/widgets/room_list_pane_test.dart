@@ -27,6 +27,8 @@ void main() {
     WidgetTester tester,
     RoomListState state, {
     bool expanded = true,
+    Widget? header,
+    Widget? compactHeader,
   }) async {
     final selected = <String>[];
     await tester.pumpWidget(
@@ -44,6 +46,8 @@ void main() {
                 onOpenMessage: opened.add,
                 onLoadMoreMessages: () => loadMore++,
                 onRetryMessages: () => retries++,
+                header: header,
+                compactHeader: compactHeader,
               ),
             ],
           ),
@@ -176,6 +180,62 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(paneWidth(tester), kRoomListCompactWidth);
+  });
+
+  testWidgets('expandida mostra o header acima das salas', (tester) async {
+    await pump(
+      tester,
+      RoomListState(rooms: kRooms, loaded: true),
+      header: const SizedBox(key: Key('header'), height: 40),
+    );
+
+    final header = tester.getTopLeft(find.byKey(const Key('header')));
+    final firstRoom = tester.getTopLeft(find.text('# lançamento-q4'));
+    expect(header.dy, lessThan(firstRoom.dy));
+  });
+
+  testWidgets('recolhida mostra o compactHeader antes dos avatares', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      RoomListState(rooms: kRooms, loaded: true),
+      expanded: false,
+      compactHeader: const SizedBox(
+        key: Key('compact_header'),
+        width: 48,
+        height: 48,
+      ),
+    );
+
+    final header = tester.getTopLeft(find.byKey(const Key('compact_header')));
+    final avatar = tester.getTopLeft(
+      find.byKey(Key('room_avatar_${kTeamRoom.id}')),
+    );
+    expect(header.dy, lessThan(avatar.dy));
+  });
+
+  testWidgets('recolhida sem salas fica visível com compactHeader', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const RoomListState(
+        rooms: [lonely],
+        loaded: true,
+        filter: RoomFilter.direct,
+      ),
+      expanded: false,
+      compactHeader: const SizedBox(
+        key: Key('compact_header'),
+        width: 48,
+        height: 48,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(paneWidth(tester), kRoomListCompactWidth);
+    expect(find.byKey(const Key('compact_header')), findsOneWidget);
   });
 
   testWidgets('expandida e sem salas no filtro, a barra fica', (tester) async {

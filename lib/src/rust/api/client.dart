@@ -79,6 +79,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
 
   bool get sessionSaved;
 
+  Future<String> setupRecovery();
+
   String get userId;
 
   Stream<RecentThreadsSnapshot> watchRecentThreads();

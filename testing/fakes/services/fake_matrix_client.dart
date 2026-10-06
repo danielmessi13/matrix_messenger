@@ -84,6 +84,22 @@ class FakeMatrixClient implements MatrixClient {
     }
   }
 
+  String setupRecoveryKey =
+      'EsTx 1234 5678 9abc defg hijk mnop qrst uvwx yzAB CDEF GHJK';
+
+  Object? setupRecoveryError;
+
+  int setupRecoveryCalls = 0;
+
+  @override
+  Future<String> setupRecovery() async {
+    setupRecoveryCalls++;
+    if (setupRecoveryError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+    return setupRecoveryKey;
+  }
+
   RoomTimeline? openTimelineResult;
 
   Object? openTimelineError;

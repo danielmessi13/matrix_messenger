@@ -9,8 +9,6 @@ import 'message_labels.dart';
 import 'reaction_chips.dart';
 import 'reaction_picker.dart';
 
-const _quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🎉'];
-
 class MessageTile extends StatelessWidget {
   const MessageTile({
     super.key,
@@ -800,12 +798,6 @@ class _ActionBar extends StatelessWidget {
                 ),
               ),
             if (onReact case final onReact?) ...[
-              for (final emoji in _quickReactions)
-                _QuickReaction(
-                  key: Key('quick_reaction_${messageId}_$emoji'),
-                  emoji: emoji,
-                  onTap: () => onReact(emoji),
-                ),
               ReactionPickerButton(
                 alignEnd: alignEnd,
                 onSelected: onReact,
@@ -837,42 +829,6 @@ class _ActionBar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _QuickReaction extends StatefulWidget {
-  const _QuickReaction({super.key, required this.emoji, required this.onTap});
-
-  final String emoji;
-
-  final VoidCallback onTap;
-
-  @override
-  State<_QuickReaction> createState() => _QuickReactionState();
-}
-
-class _QuickReactionState extends State<_QuickReaction> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.click,
-    onEnter: (_) => setState(() => _hovered = true),
-    onExit: (_) => setState(() => _hovered = false),
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: _hovered ? context.colors.surfaceHigh : null,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-          child: Text(widget.emoji, style: const TextStyle(fontSize: 16)),
-        ),
-      ),
-    ),
-  );
 }
 
 class _IconAction extends StatelessWidget {

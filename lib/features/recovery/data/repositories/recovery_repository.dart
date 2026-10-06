@@ -5,4 +5,6 @@ abstract interface class RecoveryRepository {
   Stream<RecoveryStatus> get status;
 
   Future<Result<void>> recover(String recoveryKey);
+
+  Future<Result<String>> setupRecovery();
 }

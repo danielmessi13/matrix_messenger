@@ -22,6 +22,8 @@ class RoomListPane extends StatelessWidget {
     required this.onOpenMessage,
     required this.onLoadMoreMessages,
     required this.onRetryMessages,
+    this.header,
+    this.compactHeader,
   });
 
   final bool expanded;
@@ -40,11 +42,19 @@ class RoomListPane extends StatelessWidget {
 
   final VoidCallback onRetryMessages;
 
+  final Widget? header;
+
+  final Widget? compactHeader;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    final hidden = !expanded && state.loaded && state.visibleRooms.isEmpty;
+    final hidden =
+        !expanded &&
+        state.loaded &&
+        state.visibleRooms.isEmpty &&
+        compactHeader == null;
 
     return AnimatedPane(
       expanded: expanded,
@@ -63,11 +73,13 @@ class RoomListPane extends StatelessWidget {
         onOpenMessage: onOpenMessage,
         onLoadMoreMessages: onLoadMoreMessages,
         onRetryMessages: onRetryMessages,
+        header: header,
       ),
       compactChild: RoomListCollapsed(
         state: state,
         onSelect: onSelect,
         onToggle: onToggle,
+        compactHeader: compactHeader,
       ),
     );
   }

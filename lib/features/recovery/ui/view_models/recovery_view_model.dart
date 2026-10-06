@@ -24,13 +24,13 @@ class RecoveryViewModel extends Cubit<RecoveryState> {
     );
   }
 
-  // O erro é de uma tentativa; um diálogo novo começa limpo.
+  // Cada abertura do diálogo começa no estado de digitar.
   void resetSubmit() {
-    if (state.submit != RecoverySubmit.failure) return;
+    if (state.submit case RecoverySubmit.idle || RecoverySubmit.running) return;
     emit(state.copyWith(submit: RecoverySubmit.idle, failure: () => null));
   }
 
-  void dismiss() => emit(state.copyWith(dismissed: true));
+  void finish() => emit(state.copyWith(unlocked: true));
 
   Future<void> recover(String recoveryKey) async {
     if (recoveryKey.trim().isEmpty || state.submit == RecoverySubmit.running) {

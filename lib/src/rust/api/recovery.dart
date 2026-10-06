@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `recover`, `watch`
+// These functions are ignored because they are not marked as `pub`: `recover`, `setup_recovery`, `watch`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 class RecoveryError implements FrbException {
@@ -34,6 +34,12 @@ class RecoveryError implements FrbException {
 enum RecoveryErrorKind {
   invalidKey,
   network,
+
+  /// Já existe um backup no servidor, criado por outro app com outra chave.
+  backupExists,
+
+  /// O servidor pediu a senha (UIA) para subir o cross-signing.
+  authRequired,
   unknown,
 }
 

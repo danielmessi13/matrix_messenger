@@ -110,6 +110,12 @@ class MatrixService {
     await client.recover(recoveryKey: recoveryKey);
   });
 
+  Future<Result<String>> setupRecovery() => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.setupRecovery();
+  });
+
   Future<Result<RoomTimeline>> openTimeline(String roomId) => _guard(() async {
     final client = _client;
     if (client == null) throw StateError('Sem sessão ativa');

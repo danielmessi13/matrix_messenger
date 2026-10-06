@@ -388,6 +388,8 @@ async fn latest_message(room: &Room) -> Option<LatestMessage> {
     // Sem horário a UI mostraria 01/01; melhor não mostrar prévia.
     let timestamp_ms = i64::from(event.timestamp()?.0);
     let (kind, body) = match event.raw().deserialize() {
+        // Numa sala vazia o SDK escolhe o join do próprio usuário; isso não é mensagem.
+        Ok(AnySyncTimelineEvent::State(_)) => return None,
         Ok(parsed) => message_kind(&parsed),
         Err(_) => (LatestMessageKind::Other, None),
     };
@@ -460,7 +462,11 @@ mod tests {
     use std::time::Duration;
 
     use matrix_sdk::{
-        ruma::{event_id, events::room::join_rules::JoinRule, room_id, user_id},
+        ruma::{
+            event_id,
+            events::room::{join_rules::JoinRule, member::MembershipState},
+            room_id, user_id,
+        },
         test_utils::mocks::MatrixMockServer,
     };
     use matrix_sdk_test::{event_factory::EventFactory, JoinedRoomBuilder};
@@ -577,6 +583,38 @@ mod tests {
         assert_eq!(latest.body.as_deref(), Some("Oi, tudo bem?"));
         assert_eq!(latest.sender_name, "bob");
         assert!(!latest.is_own);
+    }
+
+    #[tokio::test]
+    async fn summarize_has_no_preview_when_the_latest_event_is_the_own_join() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let room_id = room_id!("!a:b.c");
+        let me = client.user_id().unwrap().to_owned();
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_timeline_event(
+                    EventFactory::new()
+                        .room(room_id)
+                        .member(&me)
+                        .membership(MembershipState::Join)
+                        .sender(&me)
+                        .event_id(event_id!("$j")),
+                ),
+            )
+            .await;
+        // Espera o SDK escolher o join como último evento antes de afirmar a ausência de prévia.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while latest_timestamp(&room).is_none() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("join como último evento em até 5 s");
+
+        assert!(summarize(&room).await.latest.is_none());
     }
 
     #[tokio::test]
