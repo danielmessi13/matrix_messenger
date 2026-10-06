@@ -11,6 +11,7 @@ class RoomListCollapsed extends StatelessWidget {
     required this.state,
     required this.onSelect,
     required this.onToggle,
+    this.compactHeader,
   });
 
   final RoomListState state;
@@ -19,20 +20,25 @@ class RoomListCollapsed extends StatelessWidget {
 
   final VoidCallback onToggle;
 
+  final Widget? compactHeader;
+
   @override
   Widget build(BuildContext context) {
     final rooms = state.loaded && state.syncState != SyncState.unsupported
         ? state.visibleRooms
         : const [];
+    final header = compactHeader;
+    final offset = header == null ? 0 : 1;
     return Column(
       children: [
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 20),
-            itemCount: rooms.length,
+            itemCount: rooms.length + offset,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final room = rooms[index];
+              if (header != null && index == 0) return Center(child: header);
+              final room = rooms[index - offset];
               return Center(
                 child: RoomAvatarTile(
                   room: room,

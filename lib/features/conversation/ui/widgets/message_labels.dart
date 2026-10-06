@@ -47,6 +47,17 @@ String readByLabel(List<String> names) {
   return '✓✓ Lida por $joined';
 }
 
+String typingLabel(List<String> names) {
+  final first = names.map(_firstName).toList();
+  return switch (first) {
+    [] => '',
+    [final one] => '$one está digitando…',
+    [final a, final b] => '$a e $b estão digitando…',
+    [final a, final b, final c] => '$a, $b e $c estão digitando…',
+    _ => 'Várias pessoas estão digitando…',
+  };
+}
+
 String repliesLabel(int count) =>
     '$count ${count == 1 ? 'resposta' : 'respostas'}';
 
@@ -104,3 +115,12 @@ String? kindPlaceholder(MessageKind kind) => switch (kind) {
   MessageKind.redacted => 'Mensagem apagada',
   MessageKind.other => 'Mensagem de um tipo não suportado',
 };
+
+String reactionTooltip(MessageReaction reaction) {
+  final names = [...reaction.senderNames, if (reaction.reactedByMe) 'você'];
+  if (names.length > 10) {
+    return '${names[0]}, ${names[1]} e mais ${names.length - 2}';
+  }
+  if (names.length == 1) return names.single;
+  return '${names.sublist(0, names.length - 1).join(', ')} e ${names.last}';
+}

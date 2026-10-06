@@ -13,18 +13,27 @@ class FakeConversation implements Conversation {
 
   int listens = 0;
 
-  Result<bool> loadOlderResult = const Result.ok(false);
+  final typingNames = StreamController<List<String>>.broadcast();
+  final typingSent = <bool>[];
+
+  // Chega ao início por padrão, para a tela não pedir páginas sem fim.
+  Result<bool> loadOlderResult = const Result.ok(true);
   Completer<void>? loadOlderCompleter;
   int loadOlderCalls = 0;
   Result<void> sendResult = const Result.ok(null);
   final sent = <String>[];
   final sentReplies = <(String, String)>[];
+  final sentImages = <(String, String?)>[];
+  Result<void> sendImageResult = const Result.ok(null);
+  Completer<void>? sendImageCompleter;
   // Simula o snapshot que a paginação traria.
   void Function()? onLoadOlder;
   final retried = <String>[];
   final cancelled = <String>[];
+  final reacted = <(String, String)>[];
   Result<void> retryResult = const Result.ok(null);
   Result<void> cancelResult = const Result.ok(null);
+  Result<void> reactResult = const Result.ok(null);
   int markAsReadCalls = 0;
   Result<Conversation>? threadResult;
   final openedThreads = <String>[];
@@ -54,6 +63,13 @@ class FakeConversation implements Conversation {
   }
 
   @override
+  Future<Result<void>> sendImage(String path, {String? inReplyTo}) async {
+    sentImages.add((path, inReplyTo));
+    await sendImageCompleter?.future;
+    return sendImageResult;
+  }
+
+  @override
   Future<Result<void>> retry(String messageId) async {
     retried.add(messageId);
     return retryResult;
@@ -66,7 +82,19 @@ class FakeConversation implements Conversation {
   }
 
   @override
+  Future<Result<void>> toggleReaction(String messageId, String key) async {
+    reacted.add((messageId, key));
+    return reactResult;
+  }
+
+  @override
   Future<void> markAsRead() async => markAsReadCalls++;
+
+  @override
+  Stream<List<String>> get typing => typingNames.stream;
+
+  @override
+  Future<void> setTyping(bool typing) async => typingSent.add(typing);
 
   @override
   Future<Result<Conversation>> openThread(String rootEventId) async {
@@ -78,6 +106,7 @@ class FakeConversation implements Conversation {
   void dispose() {
     isDisposed = true;
     snapshots.close();
+    typingNames.close();
   }
 }
 

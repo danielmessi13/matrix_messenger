@@ -25,6 +25,7 @@ void main() {
         username: _username,
         password: _password,
         dataDir: dataDir.path,
+        keepSignedIn: true,
       );
       addTearDown(client.dispose);
 

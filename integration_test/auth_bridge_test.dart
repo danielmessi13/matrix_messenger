@@ -35,6 +35,7 @@ void main() {
         username: 'alice',
         password: 'senha',
         dataDir: dataDir.path,
+        keepSignedIn: true,
       ),
       throwsA(
         isA<AuthError>().having(
@@ -51,6 +52,7 @@ void main() {
       OidcLogin.start(
         homeserver: 'isto não é um servidor',
         dataDir: dataDir.path,
+        keepSignedIn: true,
       ),
       throwsA(
         isA<AuthError>().having(

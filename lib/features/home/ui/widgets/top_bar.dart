@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme.dart';
 
 class TopBar extends StatelessWidget {
-  const TopBar({super.key, required this.searchField, required this.userMenu});
+  const TopBar({
+    super.key,
+    required this.newRoomButton,
+    required this.searchField,
+    required this.userMenu,
+  });
+
+  final Widget newRoomButton;
 
   final Widget searchField;
 
@@ -31,6 +38,8 @@ class TopBar extends StatelessWidget {
               color: colors.textPrimary,
             ),
           ),
+          const SizedBox(width: 24),
+          newRoomButton,
           const SizedBox(width: 24),
           Expanded(
             child: Center(

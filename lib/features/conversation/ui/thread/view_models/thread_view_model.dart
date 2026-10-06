@@ -129,6 +129,9 @@ class ThreadViewModel extends Cubit<ThreadState> {
   Future<bool> cancel(String messageId) async =>
       await _thread?.cancel(messageId) is Ok;
 
+  Future<bool> toggleReaction(String messageId, String key) async =>
+      await _thread?.toggleReaction(messageId, key) is Ok;
+
   void _onUpdatesFailed(String reason, Object? error) {
     log('Atualizações da thread: $reason', name: 'conversation', error: error);
     if (_closing || isClosed || state.status != ThreadStatus.loading) return;

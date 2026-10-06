@@ -11,6 +11,7 @@ abstract interface class AuthRepository {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   });
 
   /// Motivo da última saída que o usuário não pediu (ex.: sessão revogada em outro cliente).
@@ -19,6 +20,7 @@ abstract interface class AuthRepository {
   Future<Result<UserSession>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   });
 
   Future<void> cancelBrowserLogin();

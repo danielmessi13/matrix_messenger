@@ -227,7 +227,7 @@ class _RepliesState extends State<_Replies> with FocusFlash<_Replies> {
                             onPressed: viewModel.loadOlder,
                             child: const Text('Carregar respostas anteriores'),
                           ),
-                  for (final reply in state.replies)
+                  for (final (i, reply) in state.replies.indexed)
                     Padding(
                       key: keyFor(reply.id),
                       padding: const EdgeInsets.only(top: 12),
@@ -236,8 +236,13 @@ class _RepliesState extends State<_Replies> with FocusFlash<_Replies> {
                         child: MessageTile(
                           message: reply,
                           compact: true,
+                          followedByOwn:
+                              state.replies.elementAtOrNull(i + 1)?.isOwn ??
+                              false,
                           onRetry: () => viewModel.retry(reply.id),
                           onCancel: () => viewModel.cancel(reply.id),
+                          onReact: (key) =>
+                              viewModel.toggleReaction(reply.id, key),
                           onReply: () => viewModel.startReply(reply),
                           onQuoteTap: _onQuoteTap,
                         ),

@@ -4,13 +4,17 @@ import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 class FakeRoomTimeline implements RoomTimeline {
   final snapshots = StreamController<TimelineSnapshot>.broadcast();
+  final typingNames = StreamController<List<String>>.broadcast();
+  final typingSent = <bool>[];
 
   bool reachedStartOnPaginate = false;
   int paginateCalls = 0;
   final sentBodies = <String>[];
   final replies = <(String, String)>[];
+  final images = <(String, String?)>[];
   final retried = <String>[];
   final cancelled = <String>[];
+  final reactions = <(String, String)>[];
   int markAsReadCalls = 0;
   final openedThreads = <String>[];
   RoomTimeline? thread;
@@ -45,13 +49,37 @@ class FakeRoomTimeline implements RoomTimeline {
   }
 
   @override
+  Future<void> sendImage({required String path, String? inReplyTo}) async {
+    _throwIfError();
+    images.add((path, inReplyTo));
+  }
+
+  @override
   Future<void> retry({required String itemId}) async => retried.add(itemId);
 
   @override
   Future<void> cancel({required String itemId}) async => cancelled.add(itemId);
 
   @override
+  Future<void> toggleReaction({
+    required String itemId,
+    required String key,
+  }) async {
+    _throwIfError();
+    reactions.add((itemId, key));
+  }
+
+  @override
   Future<void> markAsRead() async => markAsReadCalls++;
+
+  @override
+  Stream<List<String>> watchTyping() => typingNames.stream;
+
+  @override
+  Future<void> setTyping({required bool typing}) async {
+    _throwIfError();
+    typingSent.add(typing);
+  }
 
   @override
   Future<RoomTimeline> openThread({required String rootEventId}) async {
@@ -64,6 +92,7 @@ class FakeRoomTimeline implements RoomTimeline {
   void dispose() {
     isDisposed = true;
     snapshots.close();
+    typingNames.close();
   }
 
   void _throwIfError() {

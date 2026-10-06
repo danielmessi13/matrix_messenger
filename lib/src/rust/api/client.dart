@@ -5,12 +5,15 @@
 
 import '../frb_generated.dart';
 import 'auth.dart';
+import 'media.dart';
 import 'notifications.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'recovery.dart';
 import 'rooms.dart';
+import 'search.dart';
+import 'threads.dart';
 import 'timeline.dart';
 
 // These functions are ignored because they are not marked as `pub`: `find_room`, `forget`, `new`, `new`, `run_blocking`, `save_on_refresh`, `save_tokens`, `stored`, `watch_action`, `watch_session`
@@ -21,20 +24,36 @@ import 'timeline.dart';
 abstract class MatrixClient implements RustOpaqueInterface {
   Future<void> acceptInvite({required String roomId});
 
+  Future<bool> canInvite({required String roomId});
+
+  Future<UserCheck> checkUser({required String userId});
+
+  Future<CreatedRoom> createRoom({required NewRoom room});
+
   Future<void> declineInvite({required String roomId});
 
   String get deviceId;
+
+  Future<void> inviteUser({required String roomId, required String userId});
+
+  Future<String> joinRoom({required String target});
+
+  Future<void> leaveRoom({required String roomId});
+
+  Future<Uint8List> loadMedia({required String media, required bool thumbnail});
 
   static Future<MatrixClient> login({
     required String homeserver,
     required String username,
     required String password,
     required String dataDir,
+    required bool keepSignedIn,
   }) => RustLib.instance.api.crateApiClientMatrixClientLogin(
     homeserver: homeserver,
     username: username,
     password: password,
     dataDir: dataDir,
+    keepSignedIn: keepSignedIn,
   );
 
   Future<void> logout();
@@ -48,13 +67,26 @@ abstract class MatrixClient implements RustOpaqueInterface {
         dataDir: dataDir,
       );
 
+  Future<void> retryRecentThreads();
+
+  Future<String?> roomLink({required String roomId});
+
+  Future<MessageSearchPage> searchMessages({
+    required String term,
+    String? nextBatch,
+  });
+
   Stream<SessionEvent> sessionEvents();
 
   bool get sessionSaved;
 
+  Future<String> setupRecovery();
+
   String get userId;
 
   Stream<RoomNotification> watchNotifications();
+
+  Stream<RecentThreadsSnapshot> watchRecentThreads();
 
   Stream<RecoveryStatus> watchRecovery();
 

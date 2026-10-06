@@ -5,10 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/services/image_file_picker.dart';
 import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/room.dart';
+import '../../../rooms/domain/models/thread_request.dart';
 import '../../../rooms/ui/invite/view_models/invite_view_model.dart';
 import '../../../rooms/ui/invite/widgets/invite_actions.dart';
+import '../../../rooms/ui/room_list/view_models/message_search_state.dart';
 import '../../../rooms/ui/room_list/widgets/room_labels.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../domain/models/timeline_item.dart';
@@ -28,16 +31,29 @@ class ConversationPane extends StatelessWidget {
   const ConversationPane({
     super.key,
     required this.room,
+    required this.ownUserId,
     required this.now,
+    this.focus,
+    this.threadRequest,
     this.onThreadOpenChanged,
+    this.onOpenThreadChanged,
   });
 
   final Room? room;
 
+  final String ownUserId;
+
   final DateTime now;
+
+  final EventFocus? focus;
+
+  final ThreadRequest? threadRequest;
 
   // A home recolhe a lista de salas para a thread caber ao lado.
   final ValueChanged<bool>? onThreadOpenChanged;
+
+  // A lista de threads recentes destaca a thread aberta.
+  final ValueChanged<String?>? onOpenThreadChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +71,7 @@ class ConversationPane extends StatelessWidget {
         ),
         Room(isInvite: true) => Column(
           children: [
-            ConversationHeader(room: room),
+            ConversationHeader(room: room, ownUserId: ownUserId),
             Expanded(
               child: Center(
                 child: BlocProvider(
@@ -74,9 +90,22 @@ class ConversationPane extends StatelessWidget {
             context.read<ConversationRepository>(),
             room.id,
           )..open(),
-          child: _ThreadVisibility(
-            onChanged: onThreadOpenChanged,
-            child: _Conversation(room: room, now: now),
+          child: _FocusOnEvent(
+            focus: focus,
+            child: _ThreadVisibility(
+              onChanged: onThreadOpenChanged,
+              onThreadChanged: onOpenThreadChanged,
+              child: _ThreadRequestListener(
+                request: threadRequest?.roomId == room.id
+                    ? threadRequest
+                    : null,
+                child: _Conversation(
+                  room: room,
+                  ownUserId: ownUserId,
+                  now: now,
+                ),
+              ),
+            ),
           ),
         ),
       },
@@ -91,10 +120,84 @@ class ConversationPane extends StatelessWidget {
   );
 }
 
+class _FocusOnEvent extends StatefulWidget {
+  const _FocusOnEvent({required this.focus, required this.child});
+
+  final EventFocus? focus;
+
+  final Widget child;
+
+  @override
+  State<_FocusOnEvent> createState() => _FocusOnEventState();
+}
+
+class _FocusOnEventState extends State<_FocusOnEvent> {
+  @override
+  void initState() {
+    super.initState();
+    _focus();
+  }
+
+  @override
+  void didUpdateWidget(_FocusOnEvent old) {
+    super.didUpdateWidget(old);
+    if (widget.focus != old.focus) _focus();
+  }
+
+  void _focus() {
+    final eventId = widget.focus?.eventId;
+    if (eventId != null) {
+      context.read<ConversationViewModel>().focusEvent(eventId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+class _ThreadRequestListener extends StatefulWidget {
+  const _ThreadRequestListener({required this.request, required this.child});
+
+  final ThreadRequest? request;
+
+  final Widget child;
+
+  @override
+  State<_ThreadRequestListener> createState() => _ThreadRequestListenerState();
+}
+
+class _ThreadRequestListenerState extends State<_ThreadRequestListener> {
+  @override
+  void initState() {
+    super.initState();
+    _open(widget.request);
+  }
+
+  @override
+  void didUpdateWidget(_ThreadRequestListener old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.request, widget.request)) _open(widget.request);
+  }
+
+  void _open(ThreadRequest? request) {
+    if (request == null) return;
+    context.read<ConversationViewModel>().openThread(request.rootEventId);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _ThreadVisibility extends StatefulWidget {
-  const _ThreadVisibility({required this.onChanged, required this.child});
+  const _ThreadVisibility({
+    required this.onChanged,
+    required this.onThreadChanged,
+    required this.child,
+  });
 
   final ValueChanged<bool>? onChanged;
+
+  final ValueChanged<String?>? onThreadChanged;
 
   final Widget child;
 
@@ -108,9 +211,13 @@ class _ThreadVisibilityState extends State<_ThreadVisibility> {
   @override
   void dispose() {
     final onChanged = widget.onChanged;
+    final onThreadChanged = widget.onThreadChanged;
     // Trocar de sala com a thread aberta também a fecha; avisa fora da desmontagem.
-    if (_open && onChanged != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(false));
+    if (_open) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onChanged?.call(false);
+        onThreadChanged?.call(null);
+      });
     }
     super.dispose();
   }
@@ -118,20 +225,27 @@ class _ThreadVisibilityState extends State<_ThreadVisibility> {
   @override
   Widget build(BuildContext context) =>
       BlocListener<ConversationViewModel, ConversationState>(
-        listenWhen: (a, b) =>
-            (a.openThreadId == null) != (b.openThreadId == null),
+        listenWhen: (a, b) => a.openThreadId != b.openThreadId,
         listener: (context, state) {
-          _open = state.openThreadId != null;
-          widget.onChanged?.call(_open);
+          final open = state.openThreadId != null;
+          if (open != _open) widget.onChanged?.call(open);
+          _open = open;
+          widget.onThreadChanged?.call(state.openThreadId);
         },
         child: widget.child,
       );
 }
 
 class _Conversation extends StatelessWidget {
-  const _Conversation({required this.room, required this.now});
+  const _Conversation({
+    required this.room,
+    required this.ownUserId,
+    required this.now,
+  });
 
   final Room room;
+
+  final String ownUserId;
 
   final DateTime now;
 
@@ -141,7 +255,7 @@ class _Conversation extends StatelessWidget {
     final colors = context.colors;
     final conversation = Column(
       children: [
-        ConversationHeader(room: room),
+        ConversationHeader(room: room, ownUserId: ownUserId),
         Expanded(
           child: BlocBuilder<ConversationViewModel, ConversationState>(
             builder: (context, state) => switch (state.status) {
@@ -175,10 +289,24 @@ class _Conversation extends StatelessWidget {
             },
           ),
         ),
-        BlocBuilder<ConversationViewModel, ConversationState>(
+        BlocConsumer<ConversationViewModel, ConversationState>(
+          listenWhen: (a, b) => a.imageSend != b.imageSend,
+          listener: (context, state) {
+            final message = switch (state.imageSend) {
+              ImageSendStatus.invalid =>
+                'O arquivo não é uma imagem PNG, JPEG, GIF ou WebP.',
+              ImageSendStatus.failed => 'Não foi possível enviar a imagem.',
+              ImageSendStatus.idle || ImageSendStatus.sending => null,
+            };
+            if (message == null) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(message)));
+          },
           buildWhen: (a, b) =>
               a.status != b.status ||
               a.replyTo != b.replyTo ||
+              a.imageSend != b.imageSend ||
               (a.openThreadId == null) != (b.openThreadId == null),
           builder: (context, state) => MessageInput(
             placeholder: composerHint(
@@ -190,6 +318,10 @@ class _Conversation extends StatelessWidget {
             enabled: state.status == ConversationStatus.ready,
             covered: state.openThreadId != null,
             onSend: viewModel.send,
+            onChanged: viewModel.onDraftChanged,
+            onAttachImage: () => _attachImage(context, viewModel),
+            attaching: state.imageSend == ImageSendStatus.sending,
+            status: const _TypingLine(),
           ),
         ),
       ],
@@ -253,6 +385,54 @@ class _Conversation extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+Future<void> _attachImage(
+  BuildContext context,
+  ConversationViewModel viewModel,
+) async {
+  final path = await context.read<ImageFilePicker>().pickImage();
+  if (path != null) await viewModel.sendImage(path);
+}
+
+// Altura fixa: aparecer e sumir não empurra a timeline.
+class _TypingLine extends StatelessWidget {
+  const _TypingLine();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SizedBox(
+      height: 24,
+      child: BlocSelector<ConversationViewModel, ConversationState, String>(
+        selector: (state) => typingLabel(state.typing),
+        builder: (context, label) => AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          layoutBuilder: (current, previous) => Stack(
+            alignment: Alignment.centerLeft,
+            children: [...previous, ?current],
+          ),
+          child: label.isEmpty
+              ? const SizedBox.shrink()
+              : Padding(
+                  key: const Key('typing_indicator'),
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppFonts.serif,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 14,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ),
+        ),
       ),
     );
   }

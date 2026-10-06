@@ -8,7 +8,7 @@ import '../../../domain/models/timeline_item.dart';
 const searchPages = 3;
 
 // As páginas novas chegam pelo stream depois do loadOlder, com a janela de 100 ms da ponte.
-const _snapshotWait = Duration(seconds: 1);
+const kSnapshotWait = Duration(seconds: 1);
 
 final class FocusRequest extends Equatable {
   const FocusRequest(this.messageId, this.seq);
@@ -43,7 +43,7 @@ Future<String?> searchMessage<S>(
     final before = items(state);
     final next = cubit.stream
         .firstWhere((s) => !identical(items(s), before))
-        .timeout(_snapshotWait, onTimeout: () => cubit.state)
+        .timeout(kSnapshotWait, onTimeout: () => cubit.state)
         .then((s) => s, onError: (Object _) => cubit.state);
     await loadOlder();
     await next;

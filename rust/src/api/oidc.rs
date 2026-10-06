@@ -45,6 +45,7 @@ struct PendingLogin {
     data_dir: String,
     store_name: String,
     passphrase: String,
+    keep_signed_in: bool,
 }
 
 impl Drop for OidcLogin {
@@ -60,7 +61,11 @@ impl Drop for OidcLogin {
 }
 
 impl OidcLogin {
-    pub async fn start(homeserver: String, data_dir: String) -> Result<OidcLogin, AuthError> {
+    pub async fn start(
+        homeserver: String,
+        data_dir: String,
+        keep_signed_in: bool,
+    ) -> Result<OidcLogin, AuthError> {
         let passphrase = session_store::new_passphrase().map_err(AuthError::storage)?;
         let store_name = session_store::unique_store_name();
         let store_path = session_store::stores_dir(&data_dir).join(&store_name);
@@ -84,6 +89,7 @@ impl OidcLogin {
                 data_dir,
                 store_name,
                 passphrase,
+                keep_signed_in,
             })),
             runtime: Handle::current(),
         })
@@ -129,6 +135,7 @@ impl OidcLogin {
                     pending.data_dir,
                     pending.store_name,
                     pending.passphrase,
+                    pending.keep_signed_in,
                 )
                 .await
             }
@@ -200,7 +207,8 @@ mod tests {
     async fn start_with_malformed_homeserver_fails_without_leftovers() {
         let data_dir = temp_data_dir("oidc_malformed");
 
-        let result = OidcLogin::start("isto não é um servidor".into(), data_dir.clone()).await;
+        let result =
+            OidcLogin::start("isto não é um servidor".into(), data_dir.clone(), true).await;
 
         assert_eq!(
             result.err().map(|e| e.kind),
@@ -224,6 +232,7 @@ mod tests {
                 data_dir: data_dir.clone(),
                 store_name,
                 passphrase: "segredo".into(),
+                keep_signed_in: true,
             })),
             runtime: Handle::current(),
         };
@@ -244,7 +253,7 @@ mod tests {
     async fn oidc_start_and_cancel_against_matrix_org() {
         let data_dir = temp_data_dir("oidc_cancel");
 
-        let login = OidcLogin::start("matrix.org".into(), data_dir.clone())
+        let login = OidcLogin::start("matrix.org".into(), data_dir.clone(), true)
             .await
             .unwrap_or_else(|e| panic!("start falhou: {:?} - {}", e.kind, e.message));
         let url = Url::parse(&login.authorization_url()).unwrap();
@@ -275,7 +284,7 @@ mod tests {
     async fn oidc_full_flow_interactive() {
         let data_dir = temp_data_dir("oidc_interactive");
 
-        let login = OidcLogin::start("matrix.org".into(), data_dir.clone())
+        let login = OidcLogin::start("matrix.org".into(), data_dir.clone(), true)
             .await
             .unwrap();
         println!("\nAbra no navegador:\n{}\n", login.authorization_url());

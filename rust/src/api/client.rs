@@ -12,7 +12,9 @@ use tokio::{
 };
 
 use crate::{
+    api::rooms::SyncStatus,
     frb_generated::StreamSink,
+    recent_threads::RecentThreads,
     notifications::Notifier,
     room_list::{RoomSync, RoomSyncStopper},
     session_store::{self, SavedAuth, StoredSession},
@@ -29,6 +31,7 @@ type EventSink = Arc<Mutex<Option<StreamSink<SessionEvent>>>>;
 pub struct MatrixClient {
     pub(crate) client: ManuallyDrop<Client>,
     pub(crate) rooms: ManuallyDrop<RoomSync>,
+    pub(crate) recent_threads: ManuallyDrop<RecentThreads>,
     pub(crate) runtime: Handle,
     pub(crate) thread_reads: ThreadReads,
     pub(crate) notifier: Notifier,
@@ -42,8 +45,9 @@ impl Drop for MatrixClient {
     fn drop(&mut self) {
         self.session_watcher.abort();
         let _guard = self.runtime.enter();
-        // SAFETY: `rooms` e `client` não são mais acessados depois daqui; o próprio `MatrixClient` está sendo destruído.
+        // SAFETY: `recent_threads`, `rooms` e `client` não são mais acessados depois daqui; o próprio `MatrixClient` está sendo destruído.
         unsafe {
+            ManuallyDrop::drop(&mut self.recent_threads);
             ManuallyDrop::drop(&mut self.rooms);
             ManuallyDrop::drop(&mut self.client);
         }
@@ -92,7 +96,11 @@ impl MatrixClient {
         &self.rooms
     }
 
-    pub(crate) fn new(client: Client, data_dir: String, saved_session: Option<StoredSession>) -> Self {
+    pub(crate) fn new(
+        client: Client,
+        data_dir: String,
+        saved_session: Option<StoredSession>,
+    ) -> Self {
         let vault = saved_session.map(|stored| Arc::new(Vault::new(data_dir, stored)));
         if let Some(vault) = &vault {
             save_on_refresh(&client, vault.clone());
@@ -101,7 +109,23 @@ impl MatrixClient {
         // Inscrito aqui, e não dentro da task, para não perder um evento antes de ela rodar.
         let changes = client.subscribe_to_session_changes();
         let thread_reads = ThreadReads::default();
-        let rooms = RoomSync::new(client.clone(), thread_reads.clone(), Handle::current());
+        let rooms = RoomSync::new(client.clone(), Handle::current());
+        let recent_threads = RecentThreads::new(client.clone(), Handle::current());
+        let loader = recent_threads.loader();
+        // Uma busca por sessão, quando o primeiro sync termina e as salas já têm recency_stamp.
+        rooms.on_first_running({
+            let loader = loader.clone();
+            move || loader.load()
+        });
+        rooms.watch_status(move |status| {
+            if matches!(
+                status,
+                SyncStatus::Offline | SyncStatus::Error | SyncStatus::Unsupported
+            ) {
+                loader.sync_unavailable();
+            }
+            true
+        });
         let session_watcher = tokio::spawn(watch_session(
             changes,
             vault.clone(),
@@ -112,6 +136,7 @@ impl MatrixClient {
         Self {
             client: ManuallyDrop::new(client),
             rooms: ManuallyDrop::new(rooms),
+            recent_threads: ManuallyDrop::new(recent_threads),
             runtime: Handle::current(),
             thread_reads,
             notifier: Notifier::default(),

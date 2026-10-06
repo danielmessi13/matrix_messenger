@@ -6,27 +6,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/core/services/system_notifications.dart';
 import 'package:matrix_messenger/core/ui/animated_pane.dart';
+import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/focus_flash.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/thread_panel.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
 import 'package:matrix_messenger/features/notifications/data/repositories/notification_repository.dart';
 import 'package:matrix_messenger/features/notifications/domain/models/room_notification.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
+import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/failed_invite.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room_action_failure.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/widgets/room_list_pane.dart';
+import 'package:matrix_messenger/features/threads/domain/models/recent_thread.dart';
+import 'package:matrix_messenger/features/threads/ui/view_models/recent_threads_view_model.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_recent_threads_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_notification_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../testing/fakes/services/fake_system_notifications.dart';
 import '../../../../../testing/models/message.dart';
+import '../../../../../testing/models/recent_thread.dart';
 import '../../../../../testing/models/room.dart';
 import '../../../../../testing/models/user_session.dart';
 
@@ -35,6 +47,7 @@ void main() {
   late FakeRoomRepository roomRepository;
   late FakeRecoveryRepository recoveryRepository;
   late FakeConversationRepository conversationRepository;
+  late FakeRecentThreadsRepository recentThreadsRepository;
   late FakeNotificationRepository notificationRepository;
   late FakeSystemNotifications systemNotifications;
 
@@ -43,6 +56,7 @@ void main() {
     roomRepository = FakeRoomRepository();
     recoveryRepository = FakeRecoveryRepository();
     conversationRepository = FakeConversationRepository();
+    recentThreadsRepository = FakeRecentThreadsRepository();
     notificationRepository = FakeNotificationRepository();
     systemNotifications = FakeSystemNotifications();
   });
@@ -51,6 +65,7 @@ void main() {
     await authRepository.dispose();
     await roomRepository.dispose();
     await recoveryRepository.dispose();
+    await recentThreadsRepository.dispose();
     await notificationRepository.dispose();
   });
 
@@ -63,11 +78,16 @@ void main() {
     final viewModel = HomeViewModel(session);
     final roomListViewModel = RoomListViewModel(roomRepository)..init();
     addTearDown(viewModel.close);
+    final recentThreadsViewModel = RecentThreadsViewModel(
+      recentThreadsRepository,
+    )..init();
     addTearDown(roomListViewModel.close);
+    addTearDown(recentThreadsViewModel.close);
     await tester.pumpWidget(
       MultiRepositoryProvider(
         providers: [
           RepositoryProvider<AuthRepository>.value(value: authRepository),
+          RepositoryProvider<RoomRepository>.value(value: roomRepository),
           RepositoryProvider<RecoveryRepository>.value(
             value: recoveryRepository,
           ),
@@ -86,6 +106,7 @@ void main() {
           home: HomeScreen(
             viewModel: viewModel,
             roomListViewModel: roomListViewModel,
+            recentThreadsViewModel: recentThreadsViewModel,
             clock: () => kNow,
           ),
         ),
@@ -130,16 +151,125 @@ void main() {
     expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
   });
 
-  testWidgets('busca filtra pelo nome', (tester) async {
+  Future<void> showThreads(WidgetTester tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+    recentThreadsRepository.controller.add(
+      RecentThreads(status: RecentThreadsStatus.ready, threads: [kTeamThread]),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('filter_threads')));
+    await tester.pumpAndSettle();
+  }
+
+  final teamThreadKey = Key(
+    'thread_${kTeamThread.roomId}_${kTeamThread.rootEventId}',
+  );
+
+  testWidgets('filtro Threads troca a lista de salas pelas threads recentes', (
+    tester,
+  ) async {
+    await showThreads(tester);
+
+    expect(find.text('Threads recentes'), findsOneWidget);
+    expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('filter_inbox')));
+    await tester.pumpAndSettle();
+    expect(find.text('Threads recentes'), findsNothing);
+    expect(find.byKey(Key('room_${kTeamRoom.id}')), findsOneWidget);
+  });
+
+  testWidgets('clicar numa thread abre a sala com o painel da thread', (
+    tester,
+  ) async {
+    await showThreads(tester);
+
+    await tester.tap(find.byKey(teamThreadKey));
+    // Sem pumpAndSettle: a conversa sem snapshot mantém um indicador animando.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('#lançamento-q4'), findsWidgets);
+    expect(find.byType(ThreadPanel), findsOneWidget);
+  });
+
+  testWidgets('voltar à sala por selectRoom não reabre a thread antiga', (
+    tester,
+  ) async {
+    await showThreads(tester);
+    await tester.tap(find.byKey(teamThreadKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(conversationRepository.conversation.openedThreads, [
+      kTeamThread.rootEventId,
+    ]);
+
+    await tester.tap(find.byKey(const Key('filter_inbox')));
+    await tester.pump(const Duration(milliseconds: 500));
+    // Com a thread aberta a lista está recolhida: só os avatares.
+    await tester.tap(find.byKey(Key('room_avatar_${kDirectRoom.id}')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(Key('room_avatar_${kTeamRoom.id}')));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(conversationRepository.conversation.openedThreads, [
+      kTeamThread.rootEventId,
+    ]);
+  });
+
+  testWidgets('busca com o filtro Threads não esconde as threads', (
+    tester,
+  ) async {
+    await showThreads(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'zzz');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(teamThreadKey), findsOneWidget);
+  });
+
+  testWidgets('busca no servidor e o resultado abre a sala focada', (
+    tester,
+  ) async {
+    roomRepository.searchResult = Result.ok(
+      MessageSearchPage(
+        hits: [
+          MessageHit(
+            roomId: kTeamRoom.id,
+            roomName: kTeamRoom.name,
+            eventId: kOtherMessage.eventId!,
+            senderName: kOtherMessage.senderName,
+            body: 'A integração com o gateway novo ficou pronta.',
+            timestamp: kOtherMessage.timestamp,
+          ),
+        ],
+      ),
+    );
     await pumpScreen(tester);
     await showRooms(tester);
 
-    await tester.enterText(find.byKey(const Key('room_search')), 'design');
+    await tester.enterText(find.byKey(const Key('room_search')), 'gateway');
+    await tester.pump(kMessageSearchDebounce);
     await tester.pump();
 
-    expect(find.byKey(Key('room_${kQuietRoom.id}')), findsOneWidget);
+    expect(roomRepository.searches, [('gateway', null)]);
     expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
-    expect(find.text('Resultados'), findsOneWidget);
+    final hit = find.byKey(Key('message_hit_${kOtherMessage.eventId}'));
+    expect(hit, findsOneWidget);
+
+    await tester.tap(hit);
+    await tester.pump();
+    conversationRepository.conversation.snapshots.add(kSnapshot);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('conversation_title')), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) => w is MessageHighlight && w.flashing),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 2));
   });
 
   const desktopPlatforms = TargetPlatformVariant({
@@ -157,6 +287,219 @@ void main() {
       defaultTargetPlatform == TargetPlatform.macOS
       ? LogicalKeyboardKey.controlLeft
       : LogicalKeyboardKey.metaLeft;
+
+  Future<void> createRoom(WidgetTester tester) async {
+    await tester.enterText(find.byKey(const Key('new_room_name')), 'Plantão');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('new_room_submit')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('botão abre o diálogo e a sala criada abre ao chegar', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('new_room_dialog')), findsOneWidget);
+
+    await createRoom(tester);
+    expect(find.byKey(const Key('new_room_dialog')), findsNothing);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
+
+    await showRooms(tester, [
+      ...kRooms,
+      const Room(id: '!nova:b.c', name: 'Plantão'),
+    ]);
+    await tester.pump();
+    expect(find.text('#Plantão'), findsOneWidget);
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('entrar pela aba abre a sala quando ela chega, sem banner', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new_room_tab_join')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('join_room_target')),
+      '#aberta:b.c',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('join_room_submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('new_room_dialog')), findsNothing);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
+
+    await showRooms(tester, [
+      ...kRooms,
+      const Room(id: '!entrou:b.c', name: 'aberta', isPublic: true),
+    ]);
+    await tester.pump();
+    expect(find.text('#aberta'), findsOneWidget);
+    expect(find.byKey(const Key('copy_room_link')), findsOneWidget);
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('entrar numa sala em que já se está só abre a sala', (
+    tester,
+  ) async {
+    roomRepository.joinRoomResult = Result.ok(kTeamRoom.id);
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new_room_tab_join')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('join_room_target')),
+      kTeamRoom.id,
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('join_room_submit')));
+    // A conversa aberta tem animação contínua: pumpAndSettle não termina.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('#lançamento-q4'), findsOneWidget);
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('convites que falharam aparecem no banner e somem', (
+    tester,
+  ) async {
+    roomRepository.createRoomResult = const Result.ok(
+      CreatedRoom(
+        roomId: '!nova:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
+    );
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await createRoom(tester);
+
+    expect(find.byKey(const Key('failed_invites_banner')), findsOneWidget);
+    expect(
+      find.text('Sala criada, mas alguns convites não foram enviados'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('@joao:b.co'), findsOneWidget);
+    expect(find.textContaining('chave de recuperação'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('failed_invites_dismiss')));
+    await tester.pump();
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets(
+    'convite que falhou por sessão não verificada explica no banner',
+    (
+      tester,
+    ) async {
+      roomRepository.createRoomResult = const Result.ok(
+        CreatedRoom(
+          roomId: '!nova:b.c',
+          failedInvites: [
+            FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+            FailedInvite('@bia:b.co', RoomActionFailureType.unverifiedDevice),
+          ],
+        ),
+      );
+      await pumpScreen(tester);
+
+      await tester.tap(find.byKey(const Key('new_room_button')));
+      await tester.pumpAndSettle();
+      await createRoom(tester);
+
+      expect(find.textContaining('@joao:b.co, @bia:b.co'), findsOneWidget);
+      expect(
+        find.text(
+          'Para convidar com o histórico compartilhado, verifique esta sessão '
+          'com a chave de recuperação.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('nova criação sem falhas esconde o banner anterior', (
+    tester,
+  ) async {
+    roomRepository.createRoomResult = const Result.ok(
+      CreatedRoom(
+        roomId: '!nova:b.c',
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
+    );
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await createRoom(tester);
+    expect(find.byKey(const Key('failed_invites_banner')), findsOneWidget);
+
+    roomRepository.createRoomResult = const Result.ok(
+      CreatedRoom(roomId: '!outra:b.c', failedInvites: []),
+    );
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await createRoom(tester);
+
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('cancelar o diálogo não muda nada', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new_room_cancel')));
+    await tester.pumpAndSettle();
+
+    expect(roomRepository.createdRooms, isEmpty);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
+  });
+
+  Future<void> pressN(WidgetTester tester, LogicalKeyboardKey modifier) async {
+    await tester.sendKeyDownEvent(modifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+    await tester.sendKeyUpEvent(modifier);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('o atalho da plataforma abre o diálogo', (tester) async {
+    await pumpScreen(tester);
+
+    await pressN(tester, platformModifier());
+
+    expect(find.byKey(const Key('new_room_dialog')), findsOneWidget);
+  }, variant: desktopPlatforms);
+
+  testWidgets('o atalho da outra plataforma não abre o diálogo', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    await pressN(tester, otherModifier());
+
+    expect(find.byKey(const Key('new_room_dialog')), findsNothing);
+  }, variant: desktopPlatforms);
 
   Future<void> pressK(WidgetTester tester, LogicalKeyboardKey modifier) async {
     await tester.sendKeyDownEvent(modifier);
@@ -276,19 +619,41 @@ void main() {
   });
 
   testWidgets(
-    'mostra o banner de recuperação quando o backup está incompleto',
+    'mostra o cartão de recuperação quando o backup está incompleto',
     (
       tester,
     ) async {
       await pumpScreen(tester);
-      expect(find.byKey(const Key('recovery_banner')), findsNothing);
+      expect(find.byKey(const Key('recovery_card')), findsNothing);
 
       recoveryRepository.statusController.add(RecoveryStatus.incomplete);
       await tester.pump();
 
-      expect(find.byKey(const Key('recovery_banner')), findsOneWidget);
+      expect(find.byKey(const Key('recovery_card')), findsOneWidget);
     },
   );
+
+  testWidgets('conta sem backup mostra o cartão de configurar', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    recoveryRepository.statusController.add(RecoveryStatus.disabled);
+    await tester.pump();
+
+    expect(find.text('Proteja suas mensagens'), findsOneWidget);
+  });
+
+  testWidgets('o cartão de recuperação continua com o filtro Threads', (
+    tester,
+  ) async {
+    await showThreads(tester);
+    recoveryRepository.statusController.add(RecoveryStatus.incomplete);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Threads recentes'), findsOneWidget);
+    expect(find.byKey(const Key('recovery_card')), findsOneWidget);
+  });
 
   double roomListWidth(WidgetTester tester) =>
       tester.getSize(find.byType(RoomListPane)).width;

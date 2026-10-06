@@ -5,26 +5,39 @@ import 'message_search.dart';
 
 enum ConversationStatus { opening, ready, failed }
 
+enum ImageSendStatus { idle, sending, failed, invalid }
+
 const _unset = Object();
 
 final class ConversationState extends Equatable {
   const ConversationState({
     this.status = ConversationStatus.opening,
     this.items = const [],
+    this.hiddenOlder = 0,
     this.reachedStart = false,
-    this.loadingOlder = false,
+    this.paginating = false,
+    this.olderFailed = false,
     this.openThreadId,
     this.replyTo,
     this.focusRequest,
+    this.typing = const [],
+    this.expandedEventGroups = const {},
+    this.imageSend = ImageSendStatus.idle,
   });
 
   final ConversationStatus status;
 
   final List<TimelineItem> items;
 
+  // Itens já entregues pelo SDK que ainda estão acima da janela.
+  final int hiddenOlder;
+
   final bool reachedStart;
 
-  final bool loadingOlder;
+  final bool paginating;
+
+  // Falha não se repete sozinha; só o botão pede de novo.
+  final bool olderFailed;
 
   final String? openThreadId;
 
@@ -32,20 +45,33 @@ final class ConversationState extends Equatable {
 
   final FocusRequest? focusRequest;
 
+  final List<String> typing;
+
+  final Set<String> expandedEventGroups;
+
+  final ImageSendStatus imageSend;
+
   // `openThreadId`/`replyTo: null` limpam; sem o argumento, mantêm.
   ConversationState copyWith({
     ConversationStatus? status,
     List<TimelineItem>? items,
+    int? hiddenOlder,
     bool? reachedStart,
-    bool? loadingOlder,
+    bool? paginating,
+    bool? olderFailed,
     Object? openThreadId = _unset,
     Object? replyTo = _unset,
     FocusRequest? focusRequest,
+    List<String>? typing,
+    Set<String>? expandedEventGroups,
+    ImageSendStatus? imageSend,
   }) => ConversationState(
     status: status ?? this.status,
     items: items ?? this.items,
+    hiddenOlder: hiddenOlder ?? this.hiddenOlder,
     reachedStart: reachedStart ?? this.reachedStart,
-    loadingOlder: loadingOlder ?? this.loadingOlder,
+    paginating: paginating ?? this.paginating,
+    olderFailed: olderFailed ?? this.olderFailed,
     openThreadId: identical(openThreadId, _unset)
         ? this.openThreadId
         : openThreadId as String?,
@@ -53,16 +79,24 @@ final class ConversationState extends Equatable {
         ? this.replyTo
         : replyTo as MessageItem?,
     focusRequest: focusRequest ?? this.focusRequest,
+    typing: typing ?? this.typing,
+    expandedEventGroups: expandedEventGroups ?? this.expandedEventGroups,
+    imageSend: imageSend ?? this.imageSend,
   );
 
   @override
   List<Object?> get props => [
     status,
     items,
+    hiddenOlder,
     reachedStart,
-    loadingOlder,
+    paginating,
+    olderFailed,
     openThreadId,
     replyTo,
     focusRequest,
+    typing,
+    expandedEventGroups,
+    imageSend,
   ];
 }

@@ -13,7 +13,8 @@ use matrix_sdk::{
     ruma::{
         api::FeatureFlag,
         events::{room::message::MessageType, AnySyncMessageLikeEvent, AnySyncTimelineEvent},
-        OwnedUserId,
+        serde::Raw,
+        UserId,
     },
     Client, Room, RoomDisplayName, RoomHeroWithProfile, RoomState,
 };
@@ -35,14 +36,16 @@ use tokio::{
 };
 
 use crate::api::rooms::{LatestMessage, LatestMessageKind, RoomSummary, SyncStatus};
-use crate::diff_window::{next_batch, next_batch_or};
-use crate::threads::{unread_by_thread, ThreadReads};
+use crate::diff_window::next_batch;
 
 // Um Running mais curto que isto antes de cair no Offline conta como falha persistente, não falta de rede.
 const MIN_STABLE_RUNNING: Duration = Duration::from_secs(5);
 
 // Sem paginação: a lista inteira atravessa a ponte.
 const PAGE_SIZE: usize = 100_000;
+
+// Com o padrão do SDK (1), mensagens que chegam juntas viram um buraco e ficam fora do "N novas".
+const ROOM_LIST_TIMELINE_LIMIT: u32 = 20;
 
 pub(crate) struct RoomSync {
     inner: Arc<Inner>,
@@ -56,7 +59,6 @@ pub(crate) struct RoomSyncStopper {
 
 struct Inner {
     client: Client,
-    reads: ThreadReads,
     service: OnceCell<Arc<SyncService>>,
     started: AtomicBool,
     stopped: AtomicBool,
@@ -65,12 +67,11 @@ struct Inner {
 }
 
 impl RoomSync {
-    pub(crate) fn new(client: Client, reads: ThreadReads, runtime: Handle) -> Self {
+    pub(crate) fn new(client: Client, runtime: Handle) -> Self {
         let (status, _) = watch::channel(SyncStatus::Connecting);
         Self {
             inner: Arc::new(Inner {
                 client,
-                reads,
                 service: OnceCell::new(),
                 started: AtomicBool::new(false),
                 stopped: AtomicBool::new(false),
@@ -85,13 +86,24 @@ impl RoomSync {
         let inner = self.inner.clone();
         let task = self.runtime.spawn(async move {
             if let Some(service) = inner.service().await {
-                if let Err(error) = run_room_list(&service, inner.reads.clone(), emit).await {
+                if let Err(error) = run_room_list(&service, emit).await {
                     log::warn!("lista de salas indisponível: {error}");
                     inner.status.send_replace(SyncStatus::Error);
                 }
             }
         });
         self.inner.track(task.abort_handle());
+    }
+
+    /// Roda `action` uma única vez, quando o primeiro sync termina.
+    pub(crate) fn on_first_running(&self, action: impl Fn() + Send + 'static) {
+        let done = AtomicBool::new(false);
+        self.watch_status(move |status| {
+            if status == SyncStatus::Running && !done.swap(true, Ordering::SeqCst) {
+                action();
+            }
+            true
+        });
     }
 
     pub(crate) fn watch_status(&self, mut emit: impl FnMut(SyncStatus) -> bool + Send + 'static) {
@@ -219,6 +231,7 @@ async fn build_service(
     Ok(Arc::new(
         SyncService::builder(client.clone())
             .with_offline_mode()
+            .with_room_list_timeline_limit(ROOM_LIST_TIMELINE_LIMIT)
             .build()
             .await?,
     ))
@@ -281,7 +294,6 @@ async fn supervise(service: Arc<SyncService>, inner: Arc<Inner>) {
 
 async fn run_room_list(
     service: &SyncService,
-    reads: ThreadReads,
     mut emit: impl FnMut(Vec<RoomSummary>) -> bool,
 ) -> Result<(), matrix_sdk_ui::room_list_service::Error> {
     let room_list = service.room_list_service().all_rooms().await?;
@@ -299,11 +311,8 @@ async fn run_room_list(
         Box::new(new_filter_deduplicate_versions()),
     ])));
     pin_mut!(stream);
-    // Inscrito antes da primeira lista; o aviso só recalcula depois dela, para não emitir lista vazia.
-    let mut changed = reads.subscribe();
     let mut rooms: Vector<RoomListItem> = Vector::new();
-    let mut more = next_batch(&mut stream, &mut rooms).await;
-    while more {
+    while next_batch(&mut stream, &mut rooms).await {
         let mut summaries = Vec::with_capacity(rooms.len());
         for item in rooms.iter() {
             summaries.push(summarize(item).await);
@@ -311,10 +320,6 @@ async fn run_room_list(
         if !emit(summaries) {
             return Ok(());
         }
-        more = next_batch_or(&mut stream, &mut rooms, async {
-            let _ = changed.recv().await;
-        })
-        .await;
     }
     Ok(())
 }
@@ -344,7 +349,6 @@ fn count(value: u64) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
 
-// Vazio quando a sala não tem nome nem outros membros; o Dart mostra o texto traduzido.
 pub(crate) async fn room_name(room: &Room) -> String {
     match room.display_name().await {
         Ok(RoomDisplayName::Named(name))
@@ -361,12 +365,9 @@ async fn summarize(room: &Room) -> RoomSummary {
         name: room_name(room).await,
         is_direct: room.is_dm(),
         is_invite: room.state() == RoomState::Invited,
+        is_public: room.is_public().unwrap_or(false),
         unread_messages: count(room.num_unread_messages()),
         unread_mentions: count(room.num_unread_mentions()),
-        unread_thread_replies: unread_by_thread(room)
-            .await
-            .values()
-            .fold(0, |sum: u32, count| sum.saturating_add(*count)),
         member_count: count(room.joined_members_count()),
         heroes: room.heroes().await.into_iter().map(hero_name).collect(),
         latest: latest_message(room).await,
@@ -387,6 +388,8 @@ async fn latest_message(room: &Room) -> Option<LatestMessage> {
     // Sem horário a UI mostraria 01/01; melhor não mostrar prévia.
     let timestamp_ms = i64::from(event.timestamp()?.0);
     let (kind, body) = match event.raw().deserialize() {
+        // Numa sala vazia o SDK escolhe o join do próprio usuário; isso não é mensagem.
+        Ok(AnySyncTimelineEvent::State(_)) => return None,
         Ok(parsed) => message_kind(&parsed),
         Err(_) => (LatestMessageKind::Other, None),
     };
@@ -399,7 +402,30 @@ async fn latest_message(room: &Room) -> Option<LatestMessage> {
     })
 }
 
-pub(crate) async fn sender_name(room: &Room, sender: &OwnedUserId) -> String {
+pub(crate) async fn message_from_raw(
+    room: &Room,
+    raw: &Raw<AnySyncTimelineEvent>,
+) -> Option<LatestMessage> {
+    let event = raw.deserialize().ok()?;
+    let sender = event.sender().to_owned();
+    let (kind, body) = message_kind(&event);
+    Some(LatestMessage {
+        sender_name: sender_name(room, &sender).await,
+        is_own: sender == room.own_user_id(),
+        kind,
+        body,
+        timestamp_ms: i64::from(event.origin_server_ts().0),
+    })
+}
+
+pub(crate) fn latest_timestamp(room: &Room) -> Option<u64> {
+    match room.latest_event() {
+        LatestEventValue::Remote(event) => event.timestamp().map(|ts| u64::from(ts.0)),
+        _ => None,
+    }
+}
+
+pub(crate) async fn sender_name(room: &Room, sender: &UserId) -> String {
     match room.get_member_no_sync(sender).await {
         Ok(Some(member)) => member.name().to_owned(),
         _ => sender.localpart().to_owned(),
@@ -436,7 +462,11 @@ mod tests {
     use std::time::Duration;
 
     use matrix_sdk::{
-        ruma::{event_id, room_id, user_id},
+        ruma::{
+            event_id,
+            events::room::{join_rules::JoinRule, member::MembershipState},
+            room_id, user_id,
+        },
         test_utils::mocks::MatrixMockServer,
     };
     use matrix_sdk_test::{event_factory::EventFactory, JoinedRoomBuilder};
@@ -448,8 +478,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::test_support::{threaded_client, wait_until};
-    use crate::threads::ThreadReads;
+    use crate::test_support::wait_until;
 
     fn event(kind: &str, content: serde_json::Value) -> AnySyncTimelineEvent {
         serde_json::from_value(json!({
@@ -557,33 +586,59 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn summarize_counts_unread_thread_replies_apart_from_the_room() {
+    async fn summarize_has_no_preview_when_the_latest_event_is_the_own_join() {
         let server = MatrixMockServer::new().await;
-        let client = threaded_client(&server).await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
         let room_id = room_id!("!a:b.c");
-        let bob = user_id!("@bob:b.c");
-        let root = event_id!("$root");
-        let f = EventFactory::new().room(room_id);
+        let me = client.user_id().unwrap().to_owned();
         let room = server
             .sync_room(
                 &client,
-                JoinedRoomBuilder::new(room_id)
-                    .add_timeline_event(f.text_msg("raiz").sender(bob).event_id(root))
-                    .add_timeline_event(
-                        f.text_msg("r1").sender(bob).event_id(event_id!("$r1")).in_thread(root, root),
-                    )
-                    .add_timeline_event(
-                        f.text_msg("r2")
-                            .sender(bob)
-                            .event_id(event_id!("$r2"))
-                            .in_thread(root, event_id!("$r1")),
-                    ),
+                JoinedRoomBuilder::new(room_id).add_timeline_event(
+                    EventFactory::new()
+                        .room(room_id)
+                        .member(&me)
+                        .membership(MembershipState::Join)
+                        .sender(&me)
+                        .event_id(event_id!("$j")),
+                ),
             )
             .await;
-        let room = &room;
+        // Espera o SDK escolher o join como último evento antes de afirmar a ausência de prévia.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while latest_timestamp(&room).is_none() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("join como último evento em até 5 s");
 
-        wait_until(|| async move { summarize(room).await.unread_thread_replies == 2 }).await;
-        assert_eq!(summarize(room).await.unread_messages, 1);
+        assert!(summarize(&room).await.latest.is_none());
+    }
+
+    #[tokio::test]
+    async fn summarize_reads_whether_the_room_is_public() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let bob = user_id!("@bob:b.c");
+        let public = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id!("!pub:b.c")).add_state_event(
+                    EventFactory::new()
+                        .room_join_rules(JoinRule::Public)
+                        .sender(bob),
+                ),
+            )
+            .await;
+        let private = server
+            .sync_room(&client, JoinedRoomBuilder::new(room_id!("!priv:b.c")))
+            .await;
+
+        assert!(summarize(&public).await.is_public);
+        assert!(!summarize(&private).await.is_public);
     }
 
     // Responde a cada 50 ms, mais rápido que a janela de 100 ms da emissão.
@@ -631,7 +686,7 @@ mod tests {
             .mount()
             .await;
         mock_sliding_sync(&server).await;
-        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
+        let sync = RoomSync::new(client, Handle::current());
         let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -666,6 +721,29 @@ mod tests {
         assert!(matches!(state, State::Idle), "{state:?}");
     }
 
+    #[tokio::test]
+    async fn on_first_running_fires_once_when_the_sync_starts() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().no_server_versions().build().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
+        mock_sliding_sync(&server).await;
+        let sync = RoomSync::new(client, Handle::current());
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        sync.on_first_running(move || tx.send(()).unwrap());
+        sync.watch_rooms(|_| true);
+
+        tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .expect("disparo em até 5 s");
+        sync.stop().await;
+        assert!(rx.try_recv().is_err());
+    }
+
     async fn running_sync(server: &MatrixMockServer) -> RoomSync {
         let client = server.client_builder().no_server_versions().build().await;
         server
@@ -675,7 +753,7 @@ mod tests {
             .mount()
             .await;
         mock_sliding_sync(server).await;
-        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
+        let sync = RoomSync::new(client, Handle::current());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_status(move |status| status_tx.send(status).is_ok());
         sync.watch_rooms(|_| true);
@@ -696,6 +774,32 @@ mod tests {
         })
         .await
         .unwrap_or_else(|_| panic!("serviço ainda em {:?}", service.state().get()));
+    }
+
+    #[tokio::test]
+    async fn room_list_asks_for_the_burst_window_of_each_room() {
+        let server = MatrixMockServer::new().await;
+        let sync = running_sync(&server).await;
+        let room_list_limits = || async {
+            let requests = server.server().received_requests().await.unwrap();
+            requests
+                .iter()
+                .filter_map(|request| request.body_json::<serde_json::Value>().ok())
+                .filter(|body| body["conn_id"] == "room-list")
+                .map(|body| body["lists"]["all_rooms"]["timeline_limit"].clone())
+                .collect::<Vec<_>>()
+        };
+
+        wait_until(|| async { !room_list_limits().await.is_empty() }).await;
+
+        let limits = room_list_limits().await;
+        assert!(
+            limits
+                .iter()
+                .all(|limit| *limit == json!(ROOM_LIST_TIMELINE_LIMIT)),
+            "{limits:?}"
+        );
+        sync.stop().await;
     }
 
     #[tokio::test]
@@ -721,7 +825,7 @@ mod tests {
             .await;
         mock_sliding_sync(&server).await;
         client.send_queue().set_enabled(false).await;
-        let sync = RoomSync::new(client.clone(), ThreadReads::default(), Handle::current());
+        let sync = RoomSync::new(client.clone(), Handle::current());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_status(move |status| status_tx.send(status).is_ok());
         sync.watch_rooms(|_| true);
@@ -758,7 +862,7 @@ mod tests {
             })
             .mount(server.server())
             .await;
-        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
+        let sync = RoomSync::new(client, Handle::current());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_status(move |status| status_tx.send(status).is_ok());
         sync.watch_rooms(|_| true);
@@ -780,7 +884,7 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().no_server_versions().build().await;
         server.mock_versions().ok().mount().await;
-        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
+        let sync = RoomSync::new(client, Handle::current());
         let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();

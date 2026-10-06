@@ -7,8 +7,76 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `invited_room`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `action_room`, `create_room_within`, `invited_room`, `join_room_within`, `parse_join_target`, `with_server_of_id`, `within`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
+
+class CreateRoomError implements FrbException {
+  final CreateRoomErrorKind kind;
+  final String message;
+
+  const CreateRoomError({
+    required this.kind,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreateRoomError &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message;
+}
+
+enum CreateRoomErrorKind {
+  network,
+  unknown,
+}
+
+class CreatedRoom {
+  final String roomId;
+  final List<FailedInvite> failedInvites;
+
+  const CreatedRoom({
+    required this.roomId,
+    required this.failedInvites,
+  });
+
+  @override
+  int get hashCode => roomId.hashCode ^ failedInvites.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreatedRoom &&
+          runtimeType == other.runtimeType &&
+          roomId == other.roomId &&
+          failedInvites == other.failedInvites;
+}
+
+class FailedInvite {
+  final String userId;
+  final RoomActionErrorKind kind;
+
+  const FailedInvite({
+    required this.userId,
+    required this.kind,
+  });
+
+  @override
+  int get hashCode => userId.hashCode ^ kind.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FailedInvite &&
+          runtimeType == other.runtimeType &&
+          userId == other.userId &&
+          kind == other.kind;
+}
 
 class InviteError implements FrbException {
   final InviteErrorKind kind;
@@ -33,6 +101,35 @@ class InviteError implements FrbException {
 
 enum InviteErrorKind {
   roomNotFound,
+  network,
+  unknown,
+}
+
+class JoinRoomError implements FrbException {
+  final JoinRoomErrorKind kind;
+  final String message;
+
+  const JoinRoomError({
+    required this.kind,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JoinRoomError &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message;
+}
+
+enum JoinRoomErrorKind {
+  invalidLink,
+  notFound,
+  forbidden,
   network,
   unknown,
 }
@@ -80,14 +177,79 @@ enum LatestMessageKind {
   other,
 }
 
+class NewRoom {
+  final String name;
+  final String? topic;
+  final bool isPublic;
+  final List<String> invites;
+  final bool shareHistory;
+
+  const NewRoom({
+    required this.name,
+    this.topic,
+    required this.isPublic,
+    required this.invites,
+    required this.shareHistory,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      topic.hashCode ^
+      isPublic.hashCode ^
+      invites.hashCode ^
+      shareHistory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewRoom &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          topic == other.topic &&
+          isPublic == other.isPublic &&
+          invites == other.invites &&
+          shareHistory == other.shareHistory;
+}
+
+class RoomActionError implements FrbException {
+  final RoomActionErrorKind kind;
+  final String message;
+
+  const RoomActionError({
+    required this.kind,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoomActionError &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message;
+}
+
+enum RoomActionErrorKind {
+  roomNotFound,
+  invalidUserId,
+  forbidden,
+  network,
+  unverifiedDevice,
+  unknown,
+}
+
 class RoomSummary {
   final String id;
   final String name;
   final bool isDirect;
   final bool isInvite;
+  final bool isPublic;
   final int unreadMessages;
   final int unreadMentions;
-  final int unreadThreadReplies;
   final int memberCount;
   final List<String> heroes;
   final LatestMessage? latest;
@@ -97,9 +259,9 @@ class RoomSummary {
     required this.name,
     required this.isDirect,
     required this.isInvite,
+    required this.isPublic,
     required this.unreadMessages,
     required this.unreadMentions,
-    required this.unreadThreadReplies,
     required this.memberCount,
     required this.heroes,
     this.latest,
@@ -111,9 +273,9 @@ class RoomSummary {
       name.hashCode ^
       isDirect.hashCode ^
       isInvite.hashCode ^
+      isPublic.hashCode ^
       unreadMessages.hashCode ^
       unreadMentions.hashCode ^
-      unreadThreadReplies.hashCode ^
       memberCount.hashCode ^
       heroes.hashCode ^
       latest.hashCode;
@@ -127,9 +289,9 @@ class RoomSummary {
           name == other.name &&
           isDirect == other.isDirect &&
           isInvite == other.isInvite &&
+          isPublic == other.isPublic &&
           unreadMessages == other.unreadMessages &&
           unreadMentions == other.unreadMentions &&
-          unreadThreadReplies == other.unreadThreadReplies &&
           memberCount == other.memberCount &&
           heroes == other.heroes &&
           latest == other.latest;
@@ -141,4 +303,31 @@ enum SyncStatus {
   offline,
   unsupported,
   error,
+}
+
+class UserCheck {
+  final UserCheckStatus status;
+  final String? displayName;
+
+  const UserCheck({
+    required this.status,
+    this.displayName,
+  });
+
+  @override
+  int get hashCode => status.hashCode ^ displayName.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserCheck &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          displayName == other.displayName;
+}
+
+enum UserCheckStatus {
+  found,
+  notFound,
+  unknown,
 }

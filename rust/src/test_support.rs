@@ -80,8 +80,19 @@ pub(crate) fn env_var(name: &str) -> String {
 
 fn dotenv_value(name: &str) -> Option<String> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.env");
-    std::fs::read_to_string(path).ok()?.lines().find_map(|line| {
-        let (key, value) = line.split_once('=')?;
-        (key.trim() == name).then(|| value.trim().to_owned())
-    })
+    std::fs::read_to_string(path)
+        .ok()?
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once('=')?;
+            (key.trim() == name).then(|| value.trim().to_owned())
+        })
+}
+
+pub(crate) fn png(width: u32, height: u32) -> Vec<u8> {
+    let mut bytes = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    bytes.extend_from_slice(&width.to_be_bytes());
+    bytes.extend_from_slice(&height.to_be_bytes());
+    bytes.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    bytes
 }

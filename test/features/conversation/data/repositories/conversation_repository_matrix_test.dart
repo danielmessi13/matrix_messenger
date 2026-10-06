@@ -33,6 +33,8 @@ void main() {
     bridge.ThreadInfo? thread,
     bridge.ReplyPreview? replyTo,
     List<String> readBy = const [],
+    List<bridge.Reaction> reactions = const [],
+    bool canReact = true,
   }) => bridge.TimelineMessage(
     id: id,
     eventId: eventId,
@@ -48,6 +50,8 @@ void main() {
     thread: thread,
     replyTo: replyTo,
     readBy: readBy,
+    reactions: reactions,
+    canReact: canReact,
   );
 
   test('converte o snapshot da ponte em domínio', () async {
@@ -78,6 +82,7 @@ void main() {
           ),
         ],
         reachedStart: true,
+        paginating: false,
       ),
     );
 
@@ -112,6 +117,7 @@ void main() {
               kind: MessageKind.image,
             ),
             readBy: const ['Ana'],
+            canReact: true,
           ),
         ],
         reachedStart: true,
@@ -135,6 +141,7 @@ void main() {
             ),
         ],
         reachedStart: false,
+        paginating: false,
       ),
     );
 
@@ -162,11 +169,82 @@ void main() {
             ),
         ],
         reachedStart: false,
+        paginating: false,
       ),
     );
 
     final items = (await received).items.cast<MessageItem>();
     expect(items.map((m) => m.replyTo?.state), ReplyState.values);
+  });
+
+  test('converte evento de sala', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      const bridge.TimelineSnapshot(
+        items: [
+          bridge.TimelineEntry(
+            roomEvent: bridge.RoomEvent(
+              id: '\$e1',
+              senderName: 'Bob',
+              isOwn: false,
+              timestampMs: 3000,
+              kind: bridge.RoomEventKind.invited,
+              targetName: 'Ana',
+              targetIsOwn: true,
+              value: 'x',
+            ),
+          ),
+        ],
+        reachedStart: true,
+        paginating: false,
+      ),
+    );
+
+    expect(
+      (await received).items,
+      [
+        RoomEventItem(
+          id: '\$e1',
+          senderName: 'Bob',
+          isOwn: false,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(3000),
+          kind: RoomEventKind.invited,
+          targetName: 'Ana',
+          targetIsOwn: true,
+          value: 'x',
+        ),
+      ],
+    );
+  });
+
+  test('converte cada tipo de evento de sala', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      bridge.TimelineSnapshot(
+        items: [
+          for (final (i, kind) in bridge.RoomEventKind.values.indexed)
+            bridge.TimelineEntry(
+              roomEvent: bridge.RoomEvent(
+                id: '\$e$i',
+                senderName: 'Bob',
+                isOwn: true,
+                timestampMs: 0,
+                kind: kind,
+                targetIsOwn: false,
+              ),
+            ),
+        ],
+        reachedStart: false,
+        paginating: false,
+      ),
+    );
+
+    final items = (await received).items.cast<RoomEventItem>();
+    expect(items.map((e) => e.kind), RoomEventKind.values);
+    expect(items.map((e) => e.isOwn), everyElement(isTrue));
+    expect(items.map((e) => e.value), everyElement(isNull));
   });
 
   test('ações repassam para o RoomTimeline', () async {
@@ -193,6 +271,22 @@ void main() {
     expect(timeline.isDisposed, isTrue);
   });
 
+  test('digitação repassa para o RoomTimeline e falha é silenciosa', () async {
+    final conversation = await open();
+    final names = conversation.typing.first;
+    timeline.typingNames.add(['Bob']);
+
+    await conversation.setTyping(true);
+    timeline.error = const bridge.TimelineError(
+      kind: bridge.TimelineErrorKind.network,
+      message: 'offline',
+    );
+    await conversation.setTyping(false);
+
+    expect(await names, ['Bob']);
+    expect(timeline.typingSent, [true]);
+  });
+
   test('TimelineError vira ConversationFailure', () async {
     final conversation = await open();
     timeline.error = const bridge.TimelineError(
@@ -210,6 +304,150 @@ void main() {
         ConversationFailureType.network,
       ),
     );
+  });
+
+  test('converte reações e canReact', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      bridge.TimelineSnapshot(
+        items: [
+          bridge.TimelineEntry(
+            message: bridgeMessage(
+              canReact: false,
+              reactions: const [
+                bridge.Reaction(
+                  key: '👍',
+                  count: 2,
+                  reactedByMe: true,
+                  senderNames: ['Ana'],
+                ),
+              ],
+            ),
+          ),
+        ],
+        reachedStart: true,
+        paginating: false,
+      ),
+    );
+
+    final message = (await received).items.single as MessageItem;
+    expect(message.canReact, isFalse);
+    expect(message.reactions, const [
+      MessageReaction(
+        key: '👍',
+        count: 2,
+        reactedByMe: true,
+        senderNames: ['Ana'],
+      ),
+    ]);
+  });
+
+  test('toggleReaction repassa o id e a chave', () async {
+    final conversation = await open();
+
+    final result = await conversation.toggleReaction('\$1', '🎉');
+
+    expect(result, isA<Ok<void>>());
+    expect(timeline.reactions, [('\$1', '🎉')]);
+  });
+
+  test('toggleReaction com erro da ponte vira Result.error', () async {
+    final conversation = await open();
+    timeline.error = Exception('rede');
+
+    final result = await conversation.toggleReaction('\$1', '🎉');
+
+    expect(result, isA<Error<void>>());
+  });
+
+  test('converte a imagem da mensagem', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      const bridge.TimelineSnapshot(
+        items: [
+          bridge.TimelineEntry(
+            message: bridge.TimelineMessage(
+              id: '\$img',
+              senderId: '@bob:b.c',
+              senderName: 'Bob',
+              isOwn: false,
+              timestampMs: 1000,
+              kind: bridge.MessageKind.image,
+              edited: false,
+              sendState: bridge.SendState.sent,
+              canReply: true,
+              readBy: [],
+              reactions: [],
+              canReact: true,
+              image: bridge.ImageContent(
+                filename: 'gato.png',
+                caption: 'olha',
+                width: 800,
+                height: 600,
+                mimetype: 'image/png',
+                media: '{"url":"mxc://b.c/gato"}',
+              ),
+            ),
+          ),
+        ],
+        reachedStart: true,
+        paginating: false,
+      ),
+    );
+
+    final message = (await received).items.single as MessageItem;
+
+    expect(message.kind, MessageKind.image);
+    expect(
+      message.image,
+      const ImageContent(
+        media: '{"url":"mxc://b.c/gato"}',
+        filename: 'gato.png',
+        caption: 'olha',
+        width: 800,
+        height: 600,
+        mimetype: 'image/png',
+      ),
+    );
+  });
+
+  test('sendImage repassa e InvalidImage vira invalidImage', () async {
+    final conversation = await open();
+
+    await conversation.sendImage('/a.png', inReplyTo: '\$1');
+    timeline.error = const bridge.TimelineError(
+      kind: bridge.TimelineErrorKind.invalidImage,
+      message: 'nota.txt',
+    );
+    final result = await conversation.sendImage('/nota.txt');
+
+    expect(timeline.images, [('/a.png', '\$1')]);
+    expect(
+      (result as Error<void>).error,
+      isA<ConversationFailure>().having(
+        (f) => f.type,
+        'type',
+        ConversationFailureType.invalidImage,
+      ),
+    );
+  });
+
+  test('converte o estado da paginação', () async {
+    final conversation = await open();
+    final received = conversation.updates.take(2).toList();
+    for (final paginating in [false, true]) {
+      timeline.snapshots.add(
+        bridge.TimelineSnapshot(
+          items: const [],
+          reachedStart: false,
+          paginating: paginating,
+        ),
+      );
+    }
+
+    expect((await received).map((s) => s.paginating), [false, true]);
   });
 
   test('falha ao abrir vira ConversationFailure', () async {

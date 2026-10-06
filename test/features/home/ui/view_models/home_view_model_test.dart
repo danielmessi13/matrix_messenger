@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_state.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/failed_invite.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room_action_failure.dart';
 
 import '../../../../../testing/models/user_session.dart';
 
@@ -67,6 +69,15 @@ void main() {
     await viewModel.close();
   });
 
+  test('guarda qual thread está aberta', () async {
+    final viewModel = HomeViewModel(kUserSession)..openThreadChanged(r'$raiz');
+
+    expect(viewModel.state.openThreadId, r'$raiz');
+    viewModel.openThreadChanged(null);
+    expect(viewModel.state.openThreadId, isNull);
+    await viewModel.close();
+  });
+
   test(
     'abrir a lista à mão com a thread aberta deixa a thread por cima',
     () async {
@@ -96,4 +107,23 @@ void main() {
 
     expect(() => viewModel.threadVisibilityChanged(false), returnsNormally);
   });
+
+  blocTest<HomeViewModel, HomeState>(
+    'mostra e dispensa os convites que falharam',
+    build: () => HomeViewModel(kUserSession),
+    act: (viewModel) => viewModel
+      ..showFailedInvites(const [
+        FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+      ])
+      ..dismissFailedInvites(),
+    expect: () => const [
+      HomeState(
+        session: kUserSession,
+        failedInvites: [
+          FailedInvite('@joao:b.co', RoomActionFailureType.unknown),
+        ],
+      ),
+      HomeState(session: kUserSession),
+    ],
+  );
 }

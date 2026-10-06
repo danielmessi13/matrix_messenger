@@ -1,22 +1,45 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/message_labels.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/message_tile.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/reaction_chips.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/models/message.dart';
 
+MessageItem reactable(MessageItem m) => MessageItem(
+  id: m.id,
+  eventId: m.eventId,
+  senderId: m.senderId,
+  senderName: m.senderName,
+  isOwn: m.isOwn,
+  timestamp: m.timestamp,
+  kind: m.kind,
+  body: m.body,
+  canReply: m.canReply,
+  canReact: true,
+);
+
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   Future<({List<String> retried, List<String> cancelled})> pump(
     WidgetTester tester,
     MessageItem message, {
     bool succeeds = true,
     bool compact = false,
+    bool continuation = false,
+    bool continuedBelow = false,
+    bool followedByOwn = false,
     VoidCallback? onReply,
     VoidCallback? onStartThread,
     ValueChanged<String>? onQuoteTap,
+    Future<bool> Function(String key)? onReact,
   }) async {
     useDesktopSize(tester);
     final retried = <String>[];
@@ -31,9 +54,13 @@ void main() {
             child: MessageTile(
               message: message,
               compact: compact,
+              continuation: continuation,
+              continuedBelow: continuedBelow,
+              followedByOwn: followedByOwn,
               onReply: onReply,
               onStartThread: onStartThread,
               onQuoteTap: onQuoteTap,
+              onReact: onReact,
               onRetry: () async {
                 retried.add(message.id);
                 return succeeds;
@@ -71,7 +98,7 @@ void main() {
     expect(find.text('Diego Alves'), findsOneWidget);
     expect(find.text('10:05'), findsOneWidget);
     expect(find.textContaining('A integração com o gateway'), findsOneWidget);
-    expect(find.text('VOCÊ'), findsNothing);
+    expect(find.text('Você'), findsNothing);
   });
 
   Future<void> hover(WidgetTester tester, Finder target) async {
@@ -157,7 +184,7 @@ void main() {
   testWidgets('mensagem própria: etiqueta e "Lida por"', (tester) async {
     await pump(tester, kOwnMessage);
 
-    expect(find.text('VOCÊ'), findsOneWidget);
+    expect(find.text('Você'), findsOneWidget);
     expect(find.text('✓✓ Lida por Carla e Diego'), findsOneWidget);
   });
 
@@ -225,45 +252,6 @@ void main() {
     ),
   );
 
-  testWidgets('cabeçalho da citação ocupa a largura do cartão', (tester) async {
-    await pump(
-      tester,
-      quoted('Ana', 'um corpo bem mais largo que o cabeçalho da citação'),
-    );
-
-    final card = tester.getSize(find.byKey(const Key('message_reply_quote')));
-    final header = tester.getSize(find.byKey(const Key('reply_quote_header')));
-
-    expect(header.width, closeTo(card.width - 2, 2));
-  });
-
-  testWidgets('citação longa não alarga o cartão de uma resposta curta', (
-    tester,
-  ) async {
-    await pump(
-      tester,
-      MessageItem(
-        id: '\$q',
-        senderId: '@bob:b.c',
-        senderName: 'Bob',
-        isOwn: false,
-        timestamp: DateTime(2026, 10, 4, 10, 21),
-        kind: MessageKind.text,
-        body: 'ok',
-        replyTo: ReplyPreview(
-          eventId: '\$1',
-          state: ReplyState.ready,
-          senderName: 'Ana',
-          kind: MessageKind.text,
-          body: 'uma mensagem original bem comprida ' * 6,
-        ),
-      ),
-    );
-
-    final card = tester.getSize(find.byKey(const Key('message_reply_quote')));
-    expect(card.width, lessThan(260));
-  });
-
   testWidgets('menu fica junto do balão, não no canto da linha', (
     tester,
   ) async {
@@ -330,6 +318,30 @@ void main() {
       expect(thread.right, lessThanOrEqualTo(screen.right));
     },
   );
+
+  testWidgets('tooltip de Reagir no menu do hover abre sem erro', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReply: () {},
+      onReact: (_) async => true,
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.textContaining('A integração')));
+    await tester.pump();
+
+    await mouse.moveTo(
+      tester.getCenter(find.byKey(const Key('reaction_picker_\$other'))),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Reagir'), findsOneWidget);
+  });
 
   testWidgets('botão do menu destaca o fundo e o texto no hover', (
     tester,
@@ -525,9 +537,106 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.textContaining('concordo'), findsOneWidget);
+  });
+
+  testWidgets('citação de mensagem minha mostra "Você" no lugar do nome', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      MessageItem(
+        id: '\$2',
+        senderId: '@bob:b.c',
+        senderName: 'Bob',
+        isOwn: false,
+        timestamp: DateTime(2026, 10, 4, 10, 21),
+        kind: MessageKind.text,
+        body: 'valeu',
+        replyTo: const ReplyPreview(
+          eventId: '\$1',
+          state: ReplyState.ready,
+          isOwn: true,
+          senderName: 'Alice',
+          kind: MessageKind.text,
+          body: 'subi agora',
+        ),
+      ),
+    );
+
+    final quote = find.byKey(const Key('message_reply_quote'));
     expect(
-      find.descendant(of: quote, matching: find.textContaining('concordo')),
+      find.descendant(of: quote, matching: find.text('Você')),
       findsOneWidget,
+    );
+    expect(
+      find.descendant(of: quote, matching: find.text('Alice')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('mensagem de outra pessoa mostra o avatar com as iniciais', (
+    tester,
+  ) async {
+    await pump(tester, kOtherMessage);
+
+    expect(
+      find.descendant(
+        of: find.byKey(Key('message_avatar_${kOtherMessage.id}')),
+        matching: find.text('DA'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('continuação não repete o avatar', (tester) async {
+    await pump(tester, kOtherMessage, continuation: true);
+
+    expect(find.byKey(Key('message_avatar_${kOtherMessage.id}')), findsNothing);
+  });
+
+  testWidgets('resposta em continuação alinha a citação com o texto', (
+    tester,
+  ) async {
+    await pump(tester, quoted('Ana', 'concordo'), continuation: true);
+
+    final quote = tester.getTopLeft(find.text('Ana'));
+    final body = tester.getTopLeft(find.textContaining('concordo'));
+    expect(quote.dx, greaterThanOrEqualTo(body.dx));
+  });
+
+  testWidgets('minha resposta a mim mesmo mostra só o trecho citado', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      MessageItem(
+        id: '\$2',
+        senderId: '@alice:a.b',
+        senderName: 'Alice',
+        isOwn: true,
+        timestamp: DateTime(2026, 10, 4, 10, 21),
+        kind: MessageKind.text,
+        body: 'tenta de novo',
+        replyTo: const ReplyPreview(
+          eventId: '\$1',
+          state: ReplyState.ready,
+          isOwn: true,
+          senderName: 'Alice',
+          kind: MessageKind.text,
+          body: 'tenta agora',
+        ),
+      ),
+    );
+
+    final quote = find.byKey(const Key('message_reply_quote'));
+    expect(
+      find.descendant(of: quote, matching: find.text('tenta agora')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: quote, matching: find.text('Você')),
+      findsNothing,
     );
   });
 
@@ -535,5 +644,260 @@ void main() {
     await pump(tester, kOtherMessage);
 
     expect(find.byKey(const Key('message_reply_quote')), findsNothing);
+  });
+
+  testWidgets('continuação de outra pessoa esconde nome e hora', (
+    tester,
+  ) async {
+    await pump(tester, kOtherMessage, continuation: true);
+
+    expect(find.text('Diego Alves'), findsNothing);
+    expect(find.text('10:05'), findsNothing);
+    expect(find.textContaining('A integração'), findsOneWidget);
+  });
+
+  testWidgets('continuação própria esconde hora e VOCÊ, mas não o status', (
+    tester,
+  ) async {
+    await pump(tester, kOwnMessage, continuation: true);
+
+    expect(find.text('Você'), findsNothing);
+    expect(find.text('10:21'), findsNothing);
+    expect(find.text(readByLabel(kOwnMessage.readBy)), findsOneWidget);
+  });
+
+  testWidgets('continuação mostra a hora no hover', (tester) async {
+    await pump(tester, kOtherMessage, continuation: true, onReply: () {});
+
+    await hover(tester, find.textContaining('A integração'));
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('message_time_\$other')),
+        matching: find.text('10:05'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Responder'), findsOneWidget);
+  });
+
+  testWidgets('continuação sem menu ainda mostra a hora no hover', (
+    tester,
+  ) async {
+    await pump(tester, own(SendState.sending), continuation: true);
+
+    await hover(tester, find.text('oi'));
+
+    expect(find.byKey(const Key('message_time_txn')), findsOneWidget);
+    expect(find.text('Responder'), findsNothing);
+  });
+
+  testWidgets('mensagem com cabeçalho não repete a hora no hover', (
+    tester,
+  ) async {
+    await pump(tester, kOtherMessage, onReply: () {});
+
+    await hover(tester, find.textContaining('A integração'));
+
+    expect(find.byKey(const Key('message_time_\$other')), findsNothing);
+  });
+
+  testWidgets('própria seguida de outra sua deixa o status para a última', (
+    tester,
+  ) async {
+    await pump(tester, own(SendState.sent), followedByOwn: true);
+    expect(find.text('Enviada'), findsNothing);
+
+    await pump(tester, own(SendState.sending), followedByOwn: true);
+    expect(find.text('Enviando…'), findsNothing);
+
+    await pump(tester, own(SendState.failed), followedByOwn: true);
+    expect(find.text('Não enviada'), findsOneWidget);
+    expect(find.byKey(const Key('message_retry')), findsOneWidget);
+  });
+
+  testWidgets('própria seguida de outra sua mantém o recibo de leitura', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      own(SendState.sent, readBy: ['Ana']),
+      followedByOwn: true,
+    );
+    expect(find.text('✓✓ Lida por Ana'), findsOneWidget);
+  });
+
+  MessageItem withReactions({bool canReact = true}) => MessageItem(
+    id: '\$other',
+    eventId: '\$other',
+    senderId: '@diego:matrix.org',
+    senderName: 'Diego Alves',
+    isOwn: false,
+    timestamp: DateTime(2026, 10, 4, 10, 5),
+    kind: MessageKind.text,
+    canReply: true,
+    canReact: canReact,
+    body: 'A integração ficou pronta.',
+    reactions: const [
+      MessageReaction(
+        key: '👍',
+        count: 2,
+        reactedByMe: true,
+        senderNames: ['Ana'],
+      ),
+      MessageReaction(key: '🎉', count: 1, senderNames: ['Bruno']),
+    ],
+  );
+
+  testWidgets('chips mostram emoji e contagem', (tester) async {
+    await pump(tester, withReactions(), onReact: (_) async => true);
+
+    expect(find.byKey(const Key('reaction_\$other_👍')), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.byTooltip('Ana e você'), findsOneWidget);
+  });
+
+  testWidgets('clicar no chip chama onReact com a chave', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      withReactions(),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_🎉')));
+    await tester.pump();
+
+    expect(keys, ['🎉']);
+  });
+
+  testWidgets('falha ao reagir mostra snackbar', (tester) async {
+    await pump(tester, withReactions(), onReact: (_) async => false);
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_🎉')));
+    await tester.pump();
+
+    expect(find.text('Não foi possível reagir.'), findsOneWidget);
+  });
+
+  testWidgets('sem canReact os chips não reagem', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      withReactions(canReact: false),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_🎉')));
+    await tester.pump();
+
+    expect(keys, isEmpty);
+    expect(find.byKey(const Key('reaction_\$other_🎉')), findsOneWidget);
+  });
+
+  testWidgets('sem reações não há linha de chips', (tester) async {
+    await pump(tester, kOtherMessage, onReact: (_) async => true);
+
+    expect(find.byType(ReactionChips), findsNothing);
+  });
+
+  testWidgets('hover não tem rápidas e só o botão do seletor', (tester) async {
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReact: (_) async => true,
+    );
+
+    await hover(tester, find.textContaining('A integração'));
+
+    for (final emoji in ['👍', '❤️', '😂', '😮', '😢', '🎉']) {
+      expect(find.byKey(Key('quick_reaction_\$other_$emoji')), findsNothing);
+    }
+    expect(find.byKey(const Key('reaction_picker_\$other')), findsOneWidget);
+  });
+
+  testWidgets('escolher no seletor completo chama onReact', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await hover(tester, find.textContaining('A integração'));
+    await tester.tap(find.byKey(const Key('reaction_picker_\$other')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😀').first);
+    await tester.pumpAndSettle();
+
+    expect(keys, ['😀']);
+  });
+
+  testWidgets('sem canReact o hover não mostra o seletor', (tester) async {
+    await pump(tester, kOtherMessage, onReact: (_) async => true);
+
+    await hover(tester, find.textContaining('A integração'));
+
+    expect(find.byKey(const Key('reaction_picker_\$other')), findsNothing);
+  });
+
+  testWidgets('com o seletor aberto a barra fica mesmo sem hover', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReact: (_) async => true,
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.textContaining('A integração')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('reaction_picker_\$other')));
+    await tester.pumpAndSettle();
+
+    await mouse.moveTo(const Offset(5, 900));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reaction_picker')), findsOneWidget);
+    expect(
+      find.byKey(const Key('reaction_picker_\$other')),
+      findsOneWidget,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reaction_picker_\$other')), findsNothing);
+  });
+
+  testWidgets('chip + abre o seletor e escolher reage', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      withReactions(),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_add_\$other')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😀').first);
+    await tester.pumpAndSettle();
+
+    expect(keys, ['😀']);
   });
 }

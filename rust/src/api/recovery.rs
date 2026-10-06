@@ -34,6 +34,10 @@ impl From<RecoveryState> for RecoveryStatus {
 pub enum RecoveryErrorKind {
     InvalidKey,
     Network,
+    /// Já existe um backup no servidor, criado por outro app com outra chave.
+    BackupExists,
+    /// O servidor pediu a senha (UIA) para subir o cross-signing.
+    AuthRequired,
     Unknown,
 }
 
@@ -46,6 +50,10 @@ pub struct RecoveryError {
 impl From<SdkRecoveryError> for RecoveryError {
     fn from(error: SdkRecoveryError) -> Self {
         let kind = match &error {
+            SdkRecoveryError::BackupExistsOnServer => RecoveryErrorKind::BackupExists,
+            SdkRecoveryError::Sdk(sdk) if sdk.as_uiaa_response().is_some() => {
+                RecoveryErrorKind::AuthRequired
+            }
             SdkRecoveryError::SecretStorage(SecretStorageError::SecretStorageKey(_)) => {
                 RecoveryErrorKind::InvalidKey
             }
@@ -67,6 +75,21 @@ pub(crate) async fn recover(client: &Client, recovery_key: &str) -> Result<(), R
         .encryption()
         .recovery()
         .recover(recovery_key.trim())
+        .await
+        .map_err(Into::into)
+}
+
+// Cada enable() cria um secret storage novo e invalida a chave anterior.
+pub(crate) async fn setup_recovery(client: &Client) -> Result<String, RecoveryError> {
+    let encryption = client.encryption();
+    encryption
+        .bootstrap_cross_signing_if_needed(None)
+        .await
+        .map_err(SdkRecoveryError::from)?;
+    encryption
+        .recovery()
+        .enable()
+        .wait_for_backups_to_upload()
         .await
         .map_err(Into::into)
 }
@@ -97,10 +120,15 @@ impl MatrixClient {
     pub async fn recover(&self, recovery_key: String) -> Result<(), RecoveryError> {
         recover(&self.client, &recovery_key).await
     }
+
+    pub async fn setup_recovery(&self) -> Result<String, RecoveryError> {
+        setup_recovery(&self.client).await
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use matrix_sdk::encryption::recovery::RecoveryError as SdkError;
     use matrix_sdk::{
         ruma::{
             events::secret_storage::key::{
@@ -111,7 +139,12 @@ mod tests {
         },
         test_utils::mocks::MatrixMockServer,
     };
+    use serde_json::json;
     use tokio::sync::mpsc;
+    use wiremock::{
+        matchers::{method, path_regex},
+        Mock, ResponseTemplate,
+    };
 
     use super::*;
 
@@ -171,6 +204,84 @@ mod tests {
         assert_eq!(
             RecoveryStatus::from(RecoveryState::Incomplete),
             RecoveryStatus::Incomplete
+        );
+    }
+
+    // O bootstrap pede a lista de chaves e sobe as chaves do dispositivo antes do cross-signing.
+    async fn mount_device_keys(server: &MatrixMockServer) {
+        server.mock_query_keys().ok().mount().await;
+        server.mock_upload_keys().ok().mount().await;
+    }
+
+    #[tokio::test]
+    async fn setup_returns_a_recovery_key() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        mount_device_keys(&server).await;
+        server.mock_upload_cross_signing_keys().ok().mount().await;
+        server
+            .mock_upload_cross_signing_signatures()
+            .ok()
+            .mount()
+            .await;
+        server.mock_room_keys_version().none().mount().await;
+        server.mock_add_room_keys_version().ok().mount().await;
+        Mock::given(method("PUT"))
+            .and(path_regex(r"/account_data/"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(r"/account_data/"))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({ "errcode": "M_NOT_FOUND", "error": "not found" })),
+            )
+            .mount(server.server())
+            .await;
+
+        let key = setup_recovery(&client).await.unwrap();
+
+        let groups: Vec<&str> = key.split_whitespace().collect();
+        assert_eq!(groups.len(), 12);
+        assert!(groups.iter().all(|group| group.len() == 4));
+    }
+
+    #[tokio::test]
+    async fn uiaa_on_cross_signing_is_auth_required() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        mount_device_keys(&server).await;
+        server.mock_upload_cross_signing_keys().uiaa().mount().await;
+
+        let error = setup_recovery(&client).await.unwrap_err();
+
+        assert_eq!(error.kind, RecoveryErrorKind::AuthRequired);
+    }
+
+    #[tokio::test]
+    async fn backup_from_another_app_is_backup_exists() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        mount_device_keys(&server).await;
+        server.mock_upload_cross_signing_keys().ok().mount().await;
+        server
+            .mock_upload_cross_signing_signatures()
+            .ok()
+            .mount()
+            .await;
+        server.mock_room_keys_version().exists().mount().await;
+
+        let error = setup_recovery(&client).await.unwrap_err();
+
+        assert_eq!(error.kind, RecoveryErrorKind::BackupExists);
+    }
+
+    #[test]
+    fn backup_exists_on_server_maps_to_backup_exists() {
+        assert_eq!(
+            RecoveryError::from(SdkError::BackupExistsOnServer).kind,
+            RecoveryErrorKind::BackupExists
         );
     }
 }

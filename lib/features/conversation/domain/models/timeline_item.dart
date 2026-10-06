@@ -70,6 +70,60 @@ class ThreadSummary extends Equatable {
   ];
 }
 
+class ImageContent extends Equatable {
+  const ImageContent({
+    required this.media,
+    required this.filename,
+    this.caption,
+    this.width,
+    this.height,
+    this.mimetype,
+  });
+
+  final String media;
+
+  final String filename;
+
+  final String? caption;
+
+  final int? width;
+
+  final int? height;
+
+  final String? mimetype;
+
+  @override
+  List<Object?> get props => [
+    media,
+    filename,
+    caption,
+    width,
+    height,
+    mimetype,
+  ];
+}
+
+class MessageReaction extends Equatable {
+  const MessageReaction({
+    required this.key,
+    required this.count,
+    this.reactedByMe = false,
+    this.senderNames = const [],
+  });
+
+  final String key;
+
+  final int count;
+
+  final bool reactedByMe;
+
+  // Sem o próprio usuário; "você" entra pelo [reactedByMe].
+  final List<String> senderNames;
+
+  @override
+  List<Object?> get props => [key, count, reactedByMe, senderNames];
+}
+
 sealed class TimelineItem extends Equatable {
   const TimelineItem();
 }
@@ -99,6 +153,9 @@ final class MessageItem extends TimelineItem {
     this.thread,
     this.replyTo,
     this.readBy = const [],
+    this.image,
+    this.reactions = const [],
+    this.canReact = false,
   });
 
   final String id;
@@ -129,6 +186,12 @@ final class MessageItem extends TimelineItem {
 
   final List<String> readBy;
 
+  final ImageContent? image;
+
+  final List<MessageReaction> reactions;
+
+  final bool canReact;
+
   @override
   List<Object?> get props => [
     id,
@@ -145,16 +208,82 @@ final class MessageItem extends TimelineItem {
     thread,
     replyTo,
     readBy,
+    image,
+    reactions,
+    canReact,
+  ];
+}
+
+enum RoomEventKind {
+  created,
+  joined,
+  left,
+  invited,
+  inviteDeclined,
+  kicked,
+  banned,
+  unbanned,
+  nameChanged,
+  topicChanged,
+  avatarChanged,
+  encryptionEnabled,
+  displayNameChanged,
+}
+
+final class RoomEventItem extends TimelineItem {
+  const RoomEventItem({
+    required this.id,
+    required this.senderName,
+    required this.isOwn,
+    required this.timestamp,
+    required this.kind,
+    this.targetName,
+    this.targetIsOwn = false,
+    this.value,
+  });
+
+  final String id;
+
+  final String senderName;
+
+  final bool isOwn;
+
+  final DateTime timestamp;
+
+  final RoomEventKind kind;
+
+  final String? targetName;
+
+  final bool targetIsOwn;
+
+  final String? value;
+
+  @override
+  List<Object?> get props => [
+    id,
+    senderName,
+    isOwn,
+    timestamp,
+    kind,
+    targetName,
+    targetIsOwn,
+    value,
   ];
 }
 
 class ConversationSnapshot extends Equatable {
-  const ConversationSnapshot({required this.items, required this.reachedStart});
+  const ConversationSnapshot({
+    required this.items,
+    required this.reachedStart,
+    this.paginating = false,
+  });
 
   final List<TimelineItem> items;
 
   final bool reachedStart;
 
+  final bool paginating;
+
   @override
-  List<Object?> get props => [items, reachedStart];
+  List<Object?> get props => [items, reachedStart, paginating];
 }

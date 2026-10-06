@@ -11,8 +11,10 @@ import 'package:matrix_messenger/features/conversation/data/repositories/convers
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/conversation/view_models/conversation_view_model.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/conversation_pane.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/message_labels.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/thread_request.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
@@ -35,6 +37,8 @@ void main() {
     WidgetTester tester,
     Room? room, {
     Size size = const Size(1440, 900),
+    ThreadRequest? threadRequest,
+    ValueChanged<String?>? onOpenThreadChanged,
   }) async {
     useDesktopSize(tester, size);
     await tester.pumpWidget(
@@ -48,7 +52,10 @@ void main() {
           home: Scaffold(
             body: ConversationPane(
               room: room,
+              ownUserId: '@eu:b.c',
               now: kDay.add(const Duration(hours: 12)),
+              threadRequest: threadRequest,
+              onOpenThreadChanged: onOpenThreadChanged,
             ),
           ),
         ),
@@ -57,12 +64,88 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('pedido de thread abre a thread, também com a sala já aberta', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    expect(repository.conversation.openedThreads, isEmpty);
+
+    final request = ThreadRequest(roomId: kTeamRoom.id, rootEventId: r'$raiz');
+    await pump(tester, kTeamRoom, threadRequest: request);
+    await pump(tester, kTeamRoom, threadRequest: request);
+
+    expect(repository.conversation.openedThreads, [r'$raiz']);
+    expect(repository.openedRooms, [kTeamRoom.id]);
+
+    await pump(
+      tester,
+      kTeamRoom,
+      threadRequest: ThreadRequest(roomId: kTeamRoom.id, rootEventId: r'$raiz'),
+    );
+    // Pedido novo para a thread já aberta não reabre (openThread ignora a mesma raiz).
+    expect(repository.conversation.openedThreads, [r'$raiz']);
+  });
+
+  testWidgets('avisa qual thread abriu e quando fecha', (tester) async {
+    final opened = <String?>[];
+    final request = ThreadRequest(roomId: kTeamRoom.id, rootEventId: r'$raiz');
+    await pump(
+      tester,
+      kTeamRoom,
+      threadRequest: request,
+      onOpenThreadChanged: opened.add,
+    );
+    await tester.pump();
+
+    expect(opened, [r'$raiz']);
+
+    await pump(tester, kDirectRoom, onOpenThreadChanged: opened.add);
+    await tester.pump();
+    expect(opened, [r'$raiz', null]);
+  });
+
+  testWidgets('pedido de thread de outra sala é ignorado', (tester) async {
+    await pump(
+      tester,
+      kTeamRoom,
+      threadRequest: ThreadRequest(roomId: kDirectRoom.id, rootEventId: r'$x'),
+    );
+
+    expect(repository.conversation.openedThreads, isEmpty);
+  });
+
   // Dois pumps: na abertura nada anima, e o frame do novo estado só sai no seguinte.
   Future<void> show(WidgetTester tester, ConversationSnapshot snapshot) async {
     repository.conversation.snapshots.add(snapshot);
     await tester.pump();
     await tester.pump();
   }
+
+  ConversationSnapshot page(
+    List<TimelineItem> items, {
+    bool reachedStart = false,
+    bool paginating = false,
+  }) => ConversationSnapshot(
+    items: items,
+    reachedStart: reachedStart,
+    paginating: paginating,
+  );
+
+  MessageItem msg(
+    int i, {
+    bool own = false,
+    SendState state = SendState.sent,
+    String? id,
+  }) => MessageItem(
+    id: id ?? '\$m$i',
+    senderId: own ? '@alice:matrix.org' : '@bob:b.c',
+    senderName: own ? 'Alice' : 'Bob',
+    isOwn: own,
+    timestamp: kDay.add(Duration(minutes: i)),
+    kind: MessageKind.text,
+    body: 'mensagem $i',
+    sendState: state,
+  );
 
   testWidgets('sem sala selecionada pede para escolher', (tester) async {
     await pump(tester, null);
@@ -84,7 +167,7 @@ void main() {
     expect(find.text('#lançamento-q4'), findsOneWidget);
     expect(find.text('Hoje, 4 de outubro'), findsOneWidget);
     expect(find.text('Diego Alves'), findsOneWidget);
-    expect(find.text('VOCÊ'), findsOneWidget);
+    expect(find.text('Você'), findsOneWidget);
     expect(find.text('4 respostas'), findsOneWidget);
   });
 
@@ -225,76 +308,86 @@ void main() {
     expect(repository.conversation.openedThreads, ['\$root']);
   });
 
-  testWidgets('início da conversa e indicador de carregamento no topo', (
+  testWidgets('no início mostra "Início da conversa" e não busca', (
     tester,
   ) async {
     await pump(tester, kTeamRoom);
-    await show(
-      tester,
-      ConversationSnapshot(items: kSnapshot.items, reachedStart: true),
-    );
+    await show(tester, page(kSnapshot.items, reachedStart: true));
 
     expect(find.text('Início da conversa'), findsOneWidget);
+    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
+    expect(repository.conversation.loadOlderCalls, 0);
   });
 
-  testWidgets(
-    'sem carregar e sem chegar ao início mostra o botão de anteriores',
-    (tester) async {
-      await pump(tester, kTeamRoom);
-      await show(tester, kSnapshot);
-      await tester.pump(const Duration(milliseconds: 300));
-      final before = repository.conversation.loadOlderCalls;
+  // Página sem nada visível não muda o estado; a tela pede de novo até o início.
+  void reachStartOnCall(int call) {
+    final conversation = repository.conversation
+      ..loadOlderResult = const Result.ok(false);
+    conversation.onLoadOlder = () {
+      if (conversation.loadOlderCalls == call) {
+        conversation.loadOlderResult = const Result.ok(true);
+      }
+    };
+  }
 
-      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
-      await tester.tap(find.byKey(const Key('timeline_load_older')));
-      await tester.pump();
-
-      expect(repository.conversation.loadOlderCalls, before + 1);
-    },
-  );
-
-  testWidgets('busca automática ao abrir não mostra spinner nem botão', (
+  testWidgets('lista curta parada pede anteriores até o início', (
     tester,
   ) async {
-    final loading = repository.conversation.loadOlderCompleter =
+    reachStartOnCall(2);
+    await pump(tester, kTeamRoom);
+    await show(tester, page(kSnapshot.items));
+    await tester.pump();
+
+    expect(repository.conversation.loadOlderCalls, 2);
+    expect(find.text('Início da conversa'), findsOneWidget);
+    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
+  });
+
+  testWidgets('lista vazia sem início mostra o carregamento e pede uma vez', (
+    tester,
+  ) async {
+    final pending = repository.conversation.loadOlderCompleter =
         Completer<void>();
     await pump(tester, kTeamRoom);
-    repository.conversation.snapshots.add(kSnapshot);
-    await tester.pump();
-    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await show(tester, page(const []));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('timeline_loading_center')), findsNothing);
 
-    expect(repository.conversation.loadOlderCalls, 1);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const Key('timeline_loading_center')), findsOneWidget);
     expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
-    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
-    loading.complete();
+    expect(repository.conversation.loadOlderCalls, 1);
+    pending.complete();
     await tester.pump();
   });
 
-  testWidgets(
-    'busca automática com a lista vazia mostra o carregamento no centro',
-    (
-      tester,
-    ) async {
-      final loading = repository.conversation.loadOlderCompleter =
-          Completer<void>();
-      await pump(tester, kTeamRoom);
-      await show(
-        tester,
-        const ConversationSnapshot(items: [], reachedStart: false),
-      );
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.byKey(const Key('timeline_loading_center')), findsNothing);
+  testWidgets('lista vazia pede de novo sem snapshot novo até o início', (
+    tester,
+  ) async {
+    reachStartOnCall(3);
+    await pump(tester, kTeamRoom);
+    await show(tester, page(const []));
+    await tester.pump();
 
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.byKey(const Key('timeline_loading_center')), findsOneWidget);
-      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
-      loading.complete();
+    expect(repository.conversation.loadOlderCalls, 3);
+    expect(find.text('Nenhuma mensagem ainda.'), findsOneWidget);
+    for (var i = 0; i < 5; i++) {
       await tester.pump();
-    },
-  );
+    }
+    expect(repository.conversation.loadOlderCalls, 3);
+  });
+
+  testWidgets('paginando com a lista curta não mostra spinner nem botão', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(tester, page(kSnapshot.items, paginating: true));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
+    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
+  });
 
   testWidgets('campo desabilitado até a conversa ficar pronta', (tester) async {
     TextField field() =>
@@ -309,24 +402,31 @@ void main() {
 
   testWidgets('rolar até o topo pede mensagens antigas', (tester) async {
     await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(tester, page([for (var i = 0; i < 30; i++) msg(i)]));
+    expect(repository.conversation.loadOlderCalls, 0);
+
+    // O primeiro arraste revela as 10 escondidas; o segundo chega ao topo sem nada escondido.
+    for (var i = 0; i < 2; i++) {
+      await tester.drag(
+        find.byKey(const Key('timeline_list')),
+        const Offset(0, 5000),
+      );
+      await tester.pump();
+    }
+
+    expect(repository.conversation.loadOlderCalls, 1);
+  });
+
+  testWidgets('subir revela as mensagens já carregadas sem pedir ao Rust', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
     await show(
       tester,
-      ConversationSnapshot(
-        items: [
-          for (var i = 0; i < 30; i++)
-            MessageItem(
-              id: '\$m$i',
-              senderId: '@bob:b.c',
-              senderName: 'Bob',
-              isOwn: false,
-              timestamp: kDay.add(Duration(minutes: i)),
-              kind: MessageKind.text,
-              body: 'mensagem $i',
-            ),
-        ],
-        reachedStart: false,
-      ),
+      page([for (var i = 0; i < 60; i++) msg(i)], reachedStart: true),
     );
+    expect(find.text('mensagem 39'), findsNothing);
+    expect(find.text('Início da conversa'), findsNothing);
 
     await tester.drag(
       find.byKey(const Key('timeline_list')),
@@ -334,7 +434,62 @@ void main() {
     );
     await tester.pump();
 
-    expect(repository.conversation.loadOlderCalls, greaterThanOrEqualTo(1));
+    expect(find.text('mensagem 39'), findsOneWidget);
+    expect(repository.conversation.loadOlderCalls, 0);
+  });
+
+  testWidgets('um passo da roda perto do topo revela uma vez, não tudo', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(
+      tester,
+      page([for (var i = 0; i < 120; i++) msg(i)], reachedStart: true),
+    );
+    final list = find.byKey(const Key('timeline_list'));
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)),
+        )
+        .position;
+    final thumbBefore =
+        (position.maxScrollExtent - position.viewportDimension * 2 + 10) /
+        position.maxScrollExtent;
+
+    position.jumpTo(
+      position.maxScrollExtent - position.viewportDimension * 2 + 10,
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('mensagem 80'), findsOneWidget);
+    expect(find.text('mensagem 0'), findsNothing);
+    expect(
+      position.pixels / position.maxScrollExtent,
+      greaterThan(thumbBefore / 3),
+    );
+  });
+
+  testWidgets('pede mais a duas alturas da área visível do topo', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 524));
+    await show(tester, page([for (var i = 0; i < 60; i++) msg(i)]));
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byKey(const Key('timeline_list')),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position;
+    final distance = position.viewportDimension * 2 - 20;
+    expect(distance, greaterThan(400));
+
+    position.jumpTo(position.maxScrollExtent - distance);
+    await tester.pump();
+
+    expect(find.text('mensagem 39'), findsOneWidget);
   });
 
   testWidgets('mensagem nova lendo mais acima mostra o botão de recentes', (
@@ -370,22 +525,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('jump_to_latest')), findsNothing);
   });
-
-  MessageItem msg(
-    int i, {
-    bool own = false,
-    SendState state = SendState.sent,
-    String? id,
-  }) => MessageItem(
-    id: id ?? '\$m$i',
-    senderId: own ? '@alice:matrix.org' : '@bob:b.c',
-    senderName: own ? 'Alice' : 'Bob',
-    isOwn: own,
-    timestamp: kDay.add(Duration(minutes: i)),
-    kind: MessageKind.text,
-    body: 'mensagem $i',
-    sendState: state,
-  );
 
   testWidgets('timeline que esvazia e volta com mensagem nova não quebra', (
     tester,
@@ -437,20 +576,6 @@ void main() {
 
       final after = tester.getTopLeft(find.byKey(const Key('message_\$m20')));
       expect((after.dy - before.dy).abs(), lessThanOrEqualTo(1));
-    },
-  );
-
-  testWidgets(
-    'histórico curto sem chegar ao início pede mensagens antigas sem rolar',
-    (tester) async {
-      await pump(tester, kTeamRoom);
-      await show(
-        tester,
-        ConversationSnapshot(items: [msg(1), msg(2)], reachedStart: false),
-      );
-      await tester.pump();
-
-      expect(repository.conversation.loadOlderCalls, greaterThanOrEqualTo(1));
     },
   );
 
@@ -543,82 +668,63 @@ void main() {
     },
   );
 
-  testWidgets(
-    'indicador de carregamento aparece no topo quando há mais histórico',
-    (tester) async {
-      final loading = repository.conversation.loadOlderCompleter =
-          Completer<void>();
-      await pump(tester, kTeamRoom, size: const Size(1440, 500));
-      await show(
-        tester,
-        ConversationSnapshot(
-          items: [for (var i = 0; i < 30; i++) msg(i)],
-          reachedStart: false,
-        ),
-      );
-      await tester.drag(
-        find.byKey(const Key('timeline_list')),
-        const Offset(0, 5000),
-      );
-      await tester.pump();
-      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
-      await tester.pump(const Duration(milliseconds: 300));
+  testWidgets('paginando com a lista que já rola mostra o spinner no topo', (
+    tester,
+  ) async {
+    final many = [for (var i = 0; i < 30; i++) msg(i)];
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(tester, page(many));
+    await tester.drag(
+      find.byKey(const Key('timeline_list')),
+      const Offset(0, 5000),
+    );
+    await tester.pump();
+    await show(tester, page(many, paginating: true));
+    expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
 
-      expect(find.byKey(const Key('timeline_loading_older')), findsOneWidget);
-      loading.complete();
-      await tester.pump();
-    },
-  );
+    await tester.pump(const Duration(milliseconds: 300));
 
-  testWidgets(
-    'falha ao pedir mensagens antigas não gera novas tentativas sozinha',
-    (tester) async {
-      repository.conversation.loadOlderResult = const Result.error(
-        FakeConversationRepository.notFound,
-      );
-      await pump(tester, kTeamRoom);
-      await show(
-        tester,
-        ConversationSnapshot(items: [msg(1), msg(2)], reachedStart: false),
-      );
-      for (var i = 0; i < 5; i++) {
-        await tester.pump();
-      }
+    expect(find.byKey(const Key('timeline_loading_older')), findsOneWidget);
+    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
+  });
 
-      expect(repository.conversation.loadOlderCalls, 1);
-    },
-  );
+  testWidgets('falha com a lista vazia mostra o botão no centro', (
+    tester,
+  ) async {
+    repository.conversation.loadOlderResult = const Result.error(
+      FakeConversationRepository.notFound,
+    );
+    await pump(tester, kTeamRoom);
+    await show(tester, page(const []));
+    await tester.pump();
 
-  testWidgets(
-    'itens que chegam durante o carregamento antigo continuam a paginação',
-    (tester) async {
-      final completer = Completer<void>();
-      repository.conversation.loadOlderCompleter = completer;
-      repository.conversation.loadOlderResult = const Result.ok(false);
-      await pump(tester, kTeamRoom);
-      await show(
-        tester,
-        ConversationSnapshot(items: [msg(1), msg(2)], reachedStart: false),
-      );
-      await tester.pump();
-      expect(repository.conversation.loadOlderCalls, 1);
+    final button = find.byKey(const Key('timeline_load_older'));
+    expect(button, findsOneWidget);
+    expect(find.byKey(const Key('timeline_loading_center')), findsNothing);
+    final center = tester.getCenter(find.byKey(const Key('timeline_list')));
+    expect((tester.getCenter(button).dy - center.dy).abs(), lessThan(40));
+  });
 
-      await show(
-        tester,
-        ConversationSnapshot(
-          items: [msg(0), msg(1), msg(2)],
-          reachedStart: false,
-        ),
-      );
-      await tester.pump();
-      completer.complete();
-      for (var i = 0; i < 5; i++) {
-        await tester.pump();
-      }
+  testWidgets('falha mostra o botão e só ele pede de novo', (tester) async {
+    repository.conversation.loadOlderResult = const Result.error(
+      FakeConversationRepository.notFound,
+    );
+    await pump(tester, kTeamRoom);
+    await show(tester, page([msg(1), msg(2)]));
+    expect(repository.conversation.loadOlderCalls, 1);
+    await tester.pump();
 
-      expect(repository.conversation.loadOlderCalls, 2);
-    },
-  );
+    expect(find.byKey(const Key('timeline_load_older')), findsOneWidget);
+    await show(tester, page([msg(1), msg(2), msg(3)]));
+    await show(tester, page([msg(1), msg(2), msg(3)], paginating: true));
+    await show(tester, page([msg(1), msg(2), msg(3)]));
+    expect(repository.conversation.loadOlderCalls, 1);
+
+    await tester.tap(find.byKey(const Key('timeline_load_older')));
+    await tester.pump();
+
+    expect(repository.conversation.loadOlderCalls, 2);
+  });
 
   testWidgets('texto longo sem espaços e nome longo a 1024 px não estouram', (
     tester,
@@ -743,8 +849,9 @@ void main() {
         reachedStart: true,
       ),
     );
-    final first = find.text('mensagem 0');
-    expect(tester.getRect(first).top, lessThan(0));
+    // A citação também mostra "mensagem 0"; vale só a mensagem original.
+    final first = find.byKey(const Key('message_u0'));
+    expect(first, findsNothing);
 
     await tester.tap(find.byKey(const Key('reply_quote_header')));
     await tester.pumpAndSettle();
@@ -1071,23 +1178,349 @@ void main() {
   testWidgets(
     'sala só com eventos ocultos carrega até o início e mostra o estado vazio',
     (tester) async {
-      repository.conversation
-        ..loadOlderResult = const Result.ok(true)
-        ..onLoadOlder = () => repository.conversation.snapshots.add(
-          const ConversationSnapshot(items: [], reachedStart: true),
-        );
+      reachStartOnCall(4);
+      final first = repository.conversation.loadOlderCompleter =
+          Completer<void>();
       await pump(tester, kTeamRoom);
-      await show(
-        tester,
-        const ConversationSnapshot(items: [], reachedStart: false),
-      );
+      await show(tester, page(const []));
+      await show(tester, page(const [], paginating: true));
+      first.complete();
       await tester.pump();
-      await tester.pump();
-
       expect(repository.conversation.loadOlderCalls, 1);
+
+      await show(tester, page(const []));
+      await show(tester, page(const [], reachedStart: true));
+
+      expect(repository.conversation.loadOlderCalls, 4);
       expect(find.text('Nenhuma mensagem ainda.'), findsOneWidget);
-      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
+      expect(find.byKey(const Key('timeline_loading_center')), findsNothing);
       expect(find.byKey(const Key('timeline_load_older')), findsNothing);
     },
   );
+
+  testWidgets('mensagens seguidas do mesmo autor mostram o nome uma vez', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        DateDividerItem(kDay),
+        msg(0),
+        msg(1),
+        msg(10),
+      ], reachedStart: true),
+    );
+
+    expect(find.text('Bob'), findsNWidgets(2));
+    final first = tester.getRect(find.text('mensagem 0'));
+    final second = tester.getRect(find.text('mensagem 1'));
+    expect(second.top - first.bottom, lessThan(12));
+  });
+
+  testWidgets('evento de sala aparece numa linha e quebra o grupo', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        DateDividerItem(kDay),
+        msg(0),
+        RoomEventItem(
+          id: '\$join',
+          senderName: 'Ana',
+          isOwn: false,
+          timestamp: kDay.add(const Duration(minutes: 1)),
+          kind: RoomEventKind.joined,
+        ),
+        msg(2),
+      ], reachedStart: true),
+    );
+
+    expect(find.byKey(const Key('room_event_\$join')), findsOneWidget);
+    expect(find.textContaining('Ana entrou na sala'), findsOneWidget);
+    expect(find.text('Bob'), findsNWidgets(2));
+  });
+
+  testWidgets('sala só com eventos mostra as linhas, não o estado vazio', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        RoomEventItem(
+          id: '\$create',
+          senderName: 'Bob',
+          isOwn: true,
+          timestamp: kDay,
+          kind: RoomEventKind.created,
+        ),
+      ], reachedStart: true),
+    );
+
+    expect(find.byKey(const Key('room_event_\$create')), findsOneWidget);
+    expect(find.textContaining('Você criou a sala'), findsOneWidget);
+    expect(find.text('Nenhuma mensagem ainda.'), findsNothing);
+  });
+
+  testWidgets('minhas mensagens seguidas formam um grupo com status no fim', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      page([
+        DateDividerItem(kDay),
+        msg(0, own: true, id: r'$a'),
+        msg(0, own: true, id: r'$b'),
+        msg(0, own: true, id: r'$c'),
+      ], reachedStart: true),
+    );
+
+    expect(find.text('Você'), findsOneWidget);
+    expect(find.text('Enviada'), findsOneWidget);
+    final a = tester.getRect(find.byKey(const Key(r'message_$a')));
+    final b = tester.getRect(find.byKey(const Key(r'message_$b')));
+    final c = tester.getRect(find.byKey(const Key(r'message_$c')));
+    expect(b.top, a.bottom);
+    expect(c.top, b.bottom);
+    expect(
+      tester.getTopLeft(find.text('Enviada')).dy,
+      greaterThan(tester.getTopLeft(find.text('mensagem 0').last).dy),
+    );
+  });
+
+  group('evento de sala com texto longo', () {
+    RoomEventItem topic(String value) => RoomEventItem(
+      id: r'$topic',
+      senderName: 'Daniel Messias',
+      isOwn: false,
+      timestamp: kDay.add(const Duration(hours: 2, minutes: 6)),
+      kind: RoomEventKind.topicChanged,
+      value: value,
+    );
+
+    Future<Rect> showTopic(WidgetTester tester, String value) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([topic(value)], reachedStart: true));
+      expect(tester.takeException(), isNull);
+      return tester.getRect(
+        find
+            .descendant(
+              of: find.byKey(const Key(r'room_event_$topic')),
+              matching: find.byType(RichText),
+            )
+            .first,
+      );
+    }
+
+    void expectCenteredAndWrapped(WidgetTester tester, Rect text) {
+      final list = tester.getRect(find.byKey(const Key('timeline_list')));
+      expect(text.width, lessThanOrEqualTo(560));
+      expect(text.center.dx, closeTo(list.center.dx, 1));
+      final icon = tester.getRect(find.byIcon(Icons.notes));
+      expect(icon.left, greaterThanOrEqualTo(text.left));
+      expect(text.height, greaterThan(icon.height * 2));
+    }
+
+    testWidgets('fica centralizado e a hora segue o texto', (tester) async {
+      final text = await showTopic(tester, 'palavra ' * 40);
+
+      expectCenteredAndWrapped(tester, text);
+      final line = tester.widget<RichText>(
+        find
+            .descendant(
+              of: find.byKey(const Key(r'room_event_$topic')),
+              matching: find.byType(RichText),
+            )
+            .first,
+      );
+      expect(
+        line.text.toPlainText(),
+        endsWith('”\u00A0\u00A0${formatMessageTime(topic('').timestamp)}'),
+      );
+    });
+
+    testWidgets('tópico sem espaços quebra dentro do bloco', (tester) async {
+      final text = await showTopic(tester, 'asd' * 60);
+
+      expectCenteredAndWrapped(tester, text);
+    });
+  });
+
+  group('eventos de sala seguidos', () {
+    RoomEventItem topic(int i) => RoomEventItem(
+      id: '\$t$i',
+      senderName: 'Daniel Messias',
+      isOwn: false,
+      timestamp: kDay.add(Duration(minutes: 10 + i)),
+      kind: RoomEventKind.topicChanged,
+      value: 'tópico $i',
+    );
+
+    final events = [for (var i = 0; i < 3; i++) topic(i)];
+    const summary = Key(r'room_event_group_$t0');
+    const collapse = Key(r'room_event_group_collapse_$t0');
+
+    testWidgets('começam recolhidos num resumo com a hora do último', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events, msg(20)]));
+
+      expect(find.byKey(summary), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Daniel Messias mudou o tópico 3 vezes'
+          '\u00A0\u00A0${formatMessageTime(events.last.timestamp)}',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key(r'room_event_$t0')), findsNothing);
+      expect(find.text('Bob'), findsNWidgets(2));
+    });
+
+    testWidgets('expandir mostra cada evento e Recolher volta ao resumo', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events, msg(20)]));
+
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      for (final e in events) {
+        expect(find.byKey(Key('room_event_${e.id}')), findsOneWidget);
+      }
+      expect(find.byKey(summary), findsNothing);
+      expect(
+        tester.getTopLeft(find.byKey(collapse)).dy,
+        greaterThan(
+          tester.getBottomLeft(find.byKey(const Key(r'room_event_$t2'))).dy,
+        ),
+      );
+
+      await tester.tap(find.byKey(collapse));
+      await tester.pump();
+
+      expect(find.byKey(summary), findsOneWidget);
+      expect(find.byKey(const Key(r'room_event_$t0')), findsNothing);
+    });
+
+    testWidgets('evento novo no fim mantém o grupo aberto', (tester) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events]));
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      await show(tester, page([msg(0), ...events, topic(3)]));
+
+      expect(find.byKey(const Key(r'room_event_$t3')), findsOneWidget);
+      expect(find.byKey(collapse), findsOneWidget);
+    });
+
+    testWidgets('evento antigo no começo mantém o grupo aberto', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([...events, msg(20)]));
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      final older = RoomEventItem(
+        id: r'$antes',
+        senderName: 'Daniel Messias',
+        isOwn: false,
+        timestamp: kDay.add(const Duration(minutes: 5)),
+        kind: RoomEventKind.topicChanged,
+        value: 'tópico antigo',
+      );
+      await show(tester, page([older, ...events, msg(20)]));
+
+      expect(find.byKey(const Key(r'room_event_$antes')), findsOneWidget);
+      expect(
+        find.byKey(const Key(r'room_event_group_collapse_$antes')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('expandir lendo mais acima não move o que está embaixo', (
+      tester,
+    ) async {
+      await pump(tester, kTeamRoom, size: const Size(1440, 500));
+      await show(
+        tester,
+        page([
+          for (var i = 0; i < 10; i++) msg(i),
+          ...events,
+          for (var i = 20; i < 40; i++) msg(i),
+        ], reachedStart: true),
+      );
+      await tester.dragUntilVisible(
+        find.byKey(summary),
+        find.byKey(const Key('timeline_list')),
+        const Offset(0, 200),
+      );
+      await tester.pump();
+      final below = find.text('mensagem 20');
+      final before = tester.getTopLeft(below).dy;
+      final summaryBottom = tester.getBottomLeft(find.byKey(summary)).dy;
+
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      expect(tester.getTopLeft(below).dy, before);
+      expect(
+        tester.getBottomLeft(find.byKey(collapse)).dy,
+        closeTo(summaryBottom, 1),
+      );
+    });
+
+    testWidgets('trocar de sala recolhe de novo', (tester) async {
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events]));
+      await tester.tap(find.byKey(summary));
+      await tester.pump();
+
+      await pump(tester, kDirectRoom);
+      await show(tester, page([msg(0), ...events]));
+      await pump(tester, kTeamRoom);
+      await show(tester, page([msg(0), ...events]));
+
+      expect(find.byKey(summary), findsOneWidget);
+    });
+  });
+
+  testWidgets('clicar no chip de reação reage pela conversa', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          MessageItem(
+            id: '\$other',
+            eventId: '\$other',
+            senderId: '@diego:matrix.org',
+            senderName: 'Diego Alves',
+            isOwn: false,
+            timestamp: DateTime(2026, 10, 4, 10, 5),
+            kind: MessageKind.text,
+            body: 'A integração ficou pronta.',
+            canReact: true,
+            reactions: const [
+              MessageReaction(key: '👍', count: 1, reactedByMe: true),
+            ],
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_👍')));
+    await tester.pump();
+
+    expect(repository.conversation.reacted, [('\$other', '👍')]);
+  });
 }

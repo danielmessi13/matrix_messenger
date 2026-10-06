@@ -1,4 +1,10 @@
-enum ConversationFailureType { roomNotFound, messageNotFound, network, unknown }
+enum ConversationFailureType {
+  roomNotFound,
+  messageNotFound,
+  invalidImage,
+  network,
+  unknown,
+}
 
 class ConversationFailure implements Exception {
   const ConversationFailure(this.type, [this.details]);

@@ -309,4 +309,22 @@ void main() {
       verify: (_) => expect(repository.cancelBrowserLoginCalls, 0),
     );
   });
+
+  blocTest<LoginViewModel, LoginState>(
+    'repassa keepSignedIn ao repository',
+    build: () => LoginViewModel(repository = FakeAuthRepository(), launcher),
+    act: (viewModel) async {
+      await viewModel.login(
+        homeserver: 'matrix.org',
+        username: 'alice',
+        password: 'secret',
+        keepSignedIn: false,
+      );
+      await viewModel.loginWithBrowser(
+        homeserver: 'matrix.org',
+        keepSignedIn: false,
+      );
+    },
+    verify: (_) => expect(repository.keepSignedInCalls, [false, false]),
+  );
 }

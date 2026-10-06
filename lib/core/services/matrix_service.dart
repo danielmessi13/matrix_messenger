@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 
 import '../../src/rust/api/auth.dart';
 import '../../src/rust/api/client.dart';
 import '../../src/rust/api/notifications.dart';
+import '../../src/rust/api/media.dart';
 import '../../src/rust/api/oidc.dart';
 import '../../src/rust/api/recovery.dart';
 import '../../src/rust/api/rooms.dart';
+import '../../src/rust/api/search.dart';
+import '../../src/rust/api/threads.dart';
 import '../../src/rust/api/timeline.dart';
 import '../utils/result.dart';
 import 'local_storage_exception.dart';
@@ -46,6 +50,7 @@ class MatrixService {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) => _guard(() async {
     final dataDir = await _dataDir();
     await cancelBrowserLogin();
@@ -56,6 +61,7 @@ class MatrixService {
       username: username,
       password: password,
       dataDir: dataDir,
+      keepSignedIn: keepSignedIn,
     );
     return _adopt(client);
   });
@@ -63,6 +69,7 @@ class MatrixService {
   Future<Result<MatrixClient>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   }) => _guard(() async {
     final dataDir = await _dataDir();
     await cancelBrowserLogin();
@@ -70,6 +77,7 @@ class MatrixService {
     final login = await _bridge.startBrowserLogin(
       homeserver: homeserver,
       dataDir: dataDir,
+      keepSignedIn: keepSignedIn,
     );
     _pendingBrowserLogin = login;
     try {
@@ -92,6 +100,11 @@ class MatrixService {
   Stream<RecoveryStatus> watchRecovery() =>
       _client?.watchRecovery() ?? const Stream.empty();
 
+  Stream<RecentThreadsSnapshot> watchRecentThreads() =>
+      _client?.watchRecentThreads() ?? const Stream.empty();
+
+  Future<void> retryRecentThreads() async => _client?.retryRecentThreads();
+
   Stream<RoomNotification> watchNotifications() =>
       _client?.watchNotifications() ?? const Stream.empty();
 
@@ -101,10 +114,25 @@ class MatrixService {
     await client.recover(recoveryKey: recoveryKey);
   });
 
+  Future<Result<String>> setupRecovery() => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.setupRecovery();
+  });
+
   Future<Result<RoomTimeline>> openTimeline(String roomId) => _guard(() async {
     final client = _client;
     if (client == null) throw StateError('Sem sessão ativa');
     return client.openTimeline(roomId: roomId);
+  });
+
+  Future<Result<Uint8List>> loadMedia(
+    String media, {
+    required bool thumbnail,
+  }) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.loadMedia(media: media, thumbnail: thumbnail);
   });
 
   Future<Result<void>> acceptInvite(String roomId) => _guard(() async {
@@ -117,6 +145,58 @@ class MatrixService {
     final client = _client;
     if (client == null) throw StateError('Sem sessão ativa');
     await client.declineInvite(roomId: roomId);
+  });
+
+  Future<Result<void>> leaveRoom(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    await client.leaveRoom(roomId: roomId);
+  });
+
+  Future<Result<void>> inviteUser(String roomId, String userId) =>
+      _guard(() async {
+        final client = _client;
+        if (client == null) throw StateError('Sem sessão ativa');
+        await client.inviteUser(roomId: roomId, userId: userId);
+      });
+
+  Future<Result<bool>> canInvite(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.canInvite(roomId: roomId);
+  });
+
+  Future<Result<CreatedRoom>> createRoom(NewRoom room) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.createRoom(room: room);
+  });
+
+  Future<Result<UserCheck>> checkUser(String userId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.checkUser(userId: userId);
+  });
+
+  Future<Result<String?>> roomLink(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.roomLink(roomId: roomId);
+  });
+
+  Future<Result<String>> joinRoom(String target) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.joinRoom(target: target);
+  });
+
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  }) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.searchMessages(term: term, nextBatch: nextBatch);
   });
 
   Future<Result<void>> logout() => _guard(() async {
@@ -174,7 +254,12 @@ class MatrixService {
   static bool _isExpected(Object error) =>
       error is AuthError ||
       error is TimelineError ||
+      error is MediaError ||
       error is RecoveryError ||
       error is InviteError ||
+      error is CreateRoomError ||
+      error is JoinRoomError ||
+      error is RoomActionError ||
+      error is SearchError ||
       error is LocalStorageException;
 }

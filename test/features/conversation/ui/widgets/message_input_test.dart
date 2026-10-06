@@ -174,10 +174,13 @@ void main() {
     );
   });
 
-  testWidgets('anexar e mencionar ficam para depois', (tester) async {
+  testWidgets('anexar envia imagem e mencionar fica para depois', (
+    tester,
+  ) async {
     await pump(tester);
 
-    expect(find.byTooltip('Em breve'), findsNWidgets(2));
+    expect(find.byTooltip('Enviar imagem'), findsOneWidget);
+    expect(find.byTooltip('Em breve'), findsOneWidget);
   });
 
   Future<void> pumpWith(
@@ -271,11 +274,12 @@ void main() {
         'format_strike',
         'format_code',
         'format_list',
+        'attach_image',
         'message_send',
       ]) {
         expect(find.byKey(Key(key)), findsOneWidget, reason: key);
       }
-      expect(find.byTooltip('Em breve'), findsNWidgets(2));
+      expect(find.byTooltip('Em breve'), findsOneWidget);
     },
   );
 
@@ -354,5 +358,36 @@ void main() {
     expect(find.byKey(const Key('format_bold')), findsNothing);
     expect(find.text('Enter envia · Shift + Enter nova linha'), findsNothing);
     expect(find.byKey(const Key('message_send')), findsOneWidget);
+  });
+
+  testWidgets('o + chama onAttachImage e espera enquanto anexa', (
+    tester,
+  ) async {
+    useDesktopSize(tester);
+    var attached = 0;
+    Widget input({required bool attaching}) => MaterialApp(
+      theme: buildAppTheme(),
+      home: Scaffold(
+        body: MessageInput(
+          placeholder: 'Escrever…',
+          onSend: (_) async => true,
+          onAttachImage: () => attached++,
+          attaching: attaching,
+        ),
+      ),
+    );
+    IconButton plus() => tester.widget<IconButton>(
+      find.descendant(
+        of: find.byKey(const Key('attach_image')),
+        matching: find.byType(IconButton),
+      ),
+    );
+
+    await tester.pumpWidget(input(attaching: false));
+    await tester.tap(find.byKey(const Key('attach_image')));
+    expect(attached, 1);
+    await tester.pumpWidget(input(attaching: true));
+
+    expect(plus().onPressed, isNull);
   });
 }

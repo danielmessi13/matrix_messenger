@@ -22,6 +22,7 @@ void main() {
       ),
     );
 
+    expect(find.text('Buscar mensagens'), findsOneWidget);
     expect(find.byKey(const Key('room_search_clear')), findsNothing);
     await tester.enterText(find.byKey(const Key('room_search')), 'ana');
     await tester.pump();
@@ -31,25 +32,5 @@ void main() {
     await tester.pump();
     expect(cleared, 1);
     expect(find.text('ana'), findsNothing);
-  });
-
-  testWidgets('abas Mensagens e Pessoas estão desabilitadas', (tester) async {
-    final focusNode = FocusNode();
-    addTearDown(focusNode.dispose);
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: Scaffold(
-          body: RoomSearchField(
-            focusNode: focusNode,
-            onChanged: (_) {},
-            onCleared: () {},
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('Tudo'), findsOneWidget);
-    expect(find.byTooltip('Em breve'), findsNWidgets(2));
   });
 }

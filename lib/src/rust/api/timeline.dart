@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `from_sdk`, `new`, `new`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RoomTimeline>>
 abstract class RoomTimeline implements RustOpaqueInterface {
@@ -22,11 +22,58 @@ abstract class RoomTimeline implements RustOpaqueInterface {
 
   Future<void> retry({required String itemId});
 
+  Future<void> sendImage({required String path, String? inReplyTo});
+
   Future<void> sendMarkdown({required String body});
 
   Future<void> sendReply({required String body, required String inReplyTo});
 
+  Future<void> setTyping({required bool typing});
+
+  Future<void> toggleReaction({required String itemId, required String key});
+
   Stream<TimelineSnapshot> watch();
+
+  Stream<List<String>> watchTyping();
+}
+
+class ImageContent {
+  final String filename;
+  final String? caption;
+  final int? width;
+  final int? height;
+  final String? mimetype;
+  final String media;
+
+  const ImageContent({
+    required this.filename,
+    this.caption,
+    this.width,
+    this.height,
+    this.mimetype,
+    required this.media,
+  });
+
+  @override
+  int get hashCode =>
+      filename.hashCode ^
+      caption.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      mimetype.hashCode ^
+      media.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImageContent &&
+          runtimeType == other.runtimeType &&
+          filename == other.filename &&
+          caption == other.caption &&
+          width == other.width &&
+          height == other.height &&
+          mimetype == other.mimetype &&
+          media == other.media;
 }
 
 enum MessageKind {
@@ -38,6 +85,37 @@ enum MessageKind {
   encrypted,
   redacted,
   other,
+}
+
+class Reaction {
+  final String key;
+  final int count;
+  final bool reactedByMe;
+  final List<String> senderNames;
+
+  const Reaction({
+    required this.key,
+    required this.count,
+    required this.reactedByMe,
+    required this.senderNames,
+  });
+
+  @override
+  int get hashCode =>
+      key.hashCode ^
+      count.hashCode ^
+      reactedByMe.hashCode ^
+      senderNames.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Reaction &&
+          runtimeType == other.runtimeType &&
+          key == other.key &&
+          count == other.count &&
+          reactedByMe == other.reactedByMe &&
+          senderNames == other.senderNames;
 }
 
 class ReplyPreview {
@@ -85,6 +163,69 @@ enum ReplyState {
   unavailable,
 }
 
+class RoomEvent {
+  final String id;
+  final String senderName;
+  final bool isOwn;
+  final PlatformInt64 timestampMs;
+  final RoomEventKind kind;
+  final String? targetName;
+  final bool targetIsOwn;
+  final String? value;
+
+  const RoomEvent({
+    required this.id,
+    required this.senderName,
+    required this.isOwn,
+    required this.timestampMs,
+    required this.kind,
+    this.targetName,
+    required this.targetIsOwn,
+    this.value,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      senderName.hashCode ^
+      isOwn.hashCode ^
+      timestampMs.hashCode ^
+      kind.hashCode ^
+      targetName.hashCode ^
+      targetIsOwn.hashCode ^
+      value.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoomEvent &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          senderName == other.senderName &&
+          isOwn == other.isOwn &&
+          timestampMs == other.timestampMs &&
+          kind == other.kind &&
+          targetName == other.targetName &&
+          targetIsOwn == other.targetIsOwn &&
+          value == other.value;
+}
+
+enum RoomEventKind {
+  created,
+  joined,
+  left,
+  invited,
+  inviteDeclined,
+  kicked,
+  banned,
+  unbanned,
+  nameChanged,
+  topicChanged,
+  avatarChanged,
+  encryptionEnabled,
+  displayNameChanged,
+}
+
 enum SendState {
   sent,
   sending,
@@ -130,14 +271,17 @@ class ThreadInfo {
 class TimelineEntry {
   final PlatformInt64? dateDividerMs;
   final TimelineMessage? message;
+  final RoomEvent? roomEvent;
 
   const TimelineEntry({
     this.dateDividerMs,
     this.message,
+    this.roomEvent,
   });
 
   @override
-  int get hashCode => dateDividerMs.hashCode ^ message.hashCode;
+  int get hashCode =>
+      dateDividerMs.hashCode ^ message.hashCode ^ roomEvent.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -145,7 +289,8 @@ class TimelineEntry {
       other is TimelineEntry &&
           runtimeType == other.runtimeType &&
           dateDividerMs == other.dateDividerMs &&
-          message == other.message;
+          message == other.message &&
+          roomEvent == other.roomEvent;
 }
 
 class TimelineError implements FrbException {
@@ -172,6 +317,7 @@ class TimelineError implements FrbException {
 enum TimelineErrorKind {
   roomNotFound,
   messageNotFound,
+  invalidImage,
   network,
   unknown,
 }
@@ -191,6 +337,9 @@ class TimelineMessage {
   final ThreadInfo? thread;
   final ReplyPreview? replyTo;
   final List<String> readBy;
+  final ImageContent? image;
+  final List<Reaction> reactions;
+  final bool canReact;
 
   const TimelineMessage({
     required this.id,
@@ -207,6 +356,9 @@ class TimelineMessage {
     this.thread,
     this.replyTo,
     required this.readBy,
+    this.image,
+    required this.reactions,
+    required this.canReact,
   });
 
   @override
@@ -224,7 +376,10 @@ class TimelineMessage {
       canReply.hashCode ^
       thread.hashCode ^
       replyTo.hashCode ^
-      readBy.hashCode;
+      readBy.hashCode ^
+      image.hashCode ^
+      reactions.hashCode ^
+      canReact.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -244,20 +399,26 @@ class TimelineMessage {
           canReply == other.canReply &&
           thread == other.thread &&
           replyTo == other.replyTo &&
-          readBy == other.readBy;
+          readBy == other.readBy &&
+          image == other.image &&
+          reactions == other.reactions &&
+          canReact == other.canReact;
 }
 
 class TimelineSnapshot {
   final List<TimelineEntry> items;
   final bool reachedStart;
+  final bool paginating;
 
   const TimelineSnapshot({
     required this.items,
     required this.reachedStart,
+    required this.paginating,
   });
 
   @override
-  int get hashCode => items.hashCode ^ reachedStart.hashCode;
+  int get hashCode =>
+      items.hashCode ^ reachedStart.hashCode ^ paginating.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -265,5 +426,6 @@ class TimelineSnapshot {
       other is TimelineSnapshot &&
           runtimeType == other.runtimeType &&
           items == other.items &&
-          reachedStart == other.reachedStart;
+          reachedStart == other.reachedStart &&
+          paginating == other.paginating;
 }

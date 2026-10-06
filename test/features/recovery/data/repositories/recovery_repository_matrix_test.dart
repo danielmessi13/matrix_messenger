@@ -51,4 +51,29 @@ void main() {
       ),
     );
   });
+
+  test('setupRecovery devolve a chave', () async {
+    service.setupRecoveryResult = const Result.ok('EsTx 9999');
+
+    final result = await repository.setupRecovery();
+
+    expect((result as Ok<String>).value, 'EsTx 9999');
+    expect(service.setupRecoveryCalls, 1);
+  });
+
+  for (final (kind, type) in [
+    (bridge.RecoveryErrorKind.backupExists, RecoveryFailureType.backupExists),
+    (bridge.RecoveryErrorKind.authRequired, RecoveryFailureType.authRequired),
+    (bridge.RecoveryErrorKind.network, RecoveryFailureType.network),
+  ]) {
+    test('setupRecovery converte $kind', () async {
+      service.setupRecoveryResult = Result.error(
+        bridge.RecoveryError(kind: kind, message: 'x'),
+      );
+
+      final result = await repository.setupRecovery();
+
+      expect(((result as Error<String>).error as RecoveryFailure).type, type);
+    });
+  }
 }

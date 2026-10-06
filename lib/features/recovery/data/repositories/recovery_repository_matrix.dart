@@ -23,6 +23,16 @@ class RecoveryRepositoryMatrix implements RecoveryRepository {
     }
   }
 
+  @override
+  Future<Result<String>> setupRecovery() async {
+    switch (await _service.setupRecovery()) {
+      case Ok(:final value):
+        return Result.ok(value);
+      case Error(:final error):
+        return Result.error(_toFailure(error));
+    }
+  }
+
   RecoveryStatus _toStatus(bridge.RecoveryStatus status) => switch (status) {
     bridge.RecoveryStatus.unknown => RecoveryStatus.unknown,
     bridge.RecoveryStatus.enabled => RecoveryStatus.enabled,
@@ -35,6 +45,10 @@ class RecoveryRepositoryMatrix implements RecoveryRepository {
       switch (kind) {
         bridge.RecoveryErrorKind.invalidKey => RecoveryFailureType.invalidKey,
         bridge.RecoveryErrorKind.network => RecoveryFailureType.network,
+        bridge.RecoveryErrorKind.backupExists =>
+          RecoveryFailureType.backupExists,
+        bridge.RecoveryErrorKind.authRequired =>
+          RecoveryFailureType.authRequired,
         bridge.RecoveryErrorKind.unknown => RecoveryFailureType.unknown,
       },
       message,

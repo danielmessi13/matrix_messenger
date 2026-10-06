@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../auth/domain/models/user_session.dart';
+import '../../../rooms/domain/models/failed_invite.dart';
 import 'home_state.dart';
 
 class HomeViewModel extends Cubit<HomeState> {
@@ -33,6 +34,16 @@ class HomeViewModel extends Cubit<HomeState> {
     emit(state.copyWith(threadOpen: open, panesOverThreadWidth: null));
   }
 
+  void openThreadChanged(String? rootEventId) {
+    if (isClosed) return;
+    emit(state.copyWith(openThreadId: rootEventId));
+  }
+
   void dismissSessionWarning() =>
       emit(state.copyWith(sessionWarningDismissed: true));
+
+  void showFailedInvites(List<FailedInvite> invites) =>
+      emit(state.copyWith(failedInvites: List.unmodifiable(invites)));
+
+  void dismissFailedInvites() => emit(state.copyWith(failedInvites: const []));
 }

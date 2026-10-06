@@ -33,6 +33,7 @@ impl MatrixClient {
         username: String,
         password: String,
         data_dir: String,
+        keep_signed_in: bool,
     ) -> Result<MatrixClient, AuthError> {
         let passphrase = session_store::new_passphrase().map_err(AuthError::storage)?;
         let stores_dir = session_store::stores_dir(&data_dir);
@@ -50,7 +51,7 @@ impl MatrixClient {
                 }
             };
 
-        finish_new_login(client, data_dir, store_name, passphrase).await
+        finish_new_login(client, data_dir, store_name, passphrase, keep_signed_in).await
     }
 
     pub async fn restore_session(data_dir: String) -> Result<Option<MatrixClient>, AuthError> {
@@ -103,6 +104,7 @@ pub(crate) async fn finish_new_login(
     data_dir: String,
     store_name: String,
     passphrase: String,
+    keep_signed_in: bool,
 ) -> Result<MatrixClient, AuthError> {
     let Some(auth) = client.session().and_then(SavedAuth::from_session) else {
         drop(client);
@@ -120,9 +122,22 @@ pub(crate) async fn finish_new_login(
     };
 
     let (save_dir, to_save) = (data_dir.clone(), stored.clone());
-    let saved = run_blocking(move || session_store::save(&save_dir, &to_save))
-        .await
-        .is_ok();
+    let saved = if keep_signed_in {
+        run_blocking(move || session_store::save(&save_dir, &to_save))
+            .await
+            .is_ok()
+    } else {
+        // Se a sessão antiga ficasse no cofre, voltaria no próximo início sem o store, que é apagado logo abaixo.
+        if let Err(error) = run_blocking(move || session_store::delete(&save_dir)).await {
+            tokio::time::timeout(LOGOUT_TIMEOUT, client.logout())
+                .await
+                .ok();
+            drop(client);
+            remove_failed_store(session_store::stores_dir(&data_dir).join(&store_name)).await;
+            return Err(AuthError::storage(error));
+        }
+        false
+    };
 
     // Só com o novo login feito os stores de logins anteriores deixam de ser necessários.
     let stores_dir = session_store::stores_dir(&data_dir);
@@ -343,6 +358,7 @@ mod tests {
             "alice".into(),
             "senha".into(),
             data_dir.clone(),
+            true,
         )
         .await;
 
@@ -381,7 +397,8 @@ mod tests {
         let client = offline_client(&store_path).await;
         assert_eq!(store_count(&data_dir), 1);
 
-        let result = finish_new_login(client, data_dir.clone(), store_name, "segredo".into()).await;
+        let result =
+            finish_new_login(client, data_dir.clone(), store_name, "segredo".into(), true).await;
 
         assert!(result.is_err());
         assert_eq!(store_count(&data_dir), 0);
@@ -404,6 +421,7 @@ mod tests {
             env_var("MATRIX_USERNAME"),
             env_var("MATRIX_PASSWORD"),
             data_dir.clone(),
+            true,
         )
         .await
         .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
@@ -432,6 +450,32 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    async fn login_without_keep_signed_in_is_not_restored() {
+        let data_dir = temp_data_dir("real_not_kept");
+
+        let client = MatrixClient::login(
+            env_var("MATRIX_HOMESERVER"),
+            env_var("MATRIX_USERNAME"),
+            env_var("MATRIX_PASSWORD"),
+            data_dir.clone(),
+            false,
+        )
+        .await
+        .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
+        assert!(!client.session_saved());
+
+        assert!(matches!(
+            MatrixClient::restore_session(data_dir).await,
+            Ok(None)
+        ));
+        client
+            .logout()
+            .await
+            .unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn login_with_wrong_password_returns_invalid_credentials() {
         let data_dir = temp_data_dir("wrong_password");
 
@@ -440,6 +484,7 @@ mod tests {
             env_var("MATRIX_USERNAME"),
             "senha-errada-de-proposito".into(),
             data_dir.clone(),
+            true,
         )
         .await;
 

@@ -44,6 +44,10 @@ class _MatrixConversation implements Conversation {
   );
 
   @override
+  Future<Result<void>> sendImage(String path, {String? inReplyTo}) =>
+      _run(() => _timeline.sendImage(path: path, inReplyTo: inReplyTo));
+
+  @override
   Future<Result<void>> retry(String messageId) =>
       _run(() => _timeline.retry(itemId: messageId));
 
@@ -52,7 +56,18 @@ class _MatrixConversation implements Conversation {
       _run(() => _timeline.cancel(itemId: messageId));
 
   @override
+  Future<Result<void>> toggleReaction(String messageId, String key) =>
+      _run(() => _timeline.toggleReaction(itemId: messageId, key: key));
+
+  @override
   Future<void> markAsRead() => _run(_timeline.markAsRead);
+
+  @override
+  Stream<List<String>> get typing => _timeline.watchTyping();
+
+  @override
+  Future<void> setTyping(bool typing) =>
+      _run(() => _timeline.setTyping(typing: typing));
 
   @override
   Future<Result<Conversation>> openThread(String rootEventId) => _run(
@@ -80,6 +95,8 @@ ConversationFailure _toFailure(Exception error) => switch (error) {
         ConversationFailureType.roomNotFound,
       bridge.TimelineErrorKind.messageNotFound =>
         ConversationFailureType.messageNotFound,
+      bridge.TimelineErrorKind.invalidImage =>
+        ConversationFailureType.invalidImage,
       bridge.TimelineErrorKind.network => ConversationFailureType.network,
       bridge.TimelineErrorKind.unknown => ConversationFailureType.unknown,
     },
@@ -96,10 +113,38 @@ ConversationSnapshot _toSnapshot(bridge.TimelineSnapshot snapshot) =>
           if (entry.dateDividerMs case final ms?)
             DateDividerItem(DateTime.fromMillisecondsSinceEpoch(ms))
           else if (entry.message case final message?)
-            _toMessage(message),
+            _toMessage(message)
+          else if (entry.roomEvent case final event?)
+            _toRoomEvent(event),
       ],
       reachedStart: snapshot.reachedStart,
+      paginating: snapshot.paginating,
     );
+
+RoomEventItem _toRoomEvent(bridge.RoomEvent event) => RoomEventItem(
+  id: event.id,
+  senderName: event.senderName,
+  isOwn: event.isOwn,
+  timestamp: DateTime.fromMillisecondsSinceEpoch(event.timestampMs),
+  kind: switch (event.kind) {
+    bridge.RoomEventKind.created => RoomEventKind.created,
+    bridge.RoomEventKind.joined => RoomEventKind.joined,
+    bridge.RoomEventKind.left => RoomEventKind.left,
+    bridge.RoomEventKind.invited => RoomEventKind.invited,
+    bridge.RoomEventKind.inviteDeclined => RoomEventKind.inviteDeclined,
+    bridge.RoomEventKind.kicked => RoomEventKind.kicked,
+    bridge.RoomEventKind.banned => RoomEventKind.banned,
+    bridge.RoomEventKind.unbanned => RoomEventKind.unbanned,
+    bridge.RoomEventKind.nameChanged => RoomEventKind.nameChanged,
+    bridge.RoomEventKind.topicChanged => RoomEventKind.topicChanged,
+    bridge.RoomEventKind.avatarChanged => RoomEventKind.avatarChanged,
+    bridge.RoomEventKind.encryptionEnabled => RoomEventKind.encryptionEnabled,
+    bridge.RoomEventKind.displayNameChanged => RoomEventKind.displayNameChanged,
+  },
+  targetName: event.targetName,
+  targetIsOwn: event.targetIsOwn,
+  value: event.value,
+);
 
 MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
   id: message.id,
@@ -150,6 +195,27 @@ MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
     ),
   },
   readBy: List.unmodifiable(message.readBy),
+  image: switch (message.image) {
+    null => null,
+    final image => ImageContent(
+      media: image.media,
+      filename: image.filename,
+      caption: image.caption,
+      width: image.width,
+      height: image.height,
+      mimetype: image.mimetype,
+    ),
+  },
+  reactions: [
+    for (final reaction in message.reactions)
+      MessageReaction(
+        key: reaction.key,
+        count: reaction.count,
+        reactedByMe: reaction.reactedByMe,
+        senderNames: List.unmodifiable(reaction.senderNames),
+      ),
+  ],
+  canReact: message.canReact,
 );
 
 MessageKind _toKind(bridge.MessageKind kind) => switch (kind) {

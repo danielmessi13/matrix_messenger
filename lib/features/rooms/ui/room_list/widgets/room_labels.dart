@@ -48,10 +48,13 @@ String messageKindLabel(LatestMessageKind kind, String? body) => switch (kind) {
   LatestMessageKind.other => 'Mensagem',
 };
 
+String messageContent(LatestMessage message) =>
+    messageKindLabel(message.kind, message.body);
+
 String latestPreview(Room room) {
   final message = room.latest;
   if (message == null) return room.isInvite ? 'Convite para entrar' : '';
-  final content = messageKindLabel(message.kind, message.body);
+  final content = messageContent(message);
   if (message.isOwn) return 'Você: $content';
   if (room.isDirect) return content;
   return '${firstName(message.senderName)}: $content';

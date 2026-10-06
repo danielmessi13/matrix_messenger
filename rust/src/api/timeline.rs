@@ -2,12 +2,44 @@
 pub struct TimelineSnapshot {
     pub items: Vec<TimelineEntry>,
     pub reached_start: bool,
+    // Vem do status de paginação do SDK; sempre false na thread.
+    pub paginating: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimelineEntry {
     pub date_divider_ms: Option<i64>,
     pub message: Option<TimelineMessage>,
+    pub room_event: Option<RoomEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoomEvent {
+    pub id: String,
+    pub sender_name: String,
+    pub is_own: bool,
+    pub timestamp_ms: i64,
+    pub kind: RoomEventKind,
+    pub target_name: Option<String>,
+    pub target_is_own: bool,
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RoomEventKind {
+    Created,
+    Joined,
+    Left,
+    Invited,
+    InviteDeclined,
+    Kicked,
+    Banned,
+    Unbanned,
+    NameChanged,
+    TopicChanged,
+    AvatarChanged,
+    EncryptionEnabled,
+    DisplayNameChanged,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +59,28 @@ pub struct TimelineMessage {
     pub thread: Option<ThreadInfo>,
     pub reply_to: Option<ReplyPreview>,
     pub read_by: Vec<String>,
+    pub image: Option<ImageContent>,
+    pub reactions: Vec<Reaction>,
+    pub can_react: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageContent {
+    pub filename: String,
+    pub caption: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub mimetype: Option<String>,
+    pub media: String,
+}
+
+// `sender_names` sem o próprio usuário; o Dart põe "você" pelo `reacted_by_me`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reaction {
+    pub key: String,
+    pub count: u32,
+    pub reacted_by_me: bool,
+    pub sender_names: Vec<String>,
 }
 
 // Remetente, tipo e texto só vêm em `Ready`.
@@ -80,6 +134,7 @@ pub enum SendState {
 pub enum TimelineErrorKind {
     RoomNotFound,
     MessageNotFound,
+    InvalidImage,
     Network,
     Unknown,
 }
@@ -146,11 +201,15 @@ impl Drop for RoomTimeline {
 
 impl RoomTimeline {
     pub(crate) fn new(handle: TimelineHandle) -> Self {
-        Self { handle: ManuallyDrop::new(handle), runtime: Handle::current() }
+        Self {
+            handle: ManuallyDrop::new(handle),
+            runtime: Handle::current(),
+        }
     }
 
     pub fn watch(&self, sink: StreamSink<TimelineSnapshot>) {
-        self.handle.watch(move |snapshot| sink.add(snapshot).is_ok());
+        self.handle
+            .watch(move |snapshot| sink.add(snapshot).is_ok());
     }
 
     pub async fn paginate_backwards(&self) -> Result<bool, TimelineError> {
@@ -165,6 +224,14 @@ impl RoomTimeline {
         self.handle.send_reply(body, &in_reply_to).await
     }
 
+    pub async fn send_image(
+        &self,
+        path: String,
+        in_reply_to: Option<String>,
+    ) -> Result<(), TimelineError> {
+        self.handle.send_image(&path, in_reply_to.as_deref()).await
+    }
+
     pub async fn retry(&self, item_id: String) -> Result<(), TimelineError> {
         self.handle.retry(&item_id).await
     }
@@ -173,8 +240,25 @@ impl RoomTimeline {
         self.handle.cancel(&item_id).await
     }
 
+    pub async fn toggle_reaction(
+        &self,
+        item_id: String,
+        key: String,
+    ) -> Result<(), TimelineError> {
+        self.handle.toggle_reaction(&item_id, &key).await
+    }
+
     pub async fn mark_as_read(&self) -> Result<(), TimelineError> {
         self.handle.mark_as_read().await
+    }
+
+    pub fn watch_typing(&self, sink: StreamSink<Vec<String>>) {
+        self.handle
+            .watch_typing(move |names| sink.add(names).is_ok());
+    }
+
+    pub async fn set_typing(&self, typing: bool) -> Result<(), TimelineError> {
+        self.handle.set_typing(typing).await
     }
 
     pub async fn open_thread(&self, root_event_id: String) -> Result<RoomTimeline, TimelineError> {
@@ -187,7 +271,9 @@ impl MatrixClient {
         let room = self
             .find_room(&room_id)
             .ok_or_else(|| TimelineError::new(TimelineErrorKind::RoomNotFound, room_id))?;
-        let handle = TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone()).await?;
+        let handle =
+            TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone())
+                .await?;
         Ok(RoomTimeline::new(handle))
     }
 }
@@ -209,7 +295,11 @@ mod tests {
         );
 
         for room_id in ["!naoexiste:b.c", "isto não é um id"] {
-            let error = client.open_timeline(room_id.to_owned()).await.err().unwrap();
+            let error = client
+                .open_timeline(room_id.to_owned())
+                .await
+                .err()
+                .unwrap();
             assert_eq!(error.kind, TimelineErrorKind::RoomNotFound, "{room_id}");
         }
     }
@@ -223,16 +313,22 @@ mod tests {
             env_var("MATRIX_USERNAME"),
             env_var("MATRIX_PASSWORD"),
             temp_data_dir("real_timeline"),
+            true,
         )
         .await
         .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
         let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
-        client.room_sync().watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
+        client
+            .room_sync()
+            .watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
         let rooms = tokio::time::timeout(Duration::from_secs(60), rooms_rx.recv())
             .await
             .expect("lista em até 60 s")
             .expect("sync encerrado");
-        let room = rooms.iter().find(|room| !room.is_invite).expect("uma sala na conta");
+        let room = rooms
+            .iter()
+            .find(|room| !room.is_invite)
+            .expect("uma sala na conta");
 
         let timeline = client.open_timeline(room.id.clone()).await.unwrap();
         timeline
@@ -241,21 +337,32 @@ mod tests {
             .await
             .unwrap();
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        timeline.handle.watch(move |snapshot| tx.send(snapshot).is_ok());
+        timeline
+            .handle
+            .watch(move |snapshot| tx.send(snapshot).is_ok());
         loop {
             let snapshot = tokio::time::timeout(Duration::from_secs(30), rx.recv())
                 .await
                 .expect("snapshot em até 30 s")
                 .expect("timeline encerrada");
-            let sent = snapshot.items.iter().filter_map(|entry| entry.message.as_ref()).any(|m| {
-                m.is_own && m.send_state == SendState::Sent && m.body.as_deref() == Some("teste do **matrix_messenger**")
-            });
+            let sent = snapshot
+                .items
+                .iter()
+                .filter_map(|entry| entry.message.as_ref())
+                .any(|m| {
+                    m.is_own
+                        && m.send_state == SendState::Sent
+                        && m.body.as_deref() == Some("teste do **matrix_messenger**")
+                });
             if sent {
                 break;
             }
         }
 
         drop(timeline);
-        client.logout().await.unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
+        client
+            .logout()
+            .await
+            .unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
     }
 }

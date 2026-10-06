@@ -48,6 +48,7 @@ class AuthRepositoryMatrix implements AuthRepository {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) async {
     _lastSignOutReason = null;
     return _adoptLogin(
@@ -55,7 +56,9 @@ class AuthRepositoryMatrix implements AuthRepository {
         homeserver: homeserver,
         username: username,
         password: password,
+        keepSignedIn: keepSignedIn,
       ),
+      keepSignedIn,
     );
   }
 
@@ -63,23 +66,29 @@ class AuthRepositoryMatrix implements AuthRepository {
   Future<Result<UserSession>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   }) async {
     _lastSignOutReason = null;
     return _adoptLogin(
       await _service.loginWithBrowser(
         homeserver: homeserver,
         onAuthorizationUrl: onAuthorizationUrl,
+        keepSignedIn: keepSignedIn,
       ),
+      keepSignedIn,
     );
   }
 
   @override
   Future<void> cancelBrowserLogin() => _service.cancelBrowserLogin();
 
-  Result<UserSession> _adoptLogin(Result<MatrixClient> result) {
+  Result<UserSession> _adoptLogin(
+    Result<MatrixClient> result,
+    bool keepSignedIn,
+  ) {
     switch (result) {
       case Ok(:final value):
-        final session = _toSession(value);
+        final session = _toSession(value, keepSignedIn: keepSignedIn);
         _setSession(session);
         return Result.ok(session);
       case Error(:final error):
@@ -110,11 +119,13 @@ class AuthRepositoryMatrix implements AuthRepository {
     if (!_sessionChanges.isClosed) _sessionChanges.add(session);
   }
 
-  UserSession _toSession(MatrixClient client) => UserSession(
-    userId: client.userId,
-    deviceId: client.deviceId,
-    sessionSaved: client.sessionSaved,
-  );
+  // Sem "Manter conectado" a sessão não salva de propósito; o aviso da home é só para falha do cofre.
+  UserSession _toSession(MatrixClient client, {bool keepSignedIn = true}) =>
+      UserSession(
+        userId: client.userId,
+        deviceId: client.deviceId,
+        sessionSaved: client.sessionSaved || !keepSignedIn,
+      );
 
   AuthFailure _toFailure(Exception error) => switch (error) {
     AuthError(:final kind, :final message) => AuthFailure(

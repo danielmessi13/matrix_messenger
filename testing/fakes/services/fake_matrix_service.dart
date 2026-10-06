@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:matrix_messenger/core/services/matrix_service.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
@@ -6,6 +7,8 @@ import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/notifications.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/search.dart';
+import 'package:matrix_messenger/src/rust/api/threads.dart';
 import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 import '../../models/user_session.dart';
@@ -25,6 +28,7 @@ class FakeMatrixService implements MatrixService {
     'https://account.matrix.org/authorize?state=abc',
   );
   final loginWithBrowserCalls = <String>[];
+  final keepSignedInCalls = <bool>[];
   int cancelBrowserLoginCalls = 0;
   final revokedController = StreamController<void>.broadcast();
 
@@ -33,6 +37,11 @@ class FakeMatrixService implements MatrixService {
   final syncStatusController = StreamController<SyncStatus>.broadcast();
 
   final recoveryController = StreamController<RecoveryStatus>.broadcast();
+
+  final recentThreadsController =
+      StreamController<RecentThreadsSnapshot>.broadcast();
+
+  var recentThreadsRetries = 0;
 
   final notificationsController =
       StreamController<RoomNotification>.broadcast();
@@ -54,7 +63,9 @@ class FakeMatrixService implements MatrixService {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) async {
+    keepSignedInCalls.add(keepSignedIn);
     loginCalls.add((
       homeserver: homeserver,
       username: username,
@@ -73,7 +84,9 @@ class FakeMatrixService implements MatrixService {
   Future<Result<MatrixClient>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   }) async {
+    keepSignedInCalls.add(keepSignedIn);
     loginWithBrowserCalls.add(homeserver);
     onAuthorizationUrl(authorizationUrl);
     return loginWithBrowserResult;
@@ -92,6 +105,13 @@ class FakeMatrixService implements MatrixService {
   Stream<RecoveryStatus> watchRecovery() => recoveryController.stream;
 
   @override
+  Stream<RecentThreadsSnapshot> watchRecentThreads() =>
+      recentThreadsController.stream;
+
+  @override
+  Future<void> retryRecentThreads() async => recentThreadsRetries++;
+
+  @override
   Stream<RoomNotification> watchNotifications() =>
       notificationsController.stream;
 
@@ -101,9 +121,35 @@ class FakeMatrixService implements MatrixService {
     return recoverResult;
   }
 
+  Result<String> setupRecoveryResult = const Result.ok('EsTx 1234');
+
+  int setupRecoveryCalls = 0;
+
+  @override
+  Future<Result<String>> setupRecovery() async {
+    setupRecoveryCalls++;
+    return setupRecoveryResult;
+  }
+
   @override
   Future<Result<RoomTimeline>> openTimeline(String roomId) async =>
       openTimelineResult;
+
+  Result<Uint8List> Function(String media, bool thumbnail) loadMediaResult = (
+    media,
+    _,
+  ) => Result.ok(Uint8List.fromList(media.codeUnits));
+
+  final loadMediaCalls = <(String, bool)>[];
+
+  @override
+  Future<Result<Uint8List>> loadMedia(
+    String media, {
+    required bool thumbnail,
+  }) async {
+    loadMediaCalls.add((media, thumbnail));
+    return loadMediaResult(media, thumbnail);
+  }
 
   Result<void> inviteResult = const Result.ok(null);
 
@@ -123,11 +169,86 @@ class FakeMatrixService implements MatrixService {
     return inviteResult;
   }
 
+  Result<void> roomActionResult = const Result.ok(null);
+
+  Result<bool> canInviteResult = const Result.ok(false);
+
+  final leftRooms = <String>[];
+
+  final invitedUsers = <(String, String)>[];
+
+  @override
+  Future<Result<void>> leaveRoom(String roomId) async {
+    leftRooms.add(roomId);
+    return roomActionResult;
+  }
+
+  @override
+  Future<Result<void>> inviteUser(String roomId, String userId) async {
+    invitedUsers.add((roomId, userId));
+    return roomActionResult;
+  }
+
+  @override
+  Future<Result<bool>> canInvite(String roomId) async => canInviteResult;
+
+  Result<CreatedRoom> createRoomResult = const Result.ok(
+    CreatedRoom(roomId: '!nova:b.c', failedInvites: []),
+  );
+
+  final createdRooms = <NewRoom>[];
+
+  @override
+  Future<Result<CreatedRoom>> createRoom(NewRoom room) async {
+    createdRooms.add(room);
+    return createRoomResult;
+  }
+
+  Result<UserCheck> checkUserResult = const Result.ok(
+    UserCheck(status: UserCheckStatus.found, displayName: 'Ana'),
+  );
+
+  @override
+  Future<Result<UserCheck>> checkUser(String userId) async => checkUserResult;
+
+  Result<String?> roomLinkResult = const Result.ok(
+    'https://matrix.to/#/!a:b.c?via=b.c',
+  );
+
+  @override
+  Future<Result<String?>> roomLink(String roomId) async => roomLinkResult;
+
+  Result<String> joinRoomResult = const Result.ok('!entrou:b.c');
+
+  final joinedTargets = <String>[];
+
+  @override
+  Future<Result<String>> joinRoom(String target) async {
+    joinedTargets.add(target);
+    return joinRoomResult;
+  }
+
+  Result<MessageSearchPage> searchMessagesResult = const Result.ok(
+    MessageSearchPage(hits: []),
+  );
+
+  final searches = <(String, String?)>[];
+
+  @override
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  }) async {
+    searches.add((term, nextBatch));
+    return searchMessagesResult;
+  }
+
   Future<void> dispose() async {
     await revokedController.close();
     await roomsController.close();
     await syncStatusController.close();
     await recoveryController.close();
     await notificationsController.close();
+    await recentThreadsController.close();
   }
 }
