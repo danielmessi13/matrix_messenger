@@ -44,6 +44,9 @@ const MIN_STABLE_RUNNING: Duration = Duration::from_secs(5);
 // Sem paginação: a lista inteira atravessa a ponte.
 const PAGE_SIZE: usize = 100_000;
 
+// Com o padrão do SDK (1), mensagens que chegam juntas viram um buraco e ficam fora do "N novas".
+const ROOM_LIST_TIMELINE_LIMIT: u32 = 20;
+
 pub(crate) struct RoomSync {
     inner: Arc<Inner>,
     runtime: Handle,
@@ -219,6 +222,7 @@ async fn build_service(
     Ok(Arc::new(
         SyncService::builder(client.clone())
             .with_offline_mode()
+            .with_room_list_timeline_limit(ROOM_LIST_TIMELINE_LIMIT)
             .build()
             .await?,
     ))
@@ -693,6 +697,30 @@ mod tests {
         })
         .await
         .unwrap_or_else(|_| panic!("serviço ainda em {:?}", service.state().get()));
+    }
+
+    #[tokio::test]
+    async fn room_list_asks_for_the_burst_window_of_each_room() {
+        let server = MatrixMockServer::new().await;
+        let sync = running_sync(&server).await;
+        let room_list_limits = || async {
+            let requests = server.server().received_requests().await.unwrap();
+            requests
+                .iter()
+                .filter_map(|request| request.body_json::<serde_json::Value>().ok())
+                .filter(|body| body["conn_id"] == "room-list")
+                .map(|body| body["lists"]["all_rooms"]["timeline_limit"].clone())
+                .collect::<Vec<_>>()
+        };
+
+        wait_until(|| async { !room_list_limits().await.is_empty() }).await;
+
+        let limits = room_list_limits().await;
+        assert!(
+            limits.iter().all(|limit| *limit == json!(ROOM_LIST_TIMELINE_LIMIT)),
+            "{limits:?}"
+        );
+        sync.stop().await;
     }
 
     #[tokio::test]
