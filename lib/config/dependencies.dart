@@ -2,10 +2,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../core/services/browser_launcher.dart';
 import '../core/services/matrix_service.dart';
+import '../core/services/system_notifications.dart';
 import '../features/auth/data/repositories/auth_repository.dart';
 import '../features/auth/data/repositories/auth_repository_matrix.dart';
 import '../features/conversation/data/repositories/conversation_repository.dart';
 import '../features/conversation/data/repositories/conversation_repository_matrix.dart';
+import '../features/notifications/data/repositories/notification_repository.dart';
+import '../features/notifications/data/repositories/notification_repository_matrix.dart';
 import '../features/recovery/data/repositories/recovery_repository.dart';
 import '../features/recovery/data/repositories/recovery_repository_matrix.dart';
 import '../features/rooms/data/repositories/room_repository.dart';
@@ -32,7 +35,14 @@ List<RepositoryProvider<Object>> providers({
     create: (context) =>
         RecoveryRepositoryMatrix(context.read<MatrixService>()),
   ),
+  RepositoryProvider<NotificationRepository>(
+    create: (context) =>
+        NotificationRepositoryMatrix(context.read<MatrixService>()),
+  ),
   RepositoryProvider<BrowserLauncher>(
     create: (_) => const UrlLauncherBrowserLauncher(),
+  ),
+  RepositoryProvider<SystemNotifications>(
+    create: (_) => LocalSystemNotifications(),
   ),
 ];

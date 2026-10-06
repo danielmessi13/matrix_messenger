@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../src/rust/api/auth.dart';
 import '../../src/rust/api/client.dart';
+import '../../src/rust/api/notifications.dart';
 import '../../src/rust/api/oidc.dart';
 import '../../src/rust/api/recovery.dart';
 import '../../src/rust/api/rooms.dart';
@@ -90,6 +91,9 @@ class MatrixService {
 
   Stream<RecoveryStatus> watchRecovery() =>
       _client?.watchRecovery() ?? const Stream.empty();
+
+  Stream<RoomNotification> watchNotifications() =>
+      _client?.watchNotifications() ?? const Stream.empty();
 
   Future<Result<void>> recover(String recoveryKey) => _guard(() async {
     final client = _client;

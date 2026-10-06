@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
+import 'package:matrix_messenger/core/services/system_notifications.dart';
 import 'package:matrix_messenger/core/ui/animated_pane.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
+import 'package:matrix_messenger/features/notifications/data/repositories/notification_repository.dart';
+import 'package:matrix_messenger/features/notifications/domain/models/room_notification.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
@@ -19,8 +22,10 @@ import 'package:matrix_messenger/features/rooms/ui/room_list/widgets/room_list_p
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_notification_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
+import '../../../../../testing/fakes/services/fake_system_notifications.dart';
 import '../../../../../testing/models/message.dart';
 import '../../../../../testing/models/room.dart';
 import '../../../../../testing/models/user_session.dart';
@@ -30,18 +35,23 @@ void main() {
   late FakeRoomRepository roomRepository;
   late FakeRecoveryRepository recoveryRepository;
   late FakeConversationRepository conversationRepository;
+  late FakeNotificationRepository notificationRepository;
+  late FakeSystemNotifications systemNotifications;
 
   setUp(() {
     authRepository = FakeAuthRepository(savedSession: kUserSession);
     roomRepository = FakeRoomRepository();
     recoveryRepository = FakeRecoveryRepository();
     conversationRepository = FakeConversationRepository();
+    notificationRepository = FakeNotificationRepository();
+    systemNotifications = FakeSystemNotifications();
   });
 
   tearDown(() async {
     await authRepository.dispose();
     await roomRepository.dispose();
     await recoveryRepository.dispose();
+    await notificationRepository.dispose();
   });
 
   Future<void> pumpScreen(
@@ -63,6 +73,12 @@ void main() {
           ),
           RepositoryProvider<ConversationRepository>.value(
             value: conversationRepository,
+          ),
+          RepositoryProvider<NotificationRepository>.value(
+            value: notificationRepository,
+          ),
+          RepositoryProvider<SystemNotifications>.value(
+            value: systemNotifications,
           ),
         ],
         child: MaterialApp(
@@ -388,5 +404,63 @@ void main() {
     await tester.pump();
     await settlePanes(tester);
     expect(roomListWidth(tester), kRoomListWidth);
+  });
+
+  group('notificações', () {
+    testWidgets('clicar seleciona a sala', (tester) async {
+      await pumpScreen(tester);
+      await showRooms(tester);
+
+      systemNotifications.tap(kTeamRoom.id);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('conversation_title')), findsOneWidget);
+      expect(find.text('#lançamento-q4'), findsOneWidget);
+    });
+
+    testWidgets(
+      'clicar numa sala que saiu da lista não quebra e o próximo clique funciona',
+      (tester) async {
+        await pumpScreen(tester);
+        await showRooms(tester);
+
+        systemNotifications.tap('!saiu:matrix.org');
+        await tester.pump();
+        expect(find.text('Selecione uma conversa'), findsOneWidget);
+
+        systemNotifications.tap(kTeamRoom.id);
+        await tester.pump();
+        await tester.pump();
+        expect(find.byKey(const Key('conversation_title')), findsOneWidget);
+        expect(find.text('#lançamento-q4'), findsWidgets);
+      },
+    );
+
+    testWidgets('não notifica a sala aberta, notifica as outras', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await showRooms(tester);
+      await tester.tap(find.byKey(Key('room_${kDirectRoom.id}')));
+      await tester.pump();
+
+      RoomNotification from(Room room) => RoomNotification(
+        roomId: room.id,
+        roomName: room.name,
+        isDirect: room.isDirect,
+        senderName: 'Ana Ribeiro',
+        body: 'oi',
+        timestamp: kNow,
+      );
+      notificationRepository.notificationsController
+        ..add(from(kDirectRoom))
+        ..add(from(kTeamRoom));
+      await tester.pump();
+
+      expect(systemNotifications.shown.map((item) => item.roomId), [
+        kTeamRoom.id,
+      ]);
+    });
   });
 }

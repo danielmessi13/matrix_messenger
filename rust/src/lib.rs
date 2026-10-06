@@ -4,6 +4,7 @@ pub mod api;
 mod client_builder;
 mod diff_window;
 mod frb_generated;
+mod notifications;
 mod oidc_callback;
 mod room_list;
 mod session_store;

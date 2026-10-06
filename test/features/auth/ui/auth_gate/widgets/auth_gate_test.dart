@@ -3,21 +3,25 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/core/services/browser_launcher.dart';
+import 'package:matrix_messenger/core/services/system_notifications.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/auth/ui/auth_gate/view_models/auth_gate_view_model.dart';
 import 'package:matrix_messenger/features/auth/ui/auth_gate/widgets/auth_gate.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
+import 'package:matrix_messenger/features/notifications/data/repositories/notification_repository.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 
 import '../../../../../../testing/desktop_size.dart';
 import '../../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../../testing/fakes/repositories/fake_notification_repository.dart';
 import '../../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../../testing/fakes/services/fake_browser_launcher.dart';
+import '../../../../../../testing/fakes/services/fake_system_notifications.dart';
 import '../../../../../../testing/models/user_session.dart';
 
 void main() {
@@ -32,6 +36,8 @@ void main() {
     addTearDown(roomRepository.dispose);
     final recoveryRepository = FakeRecoveryRepository();
     addTearDown(recoveryRepository.dispose);
+    final notificationRepository = FakeNotificationRepository();
+    addTearDown(notificationRepository.dispose);
     await tester.pumpWidget(
       MultiRepositoryProvider(
         providers: [
@@ -42,6 +48,12 @@ void main() {
           ),
           RepositoryProvider<ConversationRepository>.value(
             value: FakeConversationRepository(),
+          ),
+          RepositoryProvider<NotificationRepository>.value(
+            value: notificationRepository,
+          ),
+          RepositoryProvider<SystemNotifications>.value(
+            value: FakeSystemNotifications(),
           ),
           RepositoryProvider<BrowserLauncher>.value(
             value: FakeBrowserLauncher(),

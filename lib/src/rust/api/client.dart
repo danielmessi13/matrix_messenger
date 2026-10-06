@@ -5,6 +5,7 @@
 
 import '../frb_generated.dart';
 import 'auth.dart';
+import 'notifications.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
@@ -52,6 +53,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
   bool get sessionSaved;
 
   String get userId;
+
+  Stream<RoomNotification> watchNotifications();
 
   Stream<RecoveryStatus> watchRecovery();
 

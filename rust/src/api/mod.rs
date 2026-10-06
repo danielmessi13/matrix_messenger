@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod client;
 pub mod init;
+pub mod notifications;
 pub mod oidc;
 pub mod recovery;
 pub mod rooms;

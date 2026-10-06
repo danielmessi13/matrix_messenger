@@ -13,6 +13,7 @@ use tokio::{
 
 use crate::{
     frb_generated::StreamSink,
+    notifications::Notifier,
     room_list::{RoomSync, RoomSyncStopper},
     session_store::{self, SavedAuth, StoredSession},
     threads::ThreadReads,
@@ -30,6 +31,7 @@ pub struct MatrixClient {
     pub(crate) rooms: ManuallyDrop<RoomSync>,
     pub(crate) runtime: Handle,
     pub(crate) thread_reads: ThreadReads,
+    pub(crate) notifier: Notifier,
     pub(crate) vault: Option<Arc<Vault>>,
     events: EventSink,
     pub(crate) session_watcher: AbortHandle,
@@ -112,6 +114,7 @@ impl MatrixClient {
             rooms: ManuallyDrop::new(rooms),
             runtime: Handle::current(),
             thread_reads,
+            notifier: Notifier::default(),
             vault,
             events,
             session_watcher,

@@ -5,6 +5,7 @@
 
 import 'api/auth.dart';
 import 'api/client.dart';
+import 'api/notifications.dart';
 import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';
@@ -78,7 +79,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1734407596;
+  int get rustContentHash => -61902010;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -132,6 +133,10 @@ abstract class RustLibApi extends BaseApi {
   bool crateApiClientMatrixClientSessionSaved({required MatrixClient that});
 
   String crateApiClientMatrixClientUserId({required MatrixClient that});
+
+  Stream<RoomNotification> crateApiClientMatrixClientWatchNotifications({
+    required MatrixClient that,
+  });
 
   Stream<RecoveryStatus> crateApiClientMatrixClientWatchRecovery({
     required MatrixClient that,
@@ -619,6 +624,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Stream<RoomNotification> crateApiClientMatrixClientWatchNotifications({
+    required MatrixClient that,
+  }) {
+    final sink = RustStreamSink<RoomNotification>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
+              that,
+              serializer,
+            );
+            sse_encode_StreamSink_room_notification_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 12,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiClientMatrixClientWatchNotificationsConstMeta,
+          argValues: [that, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiClientMatrixClientWatchNotificationsConstMeta =>
+      const TaskConstMeta(
+        debugName: "MatrixClient_watch_notifications",
+        argNames: ["that", "sink"],
+      );
+
+  @override
   Stream<RecoveryStatus> crateApiClientMatrixClientWatchRecovery({
     required MatrixClient that,
   }) {
@@ -636,7 +682,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 12,
+              funcId: 13,
               port: port_,
             );
           },
@@ -677,7 +723,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 13,
+              funcId: 14,
               port: port_,
             );
           },
@@ -718,7 +764,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 14,
+              funcId: 15,
               port: port_,
             );
           },
@@ -751,7 +797,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -783,7 +829,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -819,7 +865,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -855,7 +901,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -893,7 +939,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -929,7 +975,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 21,
             port: port_,
           );
         },
@@ -967,7 +1013,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1004,7 +1050,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1042,7 +1088,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1080,7 +1126,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1120,7 +1166,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1159,7 +1205,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 26,
+              funcId: 27,
               port: port_,
             );
           },
@@ -1191,7 +1237,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1332,6 +1378,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<RecoveryStatus> dco_decode_StreamSink_recovery_status_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<RoomNotification> dco_decode_StreamSink_room_notification_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -1622,6 +1676,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomNotification dco_decode_room_notification(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return RoomNotification(
+      roomId: dco_decode_String(arr[0]),
+      roomName: dco_decode_String(arr[1]),
+      isDirect: dco_decode_bool(arr[2]),
+      isInvite: dco_decode_bool(arr[3]),
+      senderName: dco_decode_String(arr[4]),
+      kind: dco_decode_latest_message_kind(arr[5]),
+      body: dco_decode_opt_String(arr[6]),
+      timestampMs: dco_decode_i_64(arr[7]),
+    );
+  }
+
+  @protected
   RoomSummary dco_decode_room_summary(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1889,6 +1961,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<RecoveryStatus> sse_decode_StreamSink_recovery_status_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<RoomNotification> sse_decode_StreamSink_room_notification_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2261,6 +2341,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomNotification sse_decode_room_notification(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_roomId = sse_decode_String(deserializer);
+    var var_roomName = sse_decode_String(deserializer);
+    var var_isDirect = sse_decode_bool(deserializer);
+    var var_isInvite = sse_decode_bool(deserializer);
+    var var_senderName = sse_decode_String(deserializer);
+    var var_kind = sse_decode_latest_message_kind(deserializer);
+    var var_body = sse_decode_opt_String(deserializer);
+    var var_timestampMs = sse_decode_i_64(deserializer);
+    return RoomNotification(
+      roomId: var_roomId,
+      roomName: var_roomName,
+      isDirect: var_isDirect,
+      isInvite: var_isInvite,
+      senderName: var_senderName,
+      kind: var_kind,
+      body: var_body,
+      timestampMs: var_timestampMs,
+    );
+  }
+
+  @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -2572,6 +2675,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_recovery_status,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_room_notification_Sse(
+    RustStreamSink<RoomNotification> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_room_notification,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -2969,6 +3089,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_room_notification(
+    RoomNotification self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.roomId, serializer);
+    sse_encode_String(self.roomName, serializer);
+    sse_encode_bool(self.isDirect, serializer);
+    sse_encode_bool(self.isInvite, serializer);
+    sse_encode_String(self.senderName, serializer);
+    sse_encode_latest_message_kind(self.kind, serializer);
+    sse_encode_opt_String(self.body, serializer);
+    sse_encode_i_64(self.timestampMs, serializer);
+  }
+
+  @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -3146,6 +3282,11 @@ class MatrixClientImpl extends RustOpaque implements MatrixClient {
   String get userId => RustLib.instance.api.crateApiClientMatrixClientUserId(
     that: this,
   );
+
+  Stream<RoomNotification> watchNotifications() =>
+      RustLib.instance.api.crateApiClientMatrixClientWatchNotifications(
+        that: this,
+      );
 
   Stream<RecoveryStatus> watchRecovery() =>
       RustLib.instance.api.crateApiClientMatrixClientWatchRecovery(
