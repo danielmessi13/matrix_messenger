@@ -622,8 +622,6 @@ class _HoverActions extends StatefulWidget {
 }
 
 class _HoverActionsState extends State<_HoverActions> {
-  final _link = LayerLink();
-
   final _portal = OverlayPortalController();
 
   bool _overMessage = false;
@@ -680,42 +678,66 @@ class _HoverActionsState extends State<_HoverActions> {
       ),
     );
     if (!hasMenu) return row(widget.child);
-    return OverlayPortal(
-      controller: _portal,
-      overlayChildBuilder: (context) => Positioned(
-        left: 0,
-        top: 0,
-        child: CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          // Cresce para o lado oposto à borda da tela: balão curto colado na direita não empurra o menu para fora.
-          targetAnchor: end ? Alignment.topLeft : Alignment.topRight,
-          followerAnchor: end ? Alignment.topRight : Alignment.topLeft,
-          // Fora do balão, para não cobrir a hora no cabeçalho.
-          offset: Offset(end ? -12 : 12, -20),
-          child: MouseRegion(
-            onEnter: (_) => _hover(bar: true),
-            onExit: (_) => _hover(bar: false),
-            child: _ActionBar(
-              messageId: widget.messageId,
-              time: time,
-              onReply: onReply,
-              onStartThread: onStartThread,
-              onReact: onReact,
-              alignEnd: end,
-              onPickerChanged: _pickerChanged,
+    // A região cobre a linha toda; só o balão serve de âncora do menu.
+    return MouseRegion(
+      onEnter: (_) => _hover(message: true),
+      onExit: (_) => _hover(message: false),
+      // Com CompositedTransformFollower, o Tooltip dentro do menu não consegue se posicionar no layout.
+      child: row(
+        OverlayPortal.overlayChildLayoutBuilder(
+          controller: _portal,
+          overlayChildBuilder: (context, info) => Positioned.fill(
+            child: CustomSingleChildLayout(
+              delegate: _ActionBarPosition(
+                anchor: MatrixUtils.transformRect(
+                  info.childPaintTransform,
+                  Offset.zero & info.childSize,
+                ),
+                alignEnd: end,
+              ),
+              child: MouseRegion(
+                onEnter: (_) => _hover(bar: true),
+                onExit: (_) => _hover(bar: false),
+                child: _ActionBar(
+                  messageId: widget.messageId,
+                  time: time,
+                  onReply: onReply,
+                  onStartThread: onStartThread,
+                  onReact: onReact,
+                  alignEnd: end,
+                  onPickerChanged: _pickerChanged,
+                ),
+              ),
             ),
           ),
+          child: widget.child,
         ),
-      ),
-      // A região cobre a linha toda; só o balão serve de âncora do menu.
-      child: MouseRegion(
-        onEnter: (_) => _hover(message: true),
-        onExit: (_) => _hover(message: false),
-        child: row(CompositedTransformTarget(link: _link, child: widget.child)),
       ),
     );
   }
+}
+
+class _ActionBarPosition extends SingleChildLayoutDelegate {
+  _ActionBarPosition({required this.anchor, required this.alignEnd});
+
+  final Rect anchor;
+
+  final bool alignEnd;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      constraints.loosen();
+
+  // Cresce para o lado oposto à borda da tela, fora do balão para não cobrir a hora no cabeçalho.
+  @override
+  Offset getPositionForChild(Size size, Size childSize) => Offset(
+    alignEnd ? anchor.left - 12 - childSize.width : anchor.right + 12,
+    anchor.top - 20,
+  );
+
+  @override
+  bool shouldRelayout(_ActionBarPosition oldDelegate) =>
+      anchor != oldDelegate.anchor || alignEnd != oldDelegate.alignEnd;
 }
 
 class _ActionBar extends StatelessWidget {
