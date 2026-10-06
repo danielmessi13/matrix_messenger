@@ -18,4 +18,6 @@ extension StringExtensions on String {
   }
 
   String get userInitials => split(':').first.initials;
+
+  String get userLocalpart => split(':').first.replaceFirst('@', '');
 }
