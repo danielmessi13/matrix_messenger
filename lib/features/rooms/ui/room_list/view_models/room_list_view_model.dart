@@ -24,9 +24,7 @@ class RoomListViewModel extends Cubit<RoomListState> {
     );
   }
 
-  void selectFilter(RoomFilter filter) {
-    if (filter.enabled) emit(state.copyWith(filter: filter));
-  }
+  void selectFilter(RoomFilter filter) => emit(state.copyWith(filter: filter));
 
   void search(String query) => emit(state.copyWith(query: query));
 

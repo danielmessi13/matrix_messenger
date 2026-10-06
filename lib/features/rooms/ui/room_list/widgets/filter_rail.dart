@@ -70,7 +70,7 @@ class FilterRail extends StatelessWidget {
               expanded: expanded,
               selected: filter == selected,
               unread: unreadByFilter[filter] ?? 0,
-              onTap: filter.enabled ? () => onSelect(filter) : null,
+              onTap: () => onSelect(filter),
             ),
           const Spacer(),
           if (!expanded)
@@ -105,32 +105,28 @@ class _FilterItem extends StatelessWidget {
 
   final int unread;
 
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final item = Opacity(
-      opacity: onTap == null ? 0.4 : 1,
-      child: Material(
-        color: selected ? colors.activeFilter : Colors.transparent,
+    final item = Material(
+      color: selected ? colors.activeFilter : Colors.transparent,
+      borderRadius: BorderRadius.circular(expanded ? 6 : 10),
+      child: InkWell(
+        key: Key('filter_${filter.name}'),
+        onTap: onTap,
+        hoverColor: colors.surface,
         borderRadius: BorderRadius.circular(expanded ? 6 : 10),
-        child: InkWell(
-          key: Key('filter_${filter.name}'),
-          onTap: onTap,
-          hoverColor: colors.surface,
-          borderRadius: BorderRadius.circular(expanded ? 6 : 10),
-          child: expanded
-              ? _WideFilterItem(filter: filter, unread: unread)
-              : _CompactFilterItem(filter: filter, unread: unread),
-        ),
+        child: expanded
+            ? _WideFilterItem(filter: filter, unread: unread)
+            : _CompactFilterItem(filter: filter, unread: unread),
       ),
     );
-    final padded = Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 2, horizontal: expanded ? 0 : 8),
       child: item,
     );
-    return onTap == null ? Tooltip(message: 'Em breve', child: padded) : padded;
   }
 }
 

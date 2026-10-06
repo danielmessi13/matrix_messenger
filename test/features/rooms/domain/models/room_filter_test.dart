@@ -6,6 +6,12 @@ void main() {
   const group = Room(id: '!g:b.c', name: 'geral');
   const mentioned = Room(id: '!m:b.c', name: 'time', unreadMentions: 2);
   const direct = Room(id: '!d:b.c', name: 'Ana', isDirect: true);
+  const threaded = Room(
+    id: '!t:b.c',
+    name: 'obras',
+    unreadMessages: 1,
+    unreadThreadReplies: 3,
+  );
 
   final cases = <(RoomFilter, Room, bool)>[
     (RoomFilter.inbox, group, true),
@@ -14,6 +20,7 @@ void main() {
     (RoomFilter.mentions, mentioned, true),
     (RoomFilter.threads, group, false),
     (RoomFilter.threads, direct, false),
+    (RoomFilter.threads, threaded, true),
     (RoomFilter.rooms, group, true),
     (RoomFilter.rooms, direct, false),
     (RoomFilter.direct, group, false),
@@ -26,9 +33,8 @@ void main() {
     });
   }
 
-  test('só Threads fica desabilitado', () {
-    expect(RoomFilter.values.where((filter) => !filter.enabled), [
-      RoomFilter.threads,
-    ]);
+  test('Threads soma respostas de thread; os outros, mensagens', () {
+    expect(RoomFilter.threads.unreadOf(threaded), 3);
+    expect(RoomFilter.inbox.unreadOf(threaded), 1);
   });
 }

@@ -25,6 +25,7 @@ class RoomRepositoryMatrix implements RoomRepository {
     isInvite: summary.isInvite,
     unreadMessages: summary.unreadMessages,
     unreadMentions: summary.unreadMentions,
+    unreadThreadReplies: summary.unreadThreadReplies,
     memberCount: summary.memberCount,
     heroes: List.unmodifiable(summary.heroes),
     latest: switch (summary.latest) {

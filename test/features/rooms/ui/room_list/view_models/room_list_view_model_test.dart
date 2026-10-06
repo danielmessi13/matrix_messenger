@@ -1,5 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room_filter.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_state.dart';
@@ -51,23 +52,30 @@ void main() {
     expect(state.visibleRooms, isEmpty);
   });
 
-  test('não lidas por filtro somam as mensagens de cada sala', () {
-    final state = RoomListState(rooms: kRooms, loaded: true);
+  test('não lidas por filtro somam o contador de cada filtro', () {
+    final state = RoomListState(
+      rooms: [
+        ...kRooms,
+        const Room(id: '!t:b.c', name: 'obras', unreadThreadReplies: 3),
+      ],
+      loaded: true,
+    );
     expect(state.unreadByFilter, {
       RoomFilter.inbox: 6,
       RoomFilter.mentions: 4,
-      RoomFilter.threads: 0,
+      RoomFilter.threads: 3,
       RoomFilter.rooms: 4,
       RoomFilter.direct: 2,
     });
     expect(state.visibleUnread, 6);
+    expect(state.copyWith(filter: RoomFilter.threads).visibleUnread, 3);
   });
 
   blocTest<RoomListViewModel, RoomListState>(
-    'Threads está desabilitado e não muda o filtro',
+    'selecionar Threads muda o filtro',
     build: () => RoomListViewModel(repository),
     act: (viewModel) => viewModel.selectFilter(RoomFilter.threads),
-    expect: () => const <RoomListState>[],
+    expect: () => const [RoomListState(filter: RoomFilter.threads)],
   );
 
   blocTest<RoomListViewModel, RoomListState>(

@@ -33,6 +33,7 @@ class Room extends Equatable {
     this.isInvite = false,
     this.unreadMessages = 0,
     this.unreadMentions = 0,
+    this.unreadThreadReplies = 0,
     this.memberCount = 0,
     this.heroes = const [],
     this.latest,
@@ -51,6 +52,8 @@ class Room extends Equatable {
 
   final int unreadMentions;
 
+  final int unreadThreadReplies;
+
   final int memberCount;
 
   final List<String> heroes;
@@ -65,6 +68,7 @@ class Room extends Equatable {
     isInvite,
     unreadMessages,
     unreadMentions,
+    unreadThreadReplies,
     memberCount,
     heroes,
     latest,

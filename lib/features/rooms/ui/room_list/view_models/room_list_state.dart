@@ -40,13 +40,13 @@ final class RoomListState extends Equatable {
   }
 
   int get visibleUnread =>
-      visibleRooms.fold(0, (sum, room) => sum + room.unreadMessages);
+      visibleRooms.fold(0, (sum, room) => sum + filter.unreadOf(room));
 
   Map<RoomFilter, int> get unreadByFilter => {
     for (final filter in RoomFilter.values)
       filter: rooms
           .where(filter.matches)
-          .fold(0, (sum, room) => sum + room.unreadMessages),
+          .fold(0, (sum, room) => sum + filter.unreadOf(room)),
   };
 
   Room? get selectedRoom =>
