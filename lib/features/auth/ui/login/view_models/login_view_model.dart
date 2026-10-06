@@ -36,6 +36,7 @@ class LoginViewModel extends Cubit<LoginState> {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) async {
     if (_busy) return;
     emit(const LoginState(status: LoginStatus.running));
@@ -44,17 +45,22 @@ class LoginViewModel extends Cubit<LoginState> {
       homeserver: homeserver,
       username: username,
       password: password,
+      keepSignedIn: keepSignedIn,
     );
     _finish(result, 'Login falhou');
   }
 
-  Future<void> loginWithBrowser({required String homeserver}) async {
+  Future<void> loginWithBrowser({
+    required String homeserver,
+    bool keepSignedIn = true,
+  }) async {
     if (_busy) return;
     _browserUnavailable = false;
     emit(const LoginState(status: LoginStatus.running));
 
     final result = await _repository.loginWithBrowser(
       homeserver: homeserver,
+      keepSignedIn: keepSignedIn,
       onAuthorizationUrl: (url) {
         _emitIfOpen(
           LoginState(

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/auth/domain/models/auth_failure.dart';
 import 'package:matrix_messenger/features/auth/ui/login/view_models/login_view_model.dart';
 import 'package:matrix_messenger/features/auth/ui/login/widgets/login_screen.dart';
@@ -21,8 +22,15 @@ void main() {
     );
     addTearDown(viewModel.close);
     addTearDown(repository.dispose);
+    tester.view
+      ..physicalSize = const Size(1280, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      MaterialApp(home: LoginScreen(viewModel: viewModel)),
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: LoginScreen(viewModel: viewModel),
+      ),
     );
   }
 
@@ -142,6 +150,46 @@ void main() {
     await tester.tap(find.byKey(const Key('login_browser_cancel')));
     await tester.pumpAndSettle();
     expect(repository.cancelBrowserLoginCalls, 1);
+    expect(find.byKey(const Key('login_submit')), findsOneWidget);
+  });
+
+  testWidgets('desmarcar "Manter conectado" vale para os dois logins', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository();
+    await pumpScreen(tester, repository);
+
+    await tester.tap(find.byKey(const Key('login_keep_signed_in')));
+    await fillAndSubmit(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('login_browser')));
+    await tester.pumpAndSettle();
+
+    expect(repository.keepSignedInCalls, [false, false]);
+  });
+
+  testWidgets('"Padrão" só aparece com o servidor padrão', (tester) async {
+    await pumpScreen(tester, FakeAuthRepository());
+    expect(find.text('Padrão'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('login_homeserver')),
+      'example.org',
+    );
+    await tester.pump();
+
+    expect(find.text('Padrão'), findsNothing);
+    expect(find.text('@voce:example.org'), findsOneWidget);
+  });
+
+  testWidgets('janela estreita esconde o painel da conversa', (tester) async {
+    await pumpScreen(tester, FakeAuthRepository());
+    expect(find.text('Seu time já está conversando.'), findsOneWidget);
+
+    tester.view.physicalSize = const Size(700, 800);
+    await tester.pump();
+
+    expect(find.text('Seu time já está conversando.'), findsNothing);
     expect(find.byKey(const Key('login_submit')), findsOneWidget);
   });
 }

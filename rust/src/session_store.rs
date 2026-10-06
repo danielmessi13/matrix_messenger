@@ -231,7 +231,10 @@ mod tests {
 
     #[test]
     fn missing_vault_loads_no_session() {
-        assert!(matches!(parse_loaded(Err(keyring::Error::NoDefaultStore)), Ok(None)));
+        assert!(matches!(
+            parse_loaded(Err(keyring::Error::NoDefaultStore)),
+            Ok(None)
+        ));
     }
 
     #[test]

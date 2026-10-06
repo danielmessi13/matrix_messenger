@@ -6,6 +6,7 @@ void main() {
   const group = Room(id: '!g:b.c', name: 'geral');
   const mentioned = Room(id: '!m:b.c', name: 'time', unreadMentions: 2);
   const direct = Room(id: '!d:b.c', name: 'Ana', isDirect: true);
+  const plain = Room(id: '!t:b.c', name: 'obras', unreadMessages: 1);
 
   final cases = <(RoomFilter, Room, bool)>[
     (RoomFilter.inbox, group, true),
@@ -26,9 +27,12 @@ void main() {
     });
   }
 
-  test('só Threads fica desabilitado', () {
-    expect(RoomFilter.values.where((filter) => !filter.enabled), [
-      RoomFilter.threads,
-    ]);
-  });
+  test(
+    'Menções somam o próprio contador, Threads zero; os outros, mensagens',
+    () {
+      expect(RoomFilter.mentions.unreadOf(mentioned), 2);
+      expect(RoomFilter.threads.unreadOf(plain), 0);
+      expect(RoomFilter.inbox.unreadOf(plain), 1);
+    },
+  );
 }

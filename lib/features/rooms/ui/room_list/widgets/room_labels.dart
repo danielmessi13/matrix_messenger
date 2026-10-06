@@ -38,22 +38,24 @@ String initialsOfName(String name) {
   return words.first.characters.take(2).toString().toUpperCase();
 }
 
-String _firstName(String name) => name.trim().split(RegExp(r'\s+')).first;
+String firstName(String name) => name.trim().split(RegExp(r'\s+')).first;
+
+String messageContent(LatestMessage message) => switch (message.kind) {
+  LatestMessageKind.text =>
+    (message.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim(),
+  LatestMessageKind.image => 'Imagem',
+  LatestMessageKind.file => 'Arquivo',
+  LatestMessageKind.encrypted => 'Mensagem criptografada',
+  LatestMessageKind.other => 'Mensagem',
+};
 
 String latestPreview(Room room) {
   final message = room.latest;
   if (message == null) return room.isInvite ? 'Convite para entrar' : '';
-  final content = switch (message.kind) {
-    LatestMessageKind.text =>
-      (message.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim(),
-    LatestMessageKind.image => 'Imagem',
-    LatestMessageKind.file => 'Arquivo',
-    LatestMessageKind.encrypted => 'Mensagem criptografada',
-    LatestMessageKind.other => 'Mensagem',
-  };
+  final content = messageContent(message);
   if (message.isOwn) return 'Você: $content';
   if (room.isDirect) return content;
-  return '${_firstName(message.senderName)}: $content';
+  return '${firstName(message.senderName)}: $content';
 }
 
 String unreadLabel(int count) => '$count ${count == 1 ? 'nova' : 'novas'}';

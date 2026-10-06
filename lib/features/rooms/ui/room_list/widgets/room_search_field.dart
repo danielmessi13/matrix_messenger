@@ -70,7 +70,7 @@ class _RoomSearchFieldState extends State<RoomSearchField> {
                 decoration: InputDecoration(
                   isCollapsed: true,
                   border: InputBorder.none,
-                  hintText: 'Buscar conversas',
+                  hintText: 'Buscar mensagens',
                   hintStyle: TextStyle(color: colors.textMuted),
                 ),
               ),
@@ -85,9 +85,6 @@ class _RoomSearchFieldState extends State<RoomSearchField> {
                 onPressed: _clear,
                 icon: const Icon(Icons.close),
               ),
-            const _ScopeChip(label: 'Tudo', active: true),
-            const _ScopeChip(label: 'Mensagens', active: false),
-            const _ScopeChip(label: 'Pessoas', active: false),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -104,34 +101,5 @@ class _RoomSearchFieldState extends State<RoomSearchField> {
         ),
       ),
     );
-  }
-}
-
-class _ScopeChip extends StatelessWidget {
-  const _ScopeChip({required this.label, required this.active});
-
-  final String label;
-
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final chip = Container(
-      margin: const EdgeInsets.only(left: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: active ? colors.borderStrong : Colors.transparent,
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12.5,
-          color: active ? colors.textPrimary : colors.textMuted,
-        ),
-      ),
-    );
-    return active ? chip : Tooltip(message: 'Em breve', child: chip);
   }
 }

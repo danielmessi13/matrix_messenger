@@ -53,6 +53,7 @@ backup-key.txt
 docs/*
 !docs/decisoes-tecnicas.md
 !docs/limitacoes.md
+.env
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
@@ -77,3 +78,5 @@ docs/*
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
+# Assinatura local do macOS (team pessoal)
+macos/Runner/Configs/Signing.local.xcconfig

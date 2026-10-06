@@ -54,13 +54,14 @@ void main() {
     expect(find.text('Caixa de entrada'), findsOneWidget);
   });
 
-  testWidgets('tocar seleciona; Threads não reage', (tester) async {
+  testWidgets('tocar seleciona, inclusive Threads', (tester) async {
     final selected = await pump(tester, expanded: true);
 
     await tester.tap(find.byKey(const Key('filter_direct')));
     await tester.tap(find.byKey(const Key('filter_threads')));
 
-    expect(selected, [RoomFilter.direct]);
+    expect(selected, [RoomFilter.direct, RoomFilter.threads]);
+    expect(find.byTooltip('Em breve'), findsNothing);
   });
 
   testWidgets('botão de recolher chama onToggle', (tester) async {

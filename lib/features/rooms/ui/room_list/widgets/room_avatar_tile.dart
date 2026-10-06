@@ -9,20 +9,26 @@ class RoomAvatarTile extends StatelessWidget {
     super.key,
     required this.room,
     required this.selected,
+    required this.unread,
     required this.onTap,
+    this.tooltip,
   });
 
   final Room room;
 
   final bool selected;
 
+  final int unread;
+
   final VoidCallback onTap;
+
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Tooltip(
-      message: roomName(room),
+      message: tooltip ?? roomName(room),
       child: InkWell(
         key: Key('room_avatar_${room.id}'),
         onTap: onTap,
@@ -50,7 +56,7 @@ class RoomAvatarTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (room.unreadMessages > 0)
+            if (unread > 0)
               Positioned(
                 right: -5,
                 top: -5,
@@ -65,7 +71,7 @@ class RoomAvatarTile extends StatelessWidget {
                     border: Border.all(color: colors.listBackground, width: 2),
                   ),
                   child: Text(
-                    '${room.unreadMessages}',
+                    '$unread',
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,

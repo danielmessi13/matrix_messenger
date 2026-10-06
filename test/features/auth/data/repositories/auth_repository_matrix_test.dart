@@ -178,6 +178,33 @@ void main() {
       );
     });
 
+    test('sem "Manter conectado" não salvar é o esperado, sem aviso', () async {
+      service.loginResult = Result.ok(
+        FakeMatrixClient(
+          userId: kUserSession.userId,
+          deviceId: kUserSession.deviceId,
+          sessionSaved: false,
+        ),
+      );
+
+      final result = await repository.login(
+        homeserver: 'matrix.org',
+        username: 'alice',
+        password: 'secret',
+        keepSignedIn: false,
+      );
+
+      expect(service.keepSignedInCalls, [false]);
+      expect(
+        result,
+        isA<Ok<UserSession>>().having(
+          (ok) => ok.value.sessionSaved,
+          'sessionSaved',
+          isTrue,
+        ),
+      );
+    });
+
     test('repassa os dados ao service', () async {
       await repository.login(
         homeserver: 'example.org',

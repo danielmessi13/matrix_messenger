@@ -35,11 +35,33 @@ void main() {
     await tester.tap(find.byKey(const Key('logout')));
   }
 
-  testWidgets('mostra as iniciais e o Matrix ID no tooltip', (tester) async {
+  testWidgets('mostra iniciais e nome; o menu mostra o Matrix ID', (
+    tester,
+  ) async {
     await pumpMenu(tester, FakeAuthRepository());
 
     expect(find.text('AL'), findsOneWidget);
-    expect(find.byTooltip('@alice:matrix.org'), findsOneWidget);
+    expect(find.text('alice'), findsOneWidget);
+    expect(find.text('@alice:matrix.org'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('user_menu')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('@alice:matrix.org'), findsOneWidget);
+    expect(find.text('Sair'), findsOneWidget);
+  });
+
+  testWidgets('gatilho sem tooltip e com hover arredondado', (tester) async {
+    await pumpMenu(tester, FakeAuthRepository());
+
+    expect(find.byTooltip('Show menu'), findsNothing);
+    final ink = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const Key('user_menu')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    expect(ink.borderRadius, BorderRadius.circular(21));
   });
 
   testWidgets('"Sair" chama o logout do repository', (tester) async {

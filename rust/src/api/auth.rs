@@ -1,11 +1,8 @@
 use std::{
-    mem::ManuallyDrop,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
     time::Duration,
 };
 
-use flutter_rust_bridge::frb;
 use matrix_sdk::{
     authentication::oauth::{
         error::{
@@ -15,19 +12,13 @@ use matrix_sdk::{
         OAuthError,
     },
     ruma::api::error::ErrorKind,
-    AuthSession, Client, ClientBuildError, HttpError, SessionChange,
-};
-use tokio::{
-    runtime::Handle,
-    sync::broadcast::{error::RecvError, Receiver},
-    task::AbortHandle,
+    Client, ClientBuildError, HttpError,
 };
 
 use crate::{
-    api::rooms::{RoomSummary, SyncStatus},
-    frb_generated::StreamSink,
+    api::client::{run_blocking, MatrixClient},
+    client_builder::client_builder,
     oidc_callback::CallbackError,
-    room_list::{RoomSync, RoomSyncStopper},
     session_store::{self, SavedAuth, StoredSession},
 };
 
@@ -36,41 +27,13 @@ const DEVICE_DISPLAY_NAME: &str = "Matrix Messenger (desktop)";
 // Por padrão, o SDK repete requisições com resposta 5xx ou 429 por até 15 minutos.
 const LOGOUT_TIMEOUT: Duration = Duration::from_secs(10);
 
-pub enum SessionEvent {
-    Revoked,
-}
-
-type EventSink = Arc<Mutex<Option<StreamSink<SessionEvent>>>>;
-
-#[frb(opaque)]
-pub struct MatrixClient {
-    client: ManuallyDrop<Client>,
-    rooms: ManuallyDrop<RoomSync>,
-    runtime: Handle,
-    vault: Option<Arc<Vault>>,
-    events: EventSink,
-    session_watcher: AbortHandle,
-}
-
-impl Drop for MatrixClient {
-    /// O finalizer do Dart roda fora do runtime Tokio, e o store SQLite do SDK precisa dele ao fechar.
-    fn drop(&mut self) {
-        self.session_watcher.abort();
-        let _guard = self.runtime.enter();
-        // SAFETY: `rooms` e `client` não são mais acessados depois daqui; o próprio `MatrixClient` está sendo destruído.
-        unsafe {
-            ManuallyDrop::drop(&mut self.rooms);
-            ManuallyDrop::drop(&mut self.client);
-        }
-    }
-}
-
 impl MatrixClient {
     pub async fn login(
         homeserver: String,
         username: String,
         password: String,
         data_dir: String,
+        keep_signed_in: bool,
     ) -> Result<MatrixClient, AuthError> {
         let passphrase = session_store::new_passphrase().map_err(AuthError::storage)?;
         let stores_dir = session_store::stores_dir(&data_dir);
@@ -88,7 +51,7 @@ impl MatrixClient {
                 }
             };
 
-        finish_new_login(client, data_dir, store_name, passphrase).await
+        finish_new_login(client, data_dir, store_name, passphrase, keep_signed_in).await
     }
 
     pub async fn restore_session(data_dir: String) -> Result<Option<MatrixClient>, AuthError> {
@@ -102,7 +65,7 @@ impl MatrixClient {
 
         let saved = stored.clone();
         let stores_dir = session_store::stores_dir(&data_dir);
-        let client = Client::builder()
+        let client = client_builder()
             .homeserver_url(&stored.homeserver_url)
             .sqlite_store(
                 stores_dir.join(&stored.store_name),
@@ -129,81 +92,10 @@ impl MatrixClient {
         // Daqui em diante um UnknownToken vem do próprio logout, não de uma revogação.
         self.session_watcher.abort();
         self.rooms.stop().await;
-        // TODO: ativar key backup/recovery do SDK; sem isso o próximo login não decifra o histórico das salas cifradas.
         tokio::time::timeout(LOGOUT_TIMEOUT, self.client.logout())
             .await
             .ok();
         Ok(())
-    }
-
-    #[frb(sync, getter)]
-    pub fn user_id(&self) -> String {
-        self.client
-            .user_id()
-            .map(ToString::to_string)
-            .unwrap_or_default()
-    }
-
-    #[frb(sync, getter)]
-    pub fn device_id(&self) -> String {
-        self.client
-            .device_id()
-            .map(ToString::to_string)
-            .unwrap_or_default()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn inner(&self) -> &Client {
-        &self.client
-    }
-
-    #[frb(sync, getter)]
-    pub fn session_saved(&self) -> bool {
-        self.vault.is_some()
-    }
-
-    pub fn session_events(&self, sink: StreamSink<SessionEvent>) {
-        *self.events.lock().unwrap() = Some(sink);
-    }
-
-    pub fn watch_rooms(&self, sink: StreamSink<Vec<RoomSummary>>) {
-        self.rooms.watch_rooms(move |rooms| sink.add(rooms).is_ok());
-    }
-
-    pub fn watch_sync_status(&self, sink: StreamSink<SyncStatus>) {
-        self.rooms
-            .watch_status(move |status| sink.add(status).is_ok());
-    }
-
-    #[cfg(test)]
-    pub(crate) fn room_sync(&self) -> &RoomSync {
-        &self.rooms
-    }
-
-    fn new(client: Client, data_dir: String, saved_session: Option<StoredSession>) -> Self {
-        let vault = saved_session.map(|stored| Arc::new(Vault::new(data_dir, stored)));
-        if let Some(vault) = &vault {
-            save_on_refresh(&client, vault.clone());
-        }
-        let events = EventSink::default();
-        // Inscrito aqui, e não dentro da task, para não perder um evento antes de ela rodar.
-        let changes = client.subscribe_to_session_changes();
-        let rooms = RoomSync::new(client.clone(), Handle::current());
-        let session_watcher = tokio::spawn(watch_session(
-            changes,
-            vault.clone(),
-            events.clone(),
-            rooms.stopper(),
-        ))
-        .abort_handle();
-        Self {
-            client: ManuallyDrop::new(client),
-            rooms: ManuallyDrop::new(rooms),
-            runtime: Handle::current(),
-            vault,
-            events,
-            session_watcher,
-        }
     }
 }
 
@@ -212,6 +104,7 @@ pub(crate) async fn finish_new_login(
     data_dir: String,
     store_name: String,
     passphrase: String,
+    keep_signed_in: bool,
 ) -> Result<MatrixClient, AuthError> {
     let Some(auth) = client.session().and_then(SavedAuth::from_session) else {
         drop(client);
@@ -229,119 +122,28 @@ pub(crate) async fn finish_new_login(
     };
 
     let (save_dir, to_save) = (data_dir.clone(), stored.clone());
-    let saved = run_blocking(move || session_store::save(&save_dir, &to_save))
-        .await
-        .is_ok();
+    let saved = if keep_signed_in {
+        run_blocking(move || session_store::save(&save_dir, &to_save))
+            .await
+            .is_ok()
+    } else {
+        // Se a sessão antiga ficasse no cofre, voltaria no próximo início sem o store, que é apagado logo abaixo.
+        if let Err(error) = run_blocking(move || session_store::delete(&save_dir)).await {
+            tokio::time::timeout(LOGOUT_TIMEOUT, client.logout())
+                .await
+                .ok();
+            drop(client);
+            remove_failed_store(session_store::stores_dir(&data_dir).join(&store_name)).await;
+            return Err(AuthError::storage(error));
+        }
+        false
+    };
 
     // Só com o novo login feito os stores de logins anteriores deixam de ser necessários.
     let stores_dir = session_store::stores_dir(&data_dir);
     run_blocking(move || session_store::remove_stores_except(&stores_dir, Some(&store_name))).await;
 
     Ok(MatrixClient::new(client, data_dir, saved.then_some(stored)))
-}
-
-struct Vault {
-    data_dir: String,
-    homeserver_url: String,
-    store_name: String,
-    passphrase: String,
-    // O delete segura o lock, então nenhum save termina depois dele.
-    active: Mutex<bool>,
-}
-
-impl Vault {
-    fn new(data_dir: String, stored: StoredSession) -> Self {
-        Self {
-            data_dir,
-            homeserver_url: stored.homeserver_url,
-            store_name: stored.store_name,
-            passphrase: stored.passphrase,
-            active: Mutex::new(true),
-        }
-    }
-
-    fn stored(&self, current: Option<AuthSession>) -> Option<StoredSession> {
-        Some(StoredSession {
-            homeserver_url: self.homeserver_url.clone(),
-            store_name: self.store_name.clone(),
-            passphrase: self.passphrase.clone(),
-            auth: SavedAuth::from_session(current?)?,
-        })
-    }
-
-    fn save_tokens(&self, current: Option<AuthSession>) -> Result<(), String> {
-        let active = self.active.lock().unwrap();
-        match self.stored(current) {
-            Some(updated) if *active => session_store::save(&self.data_dir, &updated),
-            _ => Ok(()),
-        }
-    }
-
-    fn forget(&self) -> Result<(), String> {
-        let mut active = self.active.lock().unwrap();
-        session_store::delete(&self.data_dir)?;
-        *active = false;
-        Ok(())
-    }
-}
-
-// O SDK chama o save dentro do próprio refresh, antes de avisar que os tokens mudaram.
-fn save_on_refresh(client: &Client, vault: Arc<Vault>) {
-    let registered = client.set_session_callbacks(
-        // Só é usado com o lock entre processos, que o app não ativa.
-        Box::new(|client| client.session_tokens().ok_or_else(|| "sem sessão".into())),
-        Box::new(move |client| {
-            match vault.save_tokens(client.session()) {
-                Ok(()) => log::info!("tokens renovados gravados no cofre"),
-                Err(error) => log::warn!("tokens renovados não foram gravados: {error}"),
-            }
-            Ok(())
-        }),
-    );
-    if let Err(error) = registered {
-        log::warn!("callbacks de sessão não registrados: {error}");
-    }
-}
-
-async fn watch_session(
-    mut changes: Receiver<SessionChange>,
-    vault: Option<Arc<Vault>>,
-    events: EventSink,
-    rooms: RoomSyncStopper,
-) {
-    loop {
-        match watch_action(changes.recv().await) {
-            WatchAction::Ignore => {}
-            WatchAction::Revoke => {
-                if let Some(vault) = vault.clone() {
-                    if let Err(error) = run_blocking(move || vault.forget()).await {
-                        log::warn!("sessão revogada não foi apagada do cofre: {error}");
-                    }
-                }
-                // Com o modo offline, o SDK religaria o sync a cada 401 até o processo acabar.
-                rooms.stop().await;
-                if let Some(sink) = events.lock().unwrap().as_ref() {
-                    sink.add(SessionEvent::Revoked).ok();
-                }
-            }
-            WatchAction::Stop => break,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-enum WatchAction {
-    Ignore,
-    Revoke,
-    Stop,
-}
-
-fn watch_action(change: Result<SessionChange, RecvError>) -> WatchAction {
-    match change {
-        Ok(SessionChange::TokensRefreshed) | Err(RecvError::Lagged(_)) => WatchAction::Ignore,
-        Ok(SessionChange::UnknownToken(_)) => WatchAction::Revoke,
-        Err(RecvError::Closed) => WatchAction::Stop,
-    }
 }
 
 async fn login_new_device(
@@ -351,7 +153,7 @@ async fn login_new_device(
     store_path: &Path,
     passphrase: &str,
 ) -> Result<Client, AuthError> {
-    let client = Client::builder()
+    let client = client_builder()
         .server_name_or_homeserver_url(homeserver.trim())
         .sqlite_store(store_path, Some(passphrase))
         .handle_refresh_tokens()
@@ -377,14 +179,6 @@ pub(crate) async fn remove_failed_store(path: PathBuf) {
             Err(_) => tokio::time::sleep(Duration::from_millis(100)).await,
         }
     }
-}
-
-pub(crate) async fn run_blocking<T: Send + 'static>(
-    task: impl FnOnce() -> T + Send + 'static,
-) -> T {
-    tokio::task::spawn_blocking(task)
-        .await
-        .unwrap_or_else(|error| std::panic::resume_unwind(error.into_panic()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -510,12 +304,8 @@ impl From<matrix_sdk::Error> for AuthError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use matrix_sdk::{
-        authentication::oauth::{ClientId, OAuthSession, UserSession},
-        ruma::api::error::UnknownTokenErrorData,
-    };
 
-    use crate::test_support::{offline_client, session_meta, store_count, temp_data_dir, tokens};
+    use crate::test_support::{env_var, offline_client, store_count, temp_data_dir};
 
     #[test]
     fn oauth_not_supported_maps_to_oidc_not_supported() {
@@ -547,74 +337,6 @@ mod tests {
         );
     }
 
-    fn vault() -> Vault {
-        Vault::new("dir".into(), stored_oauth("velho"))
-    }
-
-    fn stored_oauth(refresh: &str) -> StoredSession {
-        StoredSession {
-            homeserver_url: "https://matrix-client.matrix.org/".into(),
-            store_name: "login_1".into(),
-            passphrase: "segredo".into(),
-            auth: SavedAuth::OAuth {
-                client_id: "client".into(),
-                user: UserSession {
-                    meta: session_meta(),
-                    tokens: tokens(refresh),
-                },
-            },
-        }
-    }
-
-    #[test]
-    fn refreshed_or_lagged_events_are_ignored() {
-        assert_eq!(
-            watch_action(Ok(SessionChange::TokensRefreshed)),
-            WatchAction::Ignore
-        );
-        assert_eq!(watch_action(Err(RecvError::Lagged(2))), WatchAction::Ignore);
-    }
-
-    #[test]
-    fn unknown_token_revokes_and_closed_channel_stops() {
-        assert_eq!(
-            watch_action(Ok(
-                SessionChange::UnknownToken(UnknownTokenErrorData::new())
-            )),
-            WatchAction::Revoke
-        );
-        assert_eq!(watch_action(Err(RecvError::Closed)), WatchAction::Stop);
-    }
-
-    #[test]
-    fn vault_keeps_store_and_takes_current_tokens() {
-        let current = AuthSession::OAuth(Box::new(OAuthSession {
-            client_id: ClientId::new("client".into()),
-            user: UserSession {
-                meta: session_meta(),
-                tokens: tokens("novo"),
-            },
-        }));
-
-        let updated = vault().stored(Some(current)).unwrap();
-
-        assert_eq!(updated.store_name, "login_1");
-        assert_eq!(updated.passphrase, "segredo");
-        let SavedAuth::OAuth { user, .. } = updated.auth else {
-            panic!("deveria ser OAuth");
-        };
-        assert_eq!(user.tokens.refresh_token.as_deref(), Some("novo"));
-    }
-
-    #[test]
-    fn vault_without_current_session_is_none() {
-        assert!(vault().stored(None).is_none());
-    }
-
-    fn env_var(name: &str) -> String {
-        std::env::var(name).unwrap_or_else(|_| panic!("defina {name}"))
-    }
-
     #[test]
     fn invalid_server_name_maps_to_invalid_homeserver() {
         let error = AuthError::from(ClientBuildError::InvalidServerName);
@@ -636,6 +358,7 @@ mod tests {
             "alice".into(),
             "senha".into(),
             data_dir.clone(),
+            true,
         )
         .await;
 
@@ -667,59 +390,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn revocation_stops_room_sync() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        use matrix_sdk::test_utils::mocks::MatrixMockServer;
-        use wiremock::{
-            matchers::{method, path_regex},
-            Mock, ResponseTemplate,
-        };
-
-        let server = MatrixMockServer::new().await;
-        let client = server.client_builder().no_server_versions().build().await;
-        server
-            .mock_versions()
-            .with_simplified_sliding_sync()
-            .ok()
-            .mount()
-            .await;
-        let syncs = Arc::new(AtomicUsize::new(0));
-        let counter = syncs.clone();
-        Mock::given(method("POST"))
-            .and(path_regex(r"/org.matrix.simplified_msc3575/sync$"))
-            .respond_with(move |_: &wiremock::Request| {
-                counter.fetch_add(1, Ordering::SeqCst);
-                ResponseTemplate::new(401).set_body_json(serde_json::json!({
-                    "errcode": "M_UNKNOWN_TOKEN", "error": "revogado"
-                }))
-            })
-            .mount(server.server())
-            .await;
-        let client = MatrixClient::new(client, temp_data_dir("revocation_sync"), None);
-
-        client.room_sync().watch_rooms(|_| true);
-        tokio::time::timeout(Duration::from_secs(5), async {
-            while syncs.load(Ordering::SeqCst) == 0 {
-                tokio::time::sleep(Duration::from_millis(20)).await;
-            }
-        })
-        .await
-        .expect("primeiro sync em até 5 s");
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        let before = syncs.load(Ordering::SeqCst);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let after = syncs.load(Ordering::SeqCst);
-        assert_eq!(before, after, "o sync continuou depois da revogação");
-        let state = client.room_sync().service().unwrap().state().get();
-        assert!(
-            matches!(state, matrix_sdk_ui::sync_service::State::Idle),
-            "{state:?}"
-        );
-    }
-
-    #[tokio::test]
     async fn finish_without_session_removes_the_new_store() {
         let data_dir = temp_data_dir("finish_without_session");
         let store_name = session_store::unique_store_name();
@@ -727,7 +397,8 @@ mod tests {
         let client = offline_client(&store_path).await;
         assert_eq!(store_count(&data_dir), 1);
 
-        let result = finish_new_login(client, data_dir.clone(), store_name, "segredo".into()).await;
+        let result =
+            finish_new_login(client, data_dir.clone(), store_name, "segredo".into(), true).await;
 
         assert!(result.is_err());
         assert_eq!(store_count(&data_dir), 0);
@@ -750,6 +421,7 @@ mod tests {
             env_var("MATRIX_USERNAME"),
             env_var("MATRIX_PASSWORD"),
             data_dir.clone(),
+            true,
         )
         .await
         .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
@@ -776,29 +448,26 @@ mod tests {
         ));
     }
 
-    /// Requer MATRIX_HOMESERVER, MATRIX_USERNAME e MATRIX_PASSWORD.
     #[tokio::test]
     #[ignore]
-    async fn room_sync_with_real_account() {
+    async fn login_without_keep_signed_in_is_not_restored() {
+        let data_dir = temp_data_dir("real_not_kept");
+
         let client = MatrixClient::login(
             env_var("MATRIX_HOMESERVER"),
             env_var("MATRIX_USERNAME"),
             env_var("MATRIX_PASSWORD"),
-            temp_data_dir("real_rooms"),
+            data_dir.clone(),
+            false,
         )
         .await
         .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        client
-            .room_sync()
-            .watch_rooms(move |rooms| tx.send(rooms).is_ok());
+        assert!(!client.session_saved());
 
-        let rooms = tokio::time::timeout(Duration::from_secs(60), rx.recv())
-            .await
-            .expect("lista em até 60 s")
-            .expect("sync encerrado");
-        println!("{} salas", rooms.len());
-
+        assert!(matches!(
+            MatrixClient::restore_session(data_dir).await,
+            Ok(None)
+        ));
         client
             .logout()
             .await
@@ -815,6 +484,7 @@ mod tests {
             env_var("MATRIX_USERNAME"),
             "senha-errada-de-proposito".into(),
             data_dir.clone(),
+            true,
         )
         .await;
 

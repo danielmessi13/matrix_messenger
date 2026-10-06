@@ -5,6 +5,7 @@
 
 import '../frb_generated.dart';
 import 'auth.dart';
+import 'client.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
@@ -23,8 +24,10 @@ abstract class OidcLogin implements RustOpaqueInterface {
   static Future<OidcLogin> start({
     required String homeserver,
     required String dataDir,
+    required bool keepSignedIn,
   }) => RustLib.instance.api.crateApiOidcOidcLoginStart(
     homeserver: homeserver,
     dataDir: dataDir,
+    keepSignedIn: keepSignedIn,
   );
 }
