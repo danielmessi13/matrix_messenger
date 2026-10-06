@@ -15,20 +15,29 @@ import '../../domain/models/timeline_item.dart';
 import '../conversation/view_models/conversation_state.dart';
 import '../conversation/view_models/conversation_view_model.dart';
 import 'conversation_header.dart';
+import 'delayed_indicator.dart';
 import 'message_input.dart';
 import 'message_labels.dart';
 import 'thread_panel.dart';
 import 'timeline_view.dart';
 
 // Abaixo disto o painel da thread fica por cima da conversa.
-const _sideBySideWidth = 1000.0;
+const kThreadSideBySideWidth = 1000.0;
 
 class ConversationPane extends StatelessWidget {
-  const ConversationPane({super.key, required this.room, required this.now});
+  const ConversationPane({
+    super.key,
+    required this.room,
+    required this.now,
+    this.onThreadOpenChanged,
+  });
 
   final Room? room;
 
   final DateTime now;
+
+  // A home recolhe a lista de salas para a thread caber ao lado.
+  final ValueChanged<bool>? onThreadOpenChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +74,10 @@ class ConversationPane extends StatelessWidget {
             context.read<ConversationRepository>(),
             room.id,
           )..open(),
-          child: _Conversation(room: room, now: now),
+          child: _ThreadVisibility(
+            onChanged: onThreadOpenChanged,
+            child: _Conversation(room: room, now: now),
+          ),
         ),
       },
     );
@@ -77,6 +89,43 @@ class ConversationPane extends StatelessWidget {
     fontSize: size,
     color: colors.textMuted,
   );
+}
+
+class _ThreadVisibility extends StatefulWidget {
+  const _ThreadVisibility({required this.onChanged, required this.child});
+
+  final ValueChanged<bool>? onChanged;
+
+  final Widget child;
+
+  @override
+  State<_ThreadVisibility> createState() => _ThreadVisibilityState();
+}
+
+class _ThreadVisibilityState extends State<_ThreadVisibility> {
+  bool _open = false;
+
+  @override
+  void dispose() {
+    final onChanged = widget.onChanged;
+    // Trocar de sala com a thread aberta também a fecha; avisa fora da desmontagem.
+    if (_open && onChanged != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(false));
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocListener<ConversationViewModel, ConversationState>(
+        listenWhen: (a, b) =>
+            (a.openThreadId == null) != (b.openThreadId == null),
+        listener: (context, state) {
+          _open = state.openThreadId != null;
+          widget.onChanged?.call(_open);
+        },
+        child: widget.child,
+      );
 }
 
 class _Conversation extends StatelessWidget {
@@ -97,7 +146,7 @@ class _Conversation extends StatelessWidget {
           child: BlocBuilder<ConversationViewModel, ConversationState>(
             builder: (context, state) => switch (state.status) {
               ConversationStatus.opening => const Center(
-                child: CircularProgressIndicator(),
+                child: DelayedIndicator(child: CircularProgressIndicator()),
               ),
               ConversationStatus.failed => Center(
                 child: Column(
@@ -178,7 +227,7 @@ class _Conversation extends StatelessWidget {
           // Mesma posição na árvore nos três casos, para a conversa não perder rolagem nem rascunho.
           return LayoutBuilder(
             builder: (context, box) {
-              final sideBySide = box.maxWidth >= _sideBySideWidth;
+              final sideBySide = box.maxWidth >= kThreadSideBySideWidth;
               return Stack(
                 children: [
                   Positioned(

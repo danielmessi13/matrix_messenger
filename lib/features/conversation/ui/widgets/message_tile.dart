@@ -399,38 +399,14 @@ class _HoverActions extends StatefulWidget {
   State<_HoverActions> createState() => _HoverActionsState();
 }
 
-class _HoverActionsState extends State<_HoverActions>
-    with SingleTickerProviderStateMixin {
+class _HoverActionsState extends State<_HoverActions> {
   final _link = LayerLink();
 
   final _portal = OverlayPortalController();
 
-  // O overlay só sai depois que a animação de fechar termina.
-  late final _animation =
-      AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 220),
-        reverseDuration: const Duration(milliseconds: 160),
-      )..addStatusListener((status) {
-        if (status == AnimationStatus.dismissed) _portal.hide();
-      });
-
-  late final _curve = CurvedAnimation(
-    parent: _animation,
-    curve: Curves.easeOut,
-    reverseCurve: Curves.easeIn,
-  );
-
   bool _overMessage = false;
 
   bool _overBar = false;
-
-  @override
-  void dispose() {
-    _curve.dispose();
-    _animation.dispose();
-    super.dispose();
-  }
 
   // Passar do balão para o menu dispara a saída antes da entrada; vale o estado final.
   void _hover({bool? message, bool? bar}) {
@@ -438,9 +414,8 @@ class _HoverActionsState extends State<_HoverActions>
     _overBar = bar ?? _overBar;
     if (_overMessage || _overBar) {
       _portal.show();
-      _animation.forward();
     } else {
-      _animation.reverse();
+      _portal.hide();
     }
   }
 
@@ -476,24 +451,10 @@ class _HoverActionsState extends State<_HoverActions>
           child: MouseRegion(
             onEnter: (_) => _hover(bar: true),
             onExit: (_) => _hover(bar: false),
-            child: FadeTransition(
-              opacity: _curve,
-              // Desce um pouco e cresce a partir do canto preso ao balão.
-              child: SlideTransition(
-                position: Tween(
-                  begin: const Offset(0, -0.25),
-                  end: Offset.zero,
-                ).animate(_curve),
-                child: ScaleTransition(
-                  scale: Tween(begin: 0.8, end: 1.0).animate(_curve),
-                  alignment: end ? Alignment.topRight : Alignment.topLeft,
-                  child: _ActionBar(
-                    messageId: widget.messageId,
-                    onReply: onReply,
-                    onStartThread: onStartThread,
-                  ),
-                ),
-              ),
+            child: _ActionBar(
+              messageId: widget.messageId,
+              onReply: onReply,
+              onStartThread: onStartThread,
             ),
           ),
         ),

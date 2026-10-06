@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme.dart';
 import '../../domain/models/timeline_item.dart';
 import '../conversation/view_models/conversation_state.dart';
 import '../conversation/view_models/conversation_view_model.dart';
+import 'delayed_indicator.dart';
 import 'focus_flash.dart';
 import 'message_labels.dart';
 import 'message_tile.dart';
@@ -41,6 +44,11 @@ class _TimelineViewState extends State<TimelineView>
   bool _unseenNewer = false;
 
   bool _itemsChangedWhileLoading = false;
+
+  // Enquanto o app completa a tela sozinho, o topo não mostra botão nem spinner.
+  bool _autoFilling = true;
+
+  Timer? _settleTimer;
 
   MessageItem? _replyNotice;
 
@@ -120,15 +128,36 @@ class _TimelineViewState extends State<TimelineView>
 
   void _fillShortHistory() {
     final state = widget.state;
-    if (!mounted || !_scroll.hasClients) return;
-    if (state.reachedStart || state.loadingOlder) return;
-    if (_scroll.position.maxScrollExtent < _loadOlderThreshold) {
-      widget.viewModel.loadOlder();
+    if (!mounted || !_scroll.hasClients || state.loadingOlder) return;
+    if (!state.reachedStart &&
+        _scroll.position.maxScrollExtent < _loadOlderThreshold) {
+      _settleTimer?.cancel();
+      _autoFilling = true;
+      widget.viewModel.loadOlder().whenComplete(_settleAutoFill);
+    } else {
+      _settleTimer?.cancel();
+      if (_autoFilling) setState(() => _autoFilling = false);
     }
+  }
+
+  // A página nova chega depois da busca, pela janela da ponte; se nada chegar (ou a busca falhar), o botão volta.
+  void _settleAutoFill() {
+    _settleTimer?.cancel();
+    _settleTimer = Timer(kLoadingIndicatorDelay, () {
+      if (mounted && _autoFilling && !widget.state.loadingOlder) {
+        setState(() => _autoFilling = false);
+      }
+    });
+  }
+
+  void _loadOlderByUser() {
+    _autoFilling = false;
+    widget.viewModel.loadOlder();
   }
 
   @override
   void dispose() {
+    _settleTimer?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -136,7 +165,7 @@ class _TimelineViewState extends State<TimelineView>
   void _onScroll() {
     final position = _scroll.position;
     if (position.maxScrollExtent - position.pixels < _loadOlderThreshold) {
-      widget.viewModel.loadOlder();
+      _loadOlderByUser();
     }
     final away = position.pixels > _awayFromLatestOffset;
     if (away != _awayFromLatest) {
@@ -168,7 +197,9 @@ class _TimelineViewState extends State<TimelineView>
         child: Text('Nenhuma mensagem ainda.', style: _italic(colors, 17)),
       );
     }
+    // Expand: a lista ocupa a área toda e, invertida, deixa poucas mensagens coladas embaixo.
     return Stack(
+      fit: StackFit.expand,
       children: [
         // Sem lista lazy: toda mensagem carregada fica montada, e dá para rolar até qualquer uma.
         SingleChildScrollView(
@@ -180,7 +211,8 @@ class _TimelineViewState extends State<TimelineView>
             children: [
               _TimelineTop(
                 state: widget.state,
-                onLoadOlder: widget.viewModel.loadOlder,
+                autoFilling: _autoFilling,
+                onLoadOlder: _loadOlderByUser,
               ),
               for (final item in items)
                 Center(
@@ -205,6 +237,16 @@ class _TimelineViewState extends State<TimelineView>
             ],
           ),
         ),
+        if (items.isEmpty &&
+            !widget.state.reachedStart &&
+            (widget.state.loadingOlder || _autoFilling))
+          const Center(
+            child: DelayedIndicator(
+              child: CircularProgressIndicator(
+                key: Key('timeline_loading_center'),
+              ),
+            ),
+          ),
         if (_unseenNewer)
           Positioned(
             bottom: 16,
@@ -239,9 +281,15 @@ class _TimelineViewState extends State<TimelineView>
 }
 
 class _TimelineTop extends StatelessWidget {
-  const _TimelineTop({required this.state, required this.onLoadOlder});
+  const _TimelineTop({
+    required this.state,
+    required this.autoFilling,
+    required this.onLoadOlder,
+  });
 
   final ConversationState state;
+
+  final bool autoFilling;
 
   final VoidCallback onLoadOlder;
 
@@ -258,6 +306,7 @@ class _TimelineTop extends StatelessWidget {
         ),
       );
     }
+    if (autoFilling) return const SizedBox.shrink();
     if (!state.loadingOlder) {
       return Padding(
         padding: const EdgeInsets.all(4),
@@ -271,12 +320,14 @@ class _TimelineTop extends StatelessWidget {
       );
     }
     return const Padding(
-      key: Key('timeline_loading_older'),
       padding: EdgeInsets.all(12),
       child: Center(
-        child: SizedBox.square(
-          dimension: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+        child: DelayedIndicator(
+          child: SizedBox.square(
+            key: Key('timeline_loading_older'),
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
         ),
       ),
     );
@@ -380,9 +431,13 @@ class _ReplyNotice extends StatelessWidget {
             onTap: onView,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 6, 8),
-              child: Text(
-                '↩ ${repliedToYouLabel(senderName)} · Ver',
-                style: style,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.reply, size: 16, color: style.color),
+                  const SizedBox(width: 6),
+                  Text('${repliedToYouLabel(senderName)} · Ver', style: style),
+                ],
               ),
             ),
           ),

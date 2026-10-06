@@ -57,8 +57,10 @@ void main() {
     await tester.pump();
   }
 
+  // Dois pumps: na abertura nada anima, e o frame do novo estado só sai no seguinte.
   Future<void> show(WidgetTester tester, ConversationSnapshot snapshot) async {
     repository.conversation.snapshots.add(snapshot);
+    await tester.pump();
     await tester.pump();
   }
 
@@ -73,6 +75,7 @@ void main() {
     tester,
   ) async {
     await pump(tester, kTeamRoom);
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     await show(tester, kSnapshot);
@@ -83,6 +86,39 @@ void main() {
     expect(find.text('Diego Alves'), findsOneWidget);
     expect(find.text('VOCÊ'), findsOneWidget);
     expect(find.text('4 respostas'), findsOneWidget);
+  });
+
+  testWidgets('uma mensagem só fica embaixo, junto do campo', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      ConversationSnapshot(items: [kOtherMessage], reachedStart: true),
+    );
+
+    final message = tester.getRect(find.textContaining('A integração'));
+    final field = tester.getRect(find.byKey(const Key('message_field')));
+    expect(field.top - message.bottom, lessThan(120));
+  });
+
+  testWidgets('abertura rápida não pisca o carregamento', (tester) async {
+    await pump(tester, kTeamRoom);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    await show(tester, kSnapshot);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Diego Alves'), findsOneWidget);
+  });
+
+  testWidgets('abertura demorada mostra o carregamento', (tester) async {
+    await pump(tester, kTeamRoom);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
   testWidgets('sala vazia', (tester) async {
@@ -206,7 +242,7 @@ void main() {
     (tester) async {
       await pump(tester, kTeamRoom);
       await show(tester, kSnapshot);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       final before = repository.conversation.loadOlderCalls;
 
       expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
@@ -217,21 +253,48 @@ void main() {
     },
   );
 
-  testWidgets('carregando anteriores mostra o indicador sem o botão', (
+  testWidgets('busca automática ao abrir não mostra spinner nem botão', (
     tester,
   ) async {
     final loading = repository.conversation.loadOlderCompleter =
         Completer<void>();
     await pump(tester, kTeamRoom);
-    await show(tester, kSnapshot);
+    repository.conversation.snapshots.add(kSnapshot);
     await tester.pump();
+    expect(find.byKey(const Key('timeline_load_older')), findsNothing);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(repository.conversation.loadOlderCalls, 1);
-    expect(find.byKey(const Key('timeline_loading_older')), findsOneWidget);
+    expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
     expect(find.byKey(const Key('timeline_load_older')), findsNothing);
     loading.complete();
     await tester.pump();
   });
+
+  testWidgets(
+    'busca automática com a lista vazia mostra o carregamento no centro',
+    (
+      tester,
+    ) async {
+      final loading = repository.conversation.loadOlderCompleter =
+          Completer<void>();
+      await pump(tester, kTeamRoom);
+      await show(
+        tester,
+        const ConversationSnapshot(items: [], reachedStart: false),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(const Key('timeline_loading_center')), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byKey(const Key('timeline_loading_center')), findsOneWidget);
+      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
+      loading.complete();
+      await tester.pump();
+    },
+  );
 
   testWidgets('campo desabilitado até a conversa ficar pronta', (tester) async {
     TextField field() =>
@@ -498,6 +561,8 @@ void main() {
         const Offset(0, 5000),
       );
       await tester.pump();
+      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byKey(const Key('timeline_loading_older')), findsOneWidget);
       loading.complete();
@@ -742,7 +807,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('↩ Bob Souza respondeu a você · Ver'), findsOneWidget);
+    expect(find.text('Bob Souza respondeu a você · Ver'), findsOneWidget);
     expect(find.byKey(const Key('jump_to_latest')), findsNothing);
     await tester.tap(find.byKey(const Key('reply_notice_dismiss')));
     await tester.pump();
@@ -799,7 +864,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('↩ Bob Souza respondeu a você · Ver'), findsOneWidget);
+    expect(find.text('Bob Souza respondeu a você · Ver'), findsOneWidget);
   });
 
   testWidgets('abrir a thread mostra o painel e × fecha', (tester) async {
@@ -1002,4 +1067,27 @@ void main() {
     expect(tester.getSize(find.byKey(const Key('thread_panel'))).width, 380);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'sala só com eventos ocultos carrega até o início e mostra o estado vazio',
+    (tester) async {
+      repository.conversation
+        ..loadOlderResult = const Result.ok(true)
+        ..onLoadOlder = () => repository.conversation.snapshots.add(
+          const ConversationSnapshot(items: [], reachedStart: true),
+        );
+      await pump(tester, kTeamRoom);
+      await show(
+        tester,
+        const ConversationSnapshot(items: [], reachedStart: false),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.conversation.loadOlderCalls, 1);
+      expect(find.text('Nenhuma mensagem ainda.'), findsOneWidget);
+      expect(find.byKey(const Key('timeline_loading_older')), findsNothing);
+      expect(find.byKey(const Key('timeline_load_older')), findsNothing);
+    },
+  );
 }

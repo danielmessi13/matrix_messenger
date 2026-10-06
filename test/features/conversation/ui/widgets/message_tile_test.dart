@@ -79,7 +79,7 @@ void main() {
     await mouse.addPointer(location: Offset.zero);
     addTearDown(mouse.removePointer);
     await mouse.moveTo(tester.getCenter(target));
-    await tester.pumpAndSettle();
+    await tester.pump();
   }
 
   testWidgets('hover mostra Responder e Thread', (tester) async {
@@ -398,14 +398,11 @@ void main() {
     await mouse.addPointer(location: Offset.zero);
     addTearDown(mouse.removePointer);
     await mouse.moveTo(side);
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.byKey(const Key('message_reply_\$curta')), findsOneWidget);
 
-    // Fecha com animação: ainda visível no meio dela, some no fim.
     await mouse.moveTo(Offset(row.right - 20, row.bottom + 100));
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.byKey(const Key('message_reply_\$curta')), findsOneWidget);
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.byKey(const Key('message_reply_\$curta')), findsNothing);
   });
 
