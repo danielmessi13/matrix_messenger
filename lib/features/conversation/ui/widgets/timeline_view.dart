@@ -10,8 +10,8 @@ import 'message_labels.dart';
 import 'message_tile.dart';
 import 'thread_section.dart';
 
-// Distância do topo (em px) a partir da qual já pede mensagens antigas, antes de o usuário chegar lá.
-const _loadOlderThreshold = 400.0;
+// Pede mensagens antigas a duas alturas da área visível do topo, como o Element X, para chegarem antes de o usuário ver a borda.
+const _loadOlderViewports = 2.0;
 
 // Distância do fim (em px) a partir da qual o usuário está lendo mensagens antigas.
 const _awayFromLatestOffset = 300.0;
@@ -119,11 +119,17 @@ class _TimelineViewState extends State<TimelineView>
     if (!mounted) return;
     final state = widget.state;
     if (state.paginating || state.reachedStart || state.olderFailed) return;
-    final nearTop = _scroll.hasClients
-        ? _scroll.position.maxScrollExtent - _scroll.position.pixels <
-              _loadOlderThreshold
+    final position = _scroll.hasClients ? _scroll.position : null;
+    final nearTop = position != null
+        ? position.maxScrollExtent - position.pixels <
+              position.viewportDimension * _loadOlderViewports
         : state.items.isEmpty;
-    if (nearTop && await widget.viewModel.loadOlder() && mounted) {
+    if (!nearTop) return;
+    final before = widget.viewModel.state.items;
+    // Com a tela mudada, o didUpdateWidget reavalia depois do layout; reavaliar agora revelaria tudo de uma vez.
+    if (await widget.viewModel.loadOlder() &&
+        mounted &&
+        identical(widget.viewModel.state.items, before)) {
       await _loadOlderIfNeeded();
     }
   }

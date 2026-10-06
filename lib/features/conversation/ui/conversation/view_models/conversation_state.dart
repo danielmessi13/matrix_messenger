@@ -11,6 +11,7 @@ final class ConversationState extends Equatable {
   const ConversationState({
     this.status = ConversationStatus.opening,
     this.items = const [],
+    this.hiddenOlder = 0,
     this.reachedStart = false,
     this.paginating = false,
     this.olderFailed = false,
@@ -22,6 +23,9 @@ final class ConversationState extends Equatable {
   final ConversationStatus status;
 
   final List<TimelineItem> items;
+
+  // Itens já entregues pelo SDK que ainda estão acima da janela.
+  final int hiddenOlder;
 
   final bool reachedStart;
 
@@ -40,6 +44,7 @@ final class ConversationState extends Equatable {
   ConversationState copyWith({
     ConversationStatus? status,
     List<TimelineItem>? items,
+    int? hiddenOlder,
     bool? reachedStart,
     bool? paginating,
     bool? olderFailed,
@@ -49,6 +54,7 @@ final class ConversationState extends Equatable {
   }) => ConversationState(
     status: status ?? this.status,
     items: items ?? this.items,
+    hiddenOlder: hiddenOlder ?? this.hiddenOlder,
     reachedStart: reachedStart ?? this.reachedStart,
     paginating: paginating ?? this.paginating,
     olderFailed: olderFailed ?? this.olderFailed,
@@ -65,6 +71,7 @@ final class ConversationState extends Equatable {
   List<Object?> get props => [
     status,
     items,
+    hiddenOlder,
     reachedStart,
     paginating,
     olderFailed,

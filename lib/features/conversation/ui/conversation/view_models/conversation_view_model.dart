@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:math' show max;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -11,6 +12,9 @@ import '../../../domain/models/timeline_item.dart';
 import '../../thread/view_models/thread_view_model.dart';
 import 'conversation_state.dart';
 import 'message_search.dart';
+
+// Do disco, o SDK entrega blocos de até 128 eventos de uma vez; a tela revela 20 mensagens por vez.
+const _windowStep = 20;
 
 class ConversationViewModel extends Cubit<ConversationState> {
   ConversationViewModel(this._repository, this.roomId)
@@ -25,6 +29,13 @@ class ConversationViewModel extends Cubit<ConversationState> {
   StreamSubscription<ConversationSnapshot>? _updates;
 
   String? _latestMessageId;
+
+  List<TimelineItem> _loaded = const [];
+
+  // A janela vai desta mensagem até o fim, então mensagem nova embaixo não tira ninguém de cima.
+  String? _oldestVisibleId;
+
+  bool _sdkReachedStart = false;
 
   // Repetições da rolagem antes de o snapshot dizer que está paginando.
   bool _loadingOlder = false;
@@ -49,6 +60,9 @@ class ConversationViewModel extends Cubit<ConversationState> {
     if (state.status != ConversationStatus.opening) {
       emit(const ConversationState());
     }
+    _loaded = const [];
+    _oldestVisibleId = null;
+    _sdkReachedStart = false;
     final result = await _repository.open(roomId);
     if (_closing || isClosed) {
       if (result case Ok(:final value)) value.dispose();
@@ -70,11 +84,19 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   // True quando a busca rodou sem chegar ao início: uma página só de eventos ocultos não muda o estado, então quem chamou reavalia.
   Future<bool> loadOlder() async {
+    if (state.status == ConversationStatus.ready && state.hiddenOlder > 0) {
+      _reveal();
+      return true;
+    }
+    return _fetchOlder();
+  }
+
+  Future<bool> _fetchOlder() async {
     final conversation = _conversation;
     if (conversation == null ||
         _loadingOlder ||
         state.paginating ||
-        state.reachedStart ||
+        _sdkReachedStart ||
         state.status != ConversationStatus.ready) {
       return false;
     }
@@ -84,12 +106,8 @@ class ConversationViewModel extends Cubit<ConversationState> {
       if (_closing || isClosed) return false;
       switch (result) {
         case Ok(:final value):
-          emit(
-            state.copyWith(
-              olderFailed: false,
-              reachedStart: state.reachedStart || value,
-            ),
-          );
+          _sdkReachedStart = _sdkReachedStart || value;
+          _emitWindow(state.copyWith(olderFailed: false));
           return !value;
         case Error():
           emit(state.copyWith(olderFailed: true));
@@ -148,10 +166,10 @@ class ConversationViewModel extends Cubit<ConversationState> {
   Future<void> _loadOlderSettled() async {
     // Se esperou a busca em andamento, o searchMessage reconfere antes de pedir mais.
     if (state.paginating) return _untilIdle((_) => true);
-    final before = state.items;
-    await loadOlder();
-    if (state.reachedStart) return;
-    await _untilIdle((s) => !identical(s.items, before));
+    final before = _loaded;
+    await _fetchOlder();
+    if (_sdkReachedStart) return;
+    await _untilIdle((_) => !identical(_loaded, before));
   }
 
   Future<void> _untilIdle(bool Function(ConversationState s) accept) async {
@@ -167,11 +185,12 @@ class ConversationViewModel extends Cubit<ConversationState> {
     final id = await searchMessage(
       this,
       eventId: eventId,
-      items: (s) => s.items,
-      reachedStart: (s) => s.reachedStart,
+      items: (_) => _loaded,
+      reachedStart: (_) => _sdkReachedStart,
       loadOlder: _loadOlderSettled,
     );
     if (_closing || isClosed) return;
+    if (id != null) _revealUpTo(id);
     emit(state.copyWith(focusRequest: FocusRequest(id, ++_focusSeq)));
   }
 
@@ -196,11 +215,11 @@ class ConversationViewModel extends Cubit<ConversationState> {
 
   void _onSnapshot(ConversationSnapshot snapshot) {
     if (_closing || isClosed) return;
-    emit(
+    _loaded = snapshot.items;
+    _sdkReachedStart = snapshot.reachedStart;
+    _emitWindow(
       state.copyWith(
         status: ConversationStatus.ready,
-        items: snapshot.items,
-        reachedStart: snapshot.reachedStart,
         paginating: snapshot.paginating,
       ),
     );
@@ -209,6 +228,50 @@ class ConversationViewModel extends Cubit<ConversationState> {
       _conversation?.markAsRead();
     }
     _latestMessageId = latest?.id;
+  }
+
+  void _reveal() {
+    final messages = _loaded.whereType<MessageItem>().toList();
+    final top = messages.indexWhere((m) => m.id == _oldestVisibleId);
+    _oldestVisibleId = messages[max(0, top - _windowStep)].id;
+    _emitWindow(state);
+  }
+
+  void _revealUpTo(String messageId) {
+    final index = _loaded.indexWhere(
+      (item) => item is MessageItem && item.id == messageId,
+    );
+    if (index < 0 || index >= state.hiddenOlder) return;
+    _oldestVisibleId = messageId;
+    _emitWindow(state);
+  }
+
+  void _emitWindow(ConversationState base) {
+    final start = _windowStart();
+    emit(
+      base.copyWith(
+        items: start == 0 ? _loaded : _loaded.sublist(start),
+        hiddenOlder: start,
+        reachedStart: _sdkReachedStart && start == 0,
+      ),
+    );
+  }
+
+  int _windowStart() {
+    final messages = _loaded.whereType<MessageItem>().toList();
+    if (messages.isEmpty) return 0;
+    final anchor = _oldestVisibleId ??=
+        messages[max(0, messages.length - _windowStep)].id;
+    var start = _loaded.indexWhere(
+      (item) => item is MessageItem && item.id == anchor,
+    );
+    // Sem a âncora (envio cancelado, por exemplo), mostrar tudo não esconde nada que o usuário já via.
+    if (start < 0) {
+      _oldestVisibleId = messages.first.id;
+      return 0;
+    }
+    if (start > 0 && _loaded[start - 1] is DateDividerItem) start--;
+    return start;
   }
 
   void _onUpdatesFailed(String reason, Object? error) {

@@ -348,13 +348,91 @@ void main() {
     await show(tester, page([for (var i = 0; i < 30; i++) msg(i)]));
     expect(repository.conversation.loadOlderCalls, 0);
 
+    // O primeiro arraste revela as 10 escondidas; o segundo chega ao topo sem nada escondido.
+    for (var i = 0; i < 2; i++) {
+      await tester.drag(
+        find.byKey(const Key('timeline_list')),
+        const Offset(0, 5000),
+      );
+      await tester.pump();
+    }
+
+    expect(repository.conversation.loadOlderCalls, 1);
+  });
+
+  testWidgets('subir revela as mensagens já carregadas sem pedir ao Rust', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(
+      tester,
+      page([for (var i = 0; i < 60; i++) msg(i)], reachedStart: true),
+    );
+    expect(find.text('mensagem 39'), findsNothing);
+    expect(find.text('Início da conversa'), findsNothing);
+
     await tester.drag(
       find.byKey(const Key('timeline_list')),
       const Offset(0, 5000),
     );
     await tester.pump();
 
-    expect(repository.conversation.loadOlderCalls, 1);
+    expect(find.text('mensagem 39'), findsOneWidget);
+    expect(repository.conversation.loadOlderCalls, 0);
+  });
+
+  testWidgets('um passo da roda perto do topo revela uma vez, não tudo', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(
+      tester,
+      page([for (var i = 0; i < 120; i++) msg(i)], reachedStart: true),
+    );
+    final list = find.byKey(const Key('timeline_list'));
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)),
+        )
+        .position;
+    final thumbBefore =
+        (position.maxScrollExtent - position.viewportDimension * 2 + 10) /
+        position.maxScrollExtent;
+
+    position.jumpTo(
+      position.maxScrollExtent - position.viewportDimension * 2 + 10,
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('mensagem 80'), findsOneWidget);
+    expect(find.text('mensagem 0'), findsNothing);
+    expect(
+      position.pixels / position.maxScrollExtent,
+      greaterThan(thumbBefore / 3),
+    );
+  });
+
+  testWidgets('pede mais a duas alturas da área visível do topo', (
+    tester,
+  ) async {
+    await pump(tester, kTeamRoom, size: const Size(1440, 500));
+    await show(tester, page([for (var i = 0; i < 60; i++) msg(i)]));
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byKey(const Key('timeline_list')),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position;
+    final distance = position.viewportDimension * 2 - 20;
+    expect(distance, greaterThan(400));
+
+    position.jumpTo(position.maxScrollExtent - distance);
+    await tester.pump();
+
+    expect(find.text('mensagem 39'), findsOneWidget);
   });
 
   testWidgets('mensagem nova lendo mais acima mostra o botão de recentes', (
@@ -715,7 +793,7 @@ void main() {
       ),
     );
     final first = find.text('mensagem 0');
-    expect(tester.getRect(first).top, lessThan(0));
+    expect(first, findsNothing);
 
     await tester.tap(find.byKey(const Key('reply_quote_header')));
     await tester.pumpAndSettle();

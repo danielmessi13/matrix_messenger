@@ -512,4 +512,133 @@ void main() {
     expect(conversation.isDisposed, isTrue);
     expect(conversation.listens, 0);
   });
+
+  group('janela de exibição', () {
+    List<MessageItem> history(int count, {int from = 0}) => [
+      for (var i = from; i < from + count; i++) messageWith('\$m$i'),
+    ];
+
+    List<String> visibleIds(ConversationViewModel viewModel) => viewModel
+        .state
+        .items
+        .whereType<MessageItem>()
+        .map((m) => m.id)
+        .toList();
+
+    Future<ConversationViewModel> openWith(
+      List<TimelineItem> items, {
+      bool reachedStart = false,
+    }) async {
+      final viewModel = build();
+      await viewModel.open();
+      conversation.snapshots.add(
+        ConversationSnapshot(items: items, reachedStart: reachedStart),
+      );
+      await flush();
+      return viewModel;
+    }
+
+    test('abre mostrando só as 20 mensagens mais recentes', () async {
+      final viewModel = await openWith(
+        [DateDividerItem(kDay), ...history(45)],
+        reachedStart: true,
+      );
+
+      expect(visibleIds(viewModel), [for (var i = 25; i < 45; i++) '\$m$i']);
+      expect(viewModel.state.hiddenOlder, 26);
+      expect(viewModel.state.reachedStart, isFalse);
+      await viewModel.close();
+    });
+
+    test(
+      'loadOlder revela as escondidas de 20 em 20 sem chamar o Rust',
+      () async {
+        final viewModel = await openWith(history(45), reachedStart: true);
+
+        expect(await viewModel.loadOlder(), isTrue);
+        expect(visibleIds(viewModel).first, '\$m5');
+        expect(await viewModel.loadOlder(), isTrue);
+        expect(visibleIds(viewModel).first, '\$m0');
+        expect(viewModel.state.hiddenOlder, 0);
+        expect(viewModel.state.reachedStart, isTrue);
+
+        expect(conversation.loadOlderCalls, 0);
+        await viewModel.close();
+      },
+    );
+
+    test('sem escondidas pede ao Rust, e a página chega escondida', () async {
+      final viewModel = await openWith(history(10, from: 128));
+      conversation.loadOlderResult = const Result.ok(false);
+
+      await viewModel.loadOlder();
+      conversation.snapshots.add(
+        ConversationSnapshot(items: history(138), reachedStart: false),
+      );
+      await flush();
+
+      expect(conversation.loadOlderCalls, 1);
+      expect(visibleIds(viewModel).first, '\$m128');
+      expect(viewModel.state.hiddenOlder, 128);
+      await viewModel.loadOlder();
+      expect(visibleIds(viewModel).first, '\$m108');
+      expect(conversation.loadOlderCalls, 1);
+      await viewModel.close();
+    });
+
+    test('mensagem nova não tira a mais antiga visível', () async {
+      final viewModel = await openWith(history(45));
+
+      conversation.snapshots.add(
+        ConversationSnapshot(items: history(46), reachedStart: false),
+      );
+      await flush();
+
+      expect(visibleIds(viewModel).first, '\$m25');
+      expect(visibleIds(viewModel).last, '\$m45');
+      await viewModel.close();
+    });
+
+    test('mantém o divisor de data da primeira mensagem visível', () async {
+      final viewModel = await openWith([
+        ...history(25),
+        DateDividerItem(kDay),
+        ...history(20, from: 25),
+      ]);
+
+      expect(viewModel.state.items.first, DateDividerItem(kDay));
+      expect(viewModel.state.hiddenOlder, 25);
+      await viewModel.close();
+    });
+
+    test(
+      'se a mensagem do topo some, mostra tudo a partir do início',
+      () async {
+        final viewModel = await openWith(history(45));
+
+        conversation.snapshots.add(
+          ConversationSnapshot(
+            items: [...history(25), ...history(20, from: 26)],
+            reachedStart: false,
+          ),
+        );
+        await flush();
+
+        expect(viewModel.state.hiddenOlder, 0);
+        expect(visibleIds(viewModel).first, '\$m0');
+        await viewModel.close();
+      },
+    );
+
+    test('goTo de mensagem escondida amplia a janela até ela', () async {
+      final viewModel = await openWith(history(45));
+
+      await viewModel.goTo('\$m3');
+
+      expect(visibleIds(viewModel).first, '\$m3');
+      expect(viewModel.state.focusRequest?.messageId, '\$m3');
+      expect(conversation.loadOlderCalls, 0);
+      await viewModel.close();
+    });
+  });
 }
