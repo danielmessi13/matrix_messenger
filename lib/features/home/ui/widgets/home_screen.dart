@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../app/theme.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 import '../../../auth/ui/logout/view_models/logout_view_model.dart';
 import '../../../auth/ui/logout/widgets/user_menu.dart';
@@ -10,6 +11,12 @@ import '../../../conversation/ui/widgets/conversation_pane.dart';
 import '../../../recovery/data/repositories/recovery_repository.dart';
 import '../../../recovery/ui/view_models/recovery_view_model.dart';
 import '../../../recovery/ui/widgets/recovery_banner.dart';
+import '../../../rooms/data/repositories/room_repository.dart';
+import '../../../rooms/domain/models/new_room.dart';
+import '../../../rooms/ui/new_room/view_models/join_room_view_model.dart';
+import '../../../rooms/ui/new_room/view_models/new_room_view_model.dart';
+import '../../../rooms/ui/new_room/widgets/new_room_button.dart';
+import '../../../rooms/ui/new_room/widgets/new_room_dialog.dart';
 import '../../../rooms/ui/room_list/view_models/room_list_state.dart';
 import '../../../rooms/ui/room_list/view_models/room_list_view_model.dart';
 import '../../../rooms/ui/room_list/widgets/filter_rail.dart';
@@ -48,6 +55,26 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<void> _openNewRoom() async {
+    final repository = context.read<RoomRepository>();
+    final result = await showDialog<NewRoomResult>(
+      context: context,
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => NewRoomViewModel(repository)),
+          BlocProvider(create: (_) => JoinRoomViewModel(repository)),
+        ],
+        child: const NewRoomDialog(),
+      ),
+    );
+    if (result == null || !mounted) return;
+    widget.roomListViewModel.selectWhenAvailable(result.roomId);
+    if (result case CreatedRoom(:final failedInvites)) {
+      // Lista vazia limpa o banner de uma criação anterior.
+      widget.viewModel.showFailedInvites(failedInvites);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rooms = widget.roomListViewModel;
@@ -69,6 +96,11 @@ class _HomeScreenState extends State<HomeScreen> {
             control: !isMac,
             meta: isMac,
           ): _searchFocus.requestFocus,
+          SingleActivator(
+            LogicalKeyboardKey.keyN,
+            control: !isMac,
+            meta: isMac,
+          ): _openNewRoom,
         },
         // Scope próprio: o unfocus da busca devolve o foco para cá, dentro do atalho.
         child: FocusScope(
@@ -83,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     body: Column(
                       children: [
                         TopBar(
+                          newRoomButton: NewRoomButton(onPressed: _openNewRoom),
                           searchField: RoomSearchField(
                             focusNode: _searchFocus,
                             onChanged: rooms.search,
@@ -96,6 +129,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (home.showSessionWarning)
                           _SessionWarningBanner(
                             onDismiss: widget.viewModel.dismissSessionWarning,
+                          ),
+                        if (home.failedInvites.isNotEmpty)
+                          _FailedInvitesBanner(
+                            ids: home.failedInvites,
+                            onDismiss: widget.viewModel.dismissFailedInvites,
                           ),
                         RecoveryBanner(
                           viewModel: context.read<RecoveryViewModel>(),
@@ -134,6 +172,91 @@ class _SessionWarningBanner extends StatelessWidget {
     ),
     actions: [TextButton(onPressed: onDismiss, child: const Text('Entendi'))],
   );
+}
+
+class _FailedInvitesBanner extends StatelessWidget {
+  const _FailedInvitesBanner({required this.ids, required this.onDismiss})
+    : super(key: const Key('failed_invites_banner'));
+
+  final List<String> ids;
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: colors.warning.withValues(alpha: 0.1),
+        border: Border.all(color: colors.warning.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            margin: const EdgeInsets.only(top: 1),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: colors.warningText, width: 1.5),
+            ),
+            child: Text(
+              '!',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: colors.warningText,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sala criada, mas alguns convites não foram enviados',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text.rich(
+                  TextSpan(
+                    text: 'Estes IDs não foram convidados: ',
+                    style: TextStyle(color: colors.textSecondary),
+                    children: [
+                      TextSpan(
+                        text: ids.join(', '),
+                        style: TextStyle(color: colors.textPrimary),
+                      ),
+                    ],
+                  ),
+                  style: const TextStyle(fontSize: 14, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const Key('failed_invites_dismiss'),
+            tooltip: 'Dispensar',
+            visualDensity: VisualDensity.compact,
+            iconSize: 16,
+            color: colors.textMuted,
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Panes extends StatelessWidget {

@@ -1,9 +1,12 @@
 import '../../../../core/services/matrix_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../src/rust/api/rooms.dart' as bridge;
+import '../../domain/models/create_room_failure.dart';
 import '../../domain/models/join_room_failure.dart';
+import '../../domain/models/new_room.dart';
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
+import '../../domain/models/user_check.dart';
 import 'room_repository.dart';
 
 class RoomRepositoryMatrix implements RoomRepository {
@@ -27,6 +30,38 @@ class RoomRepositoryMatrix implements RoomRepository {
   @override
   Future<Result<void>> declineInvite(String roomId) =>
       _service.declineInvite(roomId);
+
+  @override
+  Future<Result<CreatedRoom>> createRoom(NewRoom room) async {
+    final request = bridge.NewRoom(
+      name: room.name,
+      topic: room.topic,
+      isPublic: room.isPublic,
+      invites: room.invites,
+    );
+    switch (await _service.createRoom(request)) {
+      case Ok(:final value):
+        return Result.ok(
+          CreatedRoom(
+            roomId: value.roomId,
+            failedInvites: List.unmodifiable(value.failedInvites),
+          ),
+        );
+      case Error(:final error):
+        return Result.error(_toCreateFailure(error));
+    }
+  }
+
+  @override
+  Future<UserCheck> checkUser(String userId) async =>
+      switch (await _service.checkUser(userId)) {
+        Ok(:final value) => switch (value.status) {
+          bridge.UserCheckStatus.found => UserFound(value.displayName),
+          bridge.UserCheckStatus.notFound => const UserNotFound(),
+          bridge.UserCheckStatus.unknown => const UserUnknown(),
+        },
+        Error() => const UserUnknown(),
+      };
 
   @override
   Future<String?> roomLink(String roomId) async =>
@@ -57,6 +92,17 @@ class RoomRepositoryMatrix implements RoomRepository {
       message,
     ),
     _ => JoinRoomFailure(JoinRoomFailureType.unknown, '$error'),
+  };
+
+  CreateRoomFailure _toCreateFailure(Exception error) => switch (error) {
+    bridge.CreateRoomError(:final kind, :final message) => CreateRoomFailure(
+      switch (kind) {
+        bridge.CreateRoomErrorKind.network => CreateRoomFailureType.network,
+        bridge.CreateRoomErrorKind.unknown => CreateRoomFailureType.unknown,
+      },
+      message,
+    ),
+    _ => CreateRoomFailure(CreateRoomFailureType.unknown, '$error'),
   };
 
   Room _toRoom(bridge.RoomSummary summary) => Room(

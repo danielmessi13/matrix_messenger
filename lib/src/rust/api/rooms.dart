@@ -7,8 +7,55 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `invited_room`, `join_room_within`, `parse_join_target`, `with_server_of_id`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `create_room_within`, `invited_room`, `join_room_within`, `parse_join_target`, `with_server_of_id`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+
+class CreateRoomError implements FrbException {
+  final CreateRoomErrorKind kind;
+  final String message;
+
+  const CreateRoomError({
+    required this.kind,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreateRoomError &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message;
+}
+
+enum CreateRoomErrorKind {
+  network,
+  unknown,
+}
+
+class CreatedRoom {
+  final String roomId;
+  final List<String> failedInvites;
+
+  const CreatedRoom({
+    required this.roomId,
+    required this.failedInvites,
+  });
+
+  @override
+  int get hashCode => roomId.hashCode ^ failedInvites.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreatedRoom &&
+          runtimeType == other.runtimeType &&
+          roomId == other.roomId &&
+          failedInvites == other.failedInvites;
+}
 
 class InviteError implements FrbException {
   final InviteErrorKind kind;
@@ -109,6 +156,34 @@ enum LatestMessageKind {
   other,
 }
 
+class NewRoom {
+  final String name;
+  final String? topic;
+  final bool isPublic;
+  final List<String> invites;
+
+  const NewRoom({
+    required this.name,
+    this.topic,
+    required this.isPublic,
+    required this.invites,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^ topic.hashCode ^ isPublic.hashCode ^ invites.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewRoom &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          topic == other.topic &&
+          isPublic == other.isPublic &&
+          invites == other.invites;
+}
+
 class RoomSummary {
   final String id;
   final String name;
@@ -174,4 +249,31 @@ enum SyncStatus {
   offline,
   unsupported,
   error,
+}
+
+class UserCheck {
+  final UserCheckStatus status;
+  final String? displayName;
+
+  const UserCheck({
+    required this.status,
+    this.displayName,
+  });
+
+  @override
+  int get hashCode => status.hashCode ^ displayName.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserCheck &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          displayName == other.displayName;
+}
+
+enum UserCheckStatus {
+  found,
+  notFound,
+  unknown,
 }

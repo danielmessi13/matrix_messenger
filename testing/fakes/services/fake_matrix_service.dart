@@ -115,6 +115,25 @@ class FakeMatrixService implements MatrixService {
     return inviteResult;
   }
 
+  Result<CreatedRoom> createRoomResult = const Result.ok(
+    CreatedRoom(roomId: '!nova:b.c', failedInvites: []),
+  );
+
+  final createdRooms = <NewRoom>[];
+
+  @override
+  Future<Result<CreatedRoom>> createRoom(NewRoom room) async {
+    createdRooms.add(room);
+    return createRoomResult;
+  }
+
+  Result<UserCheck> checkUserResult = const Result.ok(
+    UserCheck(status: UserCheckStatus.found, displayName: 'Ana'),
+  );
+
+  @override
+  Future<Result<UserCheck>> checkUser(String userId) async => checkUserResult;
+
   Result<String?> roomLinkResult = const Result.ok(
     'https://matrix.to/#/!a:b.c?via=b.c',
   );

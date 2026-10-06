@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/core/ui/animated_pane.dart';
+import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
@@ -12,6 +13,8 @@ import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.da
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
+import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/widgets/room_list_pane.dart';
@@ -58,6 +61,7 @@ void main() {
       MultiRepositoryProvider(
         providers: [
           RepositoryProvider<AuthRepository>.value(value: authRepository),
+          RepositoryProvider<RoomRepository>.value(value: roomRepository),
           RepositoryProvider<RecoveryRepository>.value(
             value: recoveryRepository,
           ),
@@ -141,6 +145,177 @@ void main() {
       defaultTargetPlatform == TargetPlatform.macOS
       ? LogicalKeyboardKey.controlLeft
       : LogicalKeyboardKey.metaLeft;
+
+  Future<void> createRoom(WidgetTester tester) async {
+    await tester.enterText(find.byKey(const Key('new_room_name')), 'Plantão');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('new_room_submit')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('botão abre o diálogo e a sala criada abre ao chegar', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('new_room_dialog')), findsOneWidget);
+
+    await createRoom(tester);
+    expect(find.byKey(const Key('new_room_dialog')), findsNothing);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
+
+    await showRooms(tester, [
+      ...kRooms,
+      const Room(id: '!nova:b.c', name: 'Plantão'),
+    ]);
+    await tester.pump();
+    expect(find.text('#Plantão'), findsOneWidget);
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('entrar pela aba abre a sala quando ela chega, sem banner', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new_room_tab_join')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('join_room_target')),
+      '#aberta:b.c',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('join_room_submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('new_room_dialog')), findsNothing);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
+
+    await showRooms(tester, [
+      ...kRooms,
+      const Room(id: '!entrou:b.c', name: 'aberta', isPublic: true),
+    ]);
+    await tester.pump();
+    expect(find.text('#aberta'), findsOneWidget);
+    expect(find.byKey(const Key('copy_room_link')), findsOneWidget);
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('entrar numa sala em que já se está só abre a sala', (
+    tester,
+  ) async {
+    roomRepository.joinRoomResult = Result.ok(kTeamRoom.id);
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new_room_tab_join')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('join_room_target')),
+      kTeamRoom.id,
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('join_room_submit')));
+    // A conversa aberta tem animação contínua: pumpAndSettle não termina.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('#lançamento-q4'), findsOneWidget);
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('convites que falharam aparecem no banner e somem', (
+    tester,
+  ) async {
+    roomRepository.createRoomResult = const Result.ok(
+      CreatedRoom(roomId: '!nova:b.c', failedInvites: ['@joao:b.co']),
+    );
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await createRoom(tester);
+
+    expect(find.byKey(const Key('failed_invites_banner')), findsOneWidget);
+    expect(
+      find.text('Sala criada, mas alguns convites não foram enviados'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('@joao:b.co'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('failed_invites_dismiss')));
+    await tester.pump();
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('nova criação sem falhas esconde o banner anterior', (
+    tester,
+  ) async {
+    roomRepository.createRoomResult = const Result.ok(
+      CreatedRoom(roomId: '!nova:b.c', failedInvites: ['@joao:b.co']),
+    );
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await createRoom(tester);
+    expect(find.byKey(const Key('failed_invites_banner')), findsOneWidget);
+
+    roomRepository.createRoomResult = const Result.ok(
+      CreatedRoom(roomId: '!outra:b.c', failedInvites: []),
+    );
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await createRoom(tester);
+
+    expect(find.byKey(const Key('failed_invites_banner')), findsNothing);
+  });
+
+  testWidgets('cancelar o diálogo não muda nada', (tester) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+
+    await tester.tap(find.byKey(const Key('new_room_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new_room_cancel')));
+    await tester.pumpAndSettle();
+
+    expect(roomRepository.createdRooms, isEmpty);
+    expect(find.text('Selecione uma conversa'), findsOneWidget);
+  });
+
+  Future<void> pressN(WidgetTester tester, LogicalKeyboardKey modifier) async {
+    await tester.sendKeyDownEvent(modifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+    await tester.sendKeyUpEvent(modifier);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('o atalho da plataforma abre o diálogo', (tester) async {
+    await pumpScreen(tester);
+
+    await pressN(tester, platformModifier());
+
+    expect(find.byKey(const Key('new_room_dialog')), findsOneWidget);
+  }, variant: desktopPlatforms);
+
+  testWidgets('o atalho da outra plataforma não abre o diálogo', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    await pressN(tester, otherModifier());
+
+    expect(find.byKey(const Key('new_room_dialog')), findsNothing);
+  }, variant: desktopPlatforms);
 
   Future<void> pressK(WidgetTester tester, LogicalKeyboardKey modifier) async {
     await tester.sendKeyDownEvent(modifier);

@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository_matrix.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/create_room_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/join_room_failure.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/user_check.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart' as bridge;
 
 import '../../../../../testing/fakes/services/fake_matrix_service.dart';
@@ -85,6 +88,96 @@ void main() {
 
     expect(service.accepted, ['!a:b.c']);
     expect(service.declined, ['!b:b.c']);
+  });
+
+  test('criar sala converte o pedido e o resultado', () async {
+    service.createRoomResult = const Result.ok(
+      bridge.CreatedRoom(roomId: '!x:b.c', failedInvites: ['@joao:b.c']),
+    );
+
+    final result = await repository.createRoom(
+      const NewRoom(
+        name: 'Plantão',
+        topic: 'Coordenação',
+        isPublic: true,
+        invites: ['@ana:b.c', '@joao:b.c'],
+      ),
+    );
+
+    expect(
+      (result as Ok<CreatedRoom>).value,
+      const CreatedRoom(roomId: '!x:b.c', failedInvites: ['@joao:b.c']),
+    );
+    expect(service.createdRooms.single.name, 'Plantão');
+    expect(service.createdRooms.single.topic, 'Coordenação');
+    expect(service.createdRooms.single.isPublic, isTrue);
+    expect(service.createdRooms.single.invites, ['@ana:b.c', '@joao:b.c']);
+  });
+
+  test('falha ao criar vira CreateRoomFailure com o tipo', () async {
+    for (final (kind, type) in [
+      (bridge.CreateRoomErrorKind.network, CreateRoomFailureType.network),
+      (bridge.CreateRoomErrorKind.unknown, CreateRoomFailureType.unknown),
+    ]) {
+      service.createRoomResult = Result.error(
+        bridge.CreateRoomError(kind: kind, message: 'x'),
+      );
+
+      final result = await repository.createRoom(
+        const NewRoom(name: 'a', isPublic: false),
+      );
+
+      expect(((result as Error).error as CreateRoomFailure).type, type);
+    }
+  });
+
+  test('erro que não veio do Rust ao criar é unknown', () async {
+    service.createRoomResult = Result.error(Exception('sem sessão'));
+
+    final result = await repository.createRoom(
+      const NewRoom(name: 'a', isPublic: false),
+    );
+
+    expect(
+      ((result as Error).error as CreateRoomFailure).type,
+      CreateRoomFailureType.unknown,
+    );
+  });
+
+  test('verificação de usuário converte cada status', () async {
+    final cases = <(bridge.UserCheck, UserCheck)>[
+      (
+        const bridge.UserCheck(
+          status: bridge.UserCheckStatus.found,
+          displayName: 'Ana',
+        ),
+        const UserFound('Ana'),
+      ),
+      (
+        const bridge.UserCheck(
+          status: bridge.UserCheckStatus.notFound,
+          displayName: null,
+        ),
+        const UserNotFound(),
+      ),
+      (
+        const bridge.UserCheck(
+          status: bridge.UserCheckStatus.unknown,
+          displayName: null,
+        ),
+        const UserUnknown(),
+      ),
+    ];
+    for (final (input, expected) in cases) {
+      service.checkUserResult = Result.ok(input);
+      expect(await repository.checkUser('@ana:b.c'), expected);
+    }
+  });
+
+  test('erro na verificação vira UserUnknown', () async {
+    service.checkUserResult = Result.error(Exception('sem sessão'));
+
+    expect(await repository.checkUser('@ana:b.c'), const UserUnknown());
   });
 
   test('link da sala repassa o valor do serviço', () async {

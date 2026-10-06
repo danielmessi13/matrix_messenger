@@ -35,4 +35,9 @@ class HomeViewModel extends Cubit<HomeState> {
 
   void dismissSessionWarning() =>
       emit(state.copyWith(sessionWarningDismissed: true));
+
+  void showFailedInvites(List<String> ids) =>
+      emit(state.copyWith(failedInvites: List.unmodifiable(ids)));
+
+  void dismissFailedInvites() => emit(state.copyWith(failedInvites: const []));
 }

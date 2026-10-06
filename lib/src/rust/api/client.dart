@@ -20,6 +20,10 @@ import 'timeline.dart';
 abstract class MatrixClient implements RustOpaqueInterface {
   Future<void> acceptInvite({required String roomId});
 
+  Future<UserCheck> checkUser({required String userId});
+
+  Future<CreatedRoom> createRoom({required NewRoom room});
+
   Future<void> declineInvite({required String roomId});
 
   String get deviceId;

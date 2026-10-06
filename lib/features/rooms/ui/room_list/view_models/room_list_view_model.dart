@@ -32,18 +32,35 @@ class RoomListViewModel extends Cubit<RoomListState> {
 
   void selectRoom(String roomId) {
     if (state.rooms.any((room) => room.id == roomId)) {
-      emit(state.copyWith(selectedRoomId: () => roomId));
+      emit(
+        state.copyWith(
+          selectedRoomId: () => roomId,
+          pendingRoomId: () => null,
+        ),
+      );
+    }
+  }
+
+  // A sala recém-criada só entra na lista na próxima volta do sync.
+  void selectWhenAvailable(String roomId) {
+    if (state.rooms.any((room) => room.id == roomId)) {
+      selectRoom(roomId);
+    } else {
+      emit(state.copyWith(pendingRoomId: () => roomId));
     }
   }
 
   void _onRooms(List<Room> rooms) {
-    final selected = state.selectedRoomId;
+    final pending = state.pendingRoomId;
+    final arrived = pending != null && rooms.any((room) => room.id == pending);
+    final selected = arrived ? pending : state.selectedRoomId;
     final keepSelection = rooms.any((room) => room.id == selected);
     emit(
       state.copyWith(
         rooms: rooms,
         loaded: true,
         selectedRoomId: () => keepSelection ? selected : null,
+        pendingRoomId: arrived ? () => null : null,
       ),
     );
   }

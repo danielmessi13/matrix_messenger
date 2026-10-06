@@ -52,4 +52,33 @@ void main() {
     expect(find.text('Tudo'), findsOneWidget);
     expect(find.byTooltip('Em breve'), findsNWidgets(2));
   });
+
+  for (final (width, visible) in [(400.0, false), (760.0, true)]) {
+    testWidgets('largura $width ${visible ? 'mostra' : 'esconde'} as abas', (
+      tester,
+    ) async {
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: width,
+                child: RoomSearchField(
+                  focusNode: focusNode,
+                  onChanged: (_) {},
+                  onCleared: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Mensagens'), visible ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('room_search')), findsOneWidget);
+    });
+  }
 }

@@ -1,6 +1,8 @@
 import '../../../../core/utils/result.dart';
+import '../../domain/models/new_room.dart';
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
+import '../../domain/models/user_check.dart';
 
 abstract interface class RoomRepository {
   Stream<List<Room>> get rooms;
@@ -10,6 +12,10 @@ abstract interface class RoomRepository {
   Future<Result<void>> acceptInvite(String roomId);
 
   Future<Result<void>> declineInvite(String roomId);
+
+  Future<Result<CreatedRoom>> createRoom(NewRoom room);
+
+  Future<UserCheck> checkUser(String userId);
 
   Future<String?> roomLink(String roomId);
 

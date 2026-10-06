@@ -12,6 +12,7 @@ final class HomeState extends Equatable {
     this.sessionWarningDismissed = false,
     this.threadOpen = false,
     this.panesOverThreadWidth,
+    this.failedInvites = const [],
   });
 
   final UserSession session;
@@ -27,6 +28,8 @@ final class HomeState extends Equatable {
   // Lista ou filtros abertos à mão com a thread aberta ficam, com a thread por cima, enquanto a janela tiver ao menos esta largura.
   final double? panesOverThreadWidth;
 
+  final List<String> failedInvites;
+
   bool get showSessionWarning =>
       !session.sessionSaved && !sessionWarningDismissed;
 
@@ -36,6 +39,7 @@ final class HomeState extends Equatable {
     bool? sessionWarningDismissed,
     bool? threadOpen,
     Object? panesOverThreadWidth = _unset,
+    List<String>? failedInvites,
   }) => HomeState(
     session: session,
     filtersExpanded: filtersExpanded ?? this.filtersExpanded,
@@ -46,6 +50,7 @@ final class HomeState extends Equatable {
     panesOverThreadWidth: identical(panesOverThreadWidth, _unset)
         ? this.panesOverThreadWidth
         : panesOverThreadWidth as double?,
+    failedInvites: failedInvites ?? this.failedInvites,
   );
 
   @override
@@ -56,5 +61,6 @@ final class HomeState extends Equatable {
     sessionWarningDismissed,
     threadOpen,
     panesOverThreadWidth,
+    failedInvites,
   ];
 }

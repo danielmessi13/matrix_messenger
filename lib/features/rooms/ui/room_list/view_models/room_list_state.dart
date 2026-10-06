@@ -13,6 +13,7 @@ final class RoomListState extends Equatable {
     this.filter = RoomFilter.inbox,
     this.query = '',
     this.selectedRoomId,
+    this.pendingRoomId,
   });
 
   final List<Room> rooms;
@@ -26,6 +27,8 @@ final class RoomListState extends Equatable {
   final String query;
 
   final String? selectedRoomId;
+
+  final String? pendingRoomId;
 
   bool get searching => query.trim().isNotEmpty;
 
@@ -59,6 +62,7 @@ final class RoomListState extends Equatable {
     RoomFilter? filter,
     String? query,
     String? Function()? selectedRoomId,
+    String? Function()? pendingRoomId,
   }) => RoomListState(
     rooms: rooms ?? this.rooms,
     loaded: loaded ?? this.loaded,
@@ -68,6 +72,7 @@ final class RoomListState extends Equatable {
     selectedRoomId: selectedRoomId == null
         ? this.selectedRoomId
         : selectedRoomId(),
+    pendingRoomId: pendingRoomId == null ? this.pendingRoomId : pendingRoomId(),
   );
 
   @override
@@ -78,5 +83,6 @@ final class RoomListState extends Equatable {
     filter,
     query,
     selectedRoomId,
+    pendingRoomId,
   ];
 }

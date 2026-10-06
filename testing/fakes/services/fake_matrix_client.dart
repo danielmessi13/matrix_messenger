@@ -106,6 +106,19 @@ class FakeMatrixClient implements MatrixClient {
     }
   }
 
+  CreatedRoom createdRoom = const CreatedRoom(
+    roomId: '!nova:b.c',
+    failedInvites: [],
+  );
+
+  final createdRooms = <NewRoom>[];
+
+  @override
+  Future<CreatedRoom> createRoom({required NewRoom room}) async {
+    createdRooms.add(room);
+    return createdRoom;
+  }
+
   String? roomLinkValue = 'https://matrix.to/#/!a:b.c?via=b.c';
 
   @override
@@ -118,6 +131,14 @@ class FakeMatrixClient implements MatrixClient {
     joinedTargets.add(target);
     return '!entrou:b.c';
   }
+
+  UserCheck userCheck = const UserCheck(
+    status: UserCheckStatus.found,
+    displayName: null,
+  );
+
+  @override
+  Future<UserCheck> checkUser({required String userId}) async => userCheck;
 
   @override
   void dispose() {

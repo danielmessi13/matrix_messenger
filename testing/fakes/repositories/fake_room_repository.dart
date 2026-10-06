@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/user_check.dart';
 
 class FakeRoomRepository implements RoomRepository {
   final roomsController = StreamController<List<Room>>.broadcast();
@@ -36,6 +38,34 @@ class FakeRoomRepository implements RoomRepository {
     declined.add(roomId);
     await inviteGate?.future;
     return inviteResult;
+  }
+
+  Result<CreatedRoom> createRoomResult = const Result.ok(
+    CreatedRoom(roomId: '!nova:b.c'),
+  );
+
+  Completer<void>? createRoomGate;
+
+  final createdRooms = <NewRoom>[];
+
+  @override
+  Future<Result<CreatedRoom>> createRoom(NewRoom room) async {
+    createdRooms.add(room);
+    await createRoomGate?.future;
+    return createRoomResult;
+  }
+
+  final userChecks = <String, UserCheck>{};
+
+  Completer<void>? checkUserGate;
+
+  final checkedUsers = <String>[];
+
+  @override
+  Future<UserCheck> checkUser(String userId) async {
+    checkedUsers.add(userId);
+    await checkUserGate?.future;
+    return userChecks[userId] ?? const UserFound();
   }
 
   String? roomLinkValue = 'https://matrix.to/#/!a:b.c?via=b.c';

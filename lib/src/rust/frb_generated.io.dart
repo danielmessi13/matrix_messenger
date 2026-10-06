@@ -146,6 +146,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MessageKind dco_decode_box_autoadd_message_kind(dynamic raw);
 
   @protected
+  NewRoom dco_decode_box_autoadd_new_room(dynamic raw);
+
+  @protected
   ReplyPreview dco_decode_box_autoadd_reply_preview(dynamic raw);
 
   @protected
@@ -153,6 +156,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TimelineMessage dco_decode_box_autoadd_timeline_message(dynamic raw);
+
+  @protected
+  CreateRoomError dco_decode_create_room_error(dynamic raw);
+
+  @protected
+  CreateRoomErrorKind dco_decode_create_room_error_kind(dynamic raw);
+
+  @protected
+  CreatedRoom dco_decode_created_room(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
@@ -192,6 +204,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MessageKind dco_decode_message_kind(dynamic raw);
+
+  @protected
+  NewRoom dco_decode_new_room(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -273,6 +288,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void dco_decode_unit(dynamic raw);
+
+  @protected
+  UserCheck dco_decode_user_check(dynamic raw);
+
+  @protected
+  UserCheckStatus dco_decode_user_check_status(dynamic raw);
 
   @protected
   BigInt dco_decode_usize(dynamic raw);
@@ -389,6 +410,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MessageKind sse_decode_box_autoadd_message_kind(SseDeserializer deserializer);
 
   @protected
+  NewRoom sse_decode_box_autoadd_new_room(SseDeserializer deserializer);
+
+  @protected
   ReplyPreview sse_decode_box_autoadd_reply_preview(
     SseDeserializer deserializer,
   );
@@ -400,6 +424,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TimelineMessage sse_decode_box_autoadd_timeline_message(
     SseDeserializer deserializer,
   );
+
+  @protected
+  CreateRoomError sse_decode_create_room_error(SseDeserializer deserializer);
+
+  @protected
+  CreateRoomErrorKind sse_decode_create_room_error_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  CreatedRoom sse_decode_created_room(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -445,6 +480,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MessageKind sse_decode_message_kind(SseDeserializer deserializer);
+
+  @protected
+  NewRoom sse_decode_new_room(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -540,6 +578,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  UserCheck sse_decode_user_check(SseDeserializer deserializer);
+
+  @protected
+  UserCheckStatus sse_decode_user_check_status(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
@@ -681,6 +725,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_new_room(NewRoom self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_reply_preview(
     ReplyPreview self,
     SseSerializer serializer,
@@ -697,6 +744,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     TimelineMessage self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_create_room_error(
+    CreateRoomError self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_create_room_error_kind(
+    CreateRoomErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_created_room(CreatedRoom self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
@@ -754,6 +816,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_message_kind(MessageKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_new_room(NewRoom self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
@@ -869,6 +934,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_user_check(UserCheck self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_user_check_status(
+    UserCheckStatus self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);

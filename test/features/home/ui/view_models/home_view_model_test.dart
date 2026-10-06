@@ -96,4 +96,16 @@ void main() {
 
     expect(() => viewModel.threadVisibilityChanged(false), returnsNormally);
   });
+
+  blocTest<HomeViewModel, HomeState>(
+    'mostra e dispensa os convites que falharam',
+    build: () => HomeViewModel(kUserSession),
+    act: (viewModel) => viewModel
+      ..showFailedInvites(['@joao:b.co'])
+      ..dismissFailedInvites(),
+    expect: () => const [
+      HomeState(session: kUserSession, failedInvites: ['@joao:b.co']),
+      HomeState(session: kUserSession),
+    ],
+  );
 }

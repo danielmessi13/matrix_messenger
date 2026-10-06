@@ -142,4 +142,75 @@ void main() {
     expect(repository.roomsController.hasListener, isFalse);
     expect(repository.syncStateController.hasListener, isFalse);
   });
+
+  test(
+    'selecionar quando disponível: sala já na lista seleciona na hora',
+    () async {
+      final viewModel = RoomListViewModel(repository)..init();
+      addTearDown(viewModel.close);
+      repository.roomsController.add(kRooms);
+      await pumpEventQueue();
+
+      viewModel.selectWhenAvailable(kTeamRoom.id);
+
+      expect(viewModel.state.selectedRoomId, kTeamRoom.id);
+      expect(viewModel.state.pendingRoomId, isNull);
+    },
+  );
+
+  test('selecionar quando disponível: sala nova seleciona ao chegar', () async {
+    final viewModel = RoomListViewModel(repository)..init();
+    addTearDown(viewModel.close);
+    repository.roomsController.add(kRooms);
+    await pumpEventQueue();
+
+    viewModel.selectWhenAvailable('!nova:b.c');
+    expect(viewModel.state.selectedRoomId, isNull);
+    expect(viewModel.state.pendingRoomId, '!nova:b.c');
+
+    repository.roomsController.add(kRooms);
+    await pumpEventQueue();
+    expect(viewModel.state.pendingRoomId, '!nova:b.c');
+
+    const created = Room(id: '!nova:b.c', name: 'Plantão');
+    repository.roomsController.add([...kRooms, created]);
+    await pumpEventQueue();
+    expect(viewModel.state.selectedRoomId, '!nova:b.c');
+    expect(viewModel.state.selectedRoom, created);
+    expect(viewModel.state.pendingRoomId, isNull);
+  });
+
+  test('sala nova escondida pelo filtro abre mesmo assim', () async {
+    final viewModel = RoomListViewModel(repository)..init();
+    addTearDown(viewModel.close);
+    viewModel
+      ..selectFilter(RoomFilter.direct)
+      ..selectWhenAvailable('!nova:b.c');
+
+    const created = Room(id: '!nova:b.c', name: 'Plantão');
+    repository.roomsController.add([...kRooms, created]);
+    await pumpEventQueue();
+
+    expect(viewModel.state.visibleRooms, isNot(contains(created)));
+    expect(viewModel.state.selectedRoom, created);
+  });
+
+  test('selecionar outra sala descarta a pendente', () async {
+    final viewModel = RoomListViewModel(repository)..init();
+    addTearDown(viewModel.close);
+    repository.roomsController.add(kRooms);
+    await pumpEventQueue();
+
+    viewModel
+      ..selectWhenAvailable('!nova:b.c')
+      ..selectRoom(kTeamRoom.id);
+    repository.roomsController.add([
+      ...kRooms,
+      const Room(id: '!nova:b.c', name: 'Plantão'),
+    ]);
+    await pumpEventQueue();
+
+    expect(viewModel.state.selectedRoomId, kTeamRoom.id);
+    expect(viewModel.state.pendingRoomId, isNull);
+  });
 }
