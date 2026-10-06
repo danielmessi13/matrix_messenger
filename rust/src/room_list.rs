@@ -432,7 +432,7 @@ pub(crate) async fn sender_name(room: &Room, sender: &UserId) -> String {
     }
 }
 
-fn message_kind(event: &AnySyncTimelineEvent) -> (LatestMessageKind, Option<String>) {
+pub(crate) fn message_kind(event: &AnySyncTimelineEvent) -> (LatestMessageKind, Option<String>) {
     let AnySyncTimelineEvent::MessageLike(event) = event else {
         return (LatestMessageKind::Other, None);
     };

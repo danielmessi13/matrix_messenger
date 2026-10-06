@@ -6,6 +6,7 @@
 import 'api/auth.dart';
 import 'api/client.dart';
 import 'api/media.dart';
+import 'api/notifications.dart';
 import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';
@@ -114,6 +115,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<RecoveryStatus> dco_decode_StreamSink_recovery_status_Sse(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<RoomNotification> dco_decode_StreamSink_room_notification_Sse(
     dynamic raw,
   );
 
@@ -335,6 +341,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RoomEventKind dco_decode_room_event_kind(dynamic raw);
 
   @protected
+  RoomNotification dco_decode_room_notification(dynamic raw);
+
+  @protected
   RoomSummary dco_decode_room_summary(dynamic raw);
 
   @protected
@@ -463,6 +472,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<RecoveryStatus> sse_decode_StreamSink_recovery_status_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<RoomNotification> sse_decode_StreamSink_room_notification_Sse(
     SseDeserializer deserializer,
   );
 
@@ -730,6 +744,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RoomEventKind sse_decode_room_event_kind(SseDeserializer deserializer);
 
   @protected
+  RoomNotification sse_decode_room_notification(SseDeserializer deserializer);
+
+  @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer);
 
   @protected
@@ -875,6 +892,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_recovery_status_Sse(
     RustStreamSink<RecoveryStatus> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_room_notification_Sse(
+    RustStreamSink<RoomNotification> self,
     SseSerializer serializer,
   );
 
@@ -1206,6 +1229,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_room_event_kind(RoomEventKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_room_notification(
+    RoomNotification self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer);

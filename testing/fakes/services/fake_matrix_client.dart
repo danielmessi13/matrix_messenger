@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/src/rust/api/client.dart';
+import 'package:matrix_messenger/src/rust/api/notifications.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
 import 'package:matrix_messenger/src/rust/api/search.dart';
@@ -71,6 +72,13 @@ class FakeMatrixClient implements MatrixClient {
 
   @override
   Future<void> retryRecentThreads() async => recentThreadsRetries++;
+
+  final notificationsController =
+      StreamController<RoomNotification>.broadcast();
+
+  @override
+  Stream<RoomNotification> watchNotifications() =>
+      notificationsController.stream;
 
   Object? recoverError;
 
@@ -233,5 +241,6 @@ class FakeMatrixClient implements MatrixClient {
     syncStatusController.close();
     recoveryController.close();
     recentThreadsController.close();
+    notificationsController.close();
   }
 }

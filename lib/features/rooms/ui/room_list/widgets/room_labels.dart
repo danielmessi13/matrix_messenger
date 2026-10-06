@@ -40,14 +40,16 @@ String initialsOfName(String name) {
 
 String firstName(String name) => name.trim().split(RegExp(r'\s+')).first;
 
-String messageContent(LatestMessage message) => switch (message.kind) {
-  LatestMessageKind.text =>
-    (message.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim(),
+String messageKindLabel(LatestMessageKind kind, String? body) => switch (kind) {
+  LatestMessageKind.text => (body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim(),
   LatestMessageKind.image => 'Imagem',
   LatestMessageKind.file => 'Arquivo',
   LatestMessageKind.encrypted => 'Mensagem criptografada',
   LatestMessageKind.other => 'Mensagem',
 };
+
+String messageContent(LatestMessage message) =>
+    messageKindLabel(message.kind, message.body);
 
 String latestPreview(Room room) {
   final message = room.latest;

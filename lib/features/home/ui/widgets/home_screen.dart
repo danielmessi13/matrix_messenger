@@ -4,10 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/services/system_notifications.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 import '../../../auth/ui/logout/view_models/logout_view_model.dart';
 import '../../../auth/ui/logout/widgets/user_menu.dart';
 import '../../../conversation/ui/widgets/conversation_pane.dart';
+import '../../../notifications/data/repositories/notification_repository.dart';
+import '../../../notifications/ui/view_models/notifications_state.dart';
+import '../../../notifications/ui/view_models/notifications_view_model.dart';
 import '../../../recovery/data/repositories/recovery_repository.dart';
 import '../../../recovery/ui/view_models/recovery_state.dart';
 import '../../../recovery/ui/view_models/recovery_view_model.dart';
@@ -99,73 +103,140 @@ class _HomeScreenState extends State<HomeScreen> {
           create: (context) =>
               RecoveryViewModel(context.read<RecoveryRepository>())..init(),
         ),
+        BlocProvider(
+          create: (context) => NotificationsViewModel(
+            context.read<NotificationRepository>(),
+            context.read<SystemNotifications>(),
+          )..init(),
+        ),
       ],
-      child: CallbackShortcuts(
-        bindings: {
-          SingleActivator(
-            LogicalKeyboardKey.keyK,
-            control: !isMac,
-            meta: isMac,
-          ): _searchFocus.requestFocus,
-          SingleActivator(
-            LogicalKeyboardKey.keyN,
-            control: !isMac,
-            meta: isMac,
-          ): _openNewRoom,
-        },
-        // Scope próprio: o unfocus da busca devolve o foco para cá, dentro do atalho.
-        child: FocusScope(
-          autofocus: true,
-          child: BlocBuilder<HomeViewModel, HomeState>(
-            bloc: widget.viewModel,
-            builder: (context, home) =>
-                BlocBuilder<RoomListViewModel, RoomListState>(
-                  bloc: rooms,
-                  builder: (context, list) => Scaffold(
-                    key: const Key('home_screen'),
-                    body: Column(
-                      children: [
-                        TopBar(
-                          newRoomButton: NewRoomButton(onPressed: _openNewRoom),
-                          searchField: RoomSearchField(
-                            focusNode: _searchFocus,
-                            onChanged: rooms.search,
-                            onCleared: rooms.clearSearch,
+      child: _NotificationBindings(
+        rooms: rooms,
+        child: CallbackShortcuts(
+          bindings: {
+            SingleActivator(
+              LogicalKeyboardKey.keyK,
+              control: !isMac,
+              meta: isMac,
+            ): _searchFocus.requestFocus,
+            SingleActivator(
+              LogicalKeyboardKey.keyN,
+              control: !isMac,
+              meta: isMac,
+            ): _openNewRoom,
+          },
+          // Scope próprio: o unfocus da busca devolve o foco para cá, dentro do atalho.
+          child: FocusScope(
+            autofocus: true,
+            child: BlocBuilder<HomeViewModel, HomeState>(
+              bloc: widget.viewModel,
+              builder: (context, home) =>
+                  BlocBuilder<RoomListViewModel, RoomListState>(
+                    bloc: rooms,
+                    builder: (context, list) => Scaffold(
+                      key: const Key('home_screen'),
+                      body: Column(
+                        children: [
+                          TopBar(
+                            newRoomButton: NewRoomButton(
+                              onPressed: _openNewRoom,
+                            ),
+                            searchField: RoomSearchField(
+                              focusNode: _searchFocus,
+                              onChanged: rooms.search,
+                              onCleared: rooms.clearSearch,
+                            ),
+                            userMenu: UserMenu(
+                              viewModel: context.read<LogoutViewModel>(),
+                              userId: home.session.userId,
+                            ),
                           ),
-                          userMenu: UserMenu(
-                            viewModel: context.read<LogoutViewModel>(),
-                            userId: home.session.userId,
+                          if (home.showSessionWarning)
+                            _SessionWarningBanner(
+                              onDismiss: widget.viewModel.dismissSessionWarning,
+                            ),
+                          if (home.failedInvites.isNotEmpty)
+                            _FailedInvitesBanner(
+                              invites: home.failedInvites,
+                              onDismiss: widget.viewModel.dismissFailedInvites,
+                            ),
+                          Expanded(
+                            child: _Panes(
+                              home: home,
+                              list: list,
+                              viewModel: widget.viewModel,
+                              roomListViewModel: rooms,
+                              recentThreadsViewModel:
+                                  widget.recentThreadsViewModel,
+                              now: widget.clock(),
+                            ),
                           ),
-                        ),
-                        if (home.showSessionWarning)
-                          _SessionWarningBanner(
-                            onDismiss: widget.viewModel.dismissSessionWarning,
-                          ),
-                        if (home.failedInvites.isNotEmpty)
-                          _FailedInvitesBanner(
-                            invites: home.failedInvites,
-                            onDismiss: widget.viewModel.dismissFailedInvites,
-                          ),
-                        Expanded(
-                          child: _Panes(
-                            home: home,
-                            list: list,
-                            viewModel: widget.viewModel,
-                            roomListViewModel: rooms,
-                            recentThreadsViewModel:
-                                widget.recentThreadsViewModel,
-                            now: widget.clock(),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _NotificationBindings extends StatefulWidget {
+  const _NotificationBindings({required this.rooms, required this.child});
+
+  final RoomListViewModel rooms;
+
+  final Widget child;
+
+  @override
+  State<_NotificationBindings> createState() => _NotificationBindingsState();
+}
+
+class _NotificationBindingsState extends State<_NotificationBindings> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // No desktop, perder o foco da janela gera inactive.
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (state) => context
+          .read<NotificationsViewModel>()
+          .setWindowFocused(state == AppLifecycleState.resumed),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => MultiBlocListener(
+    listeners: [
+      BlocListener<RoomListViewModel, RoomListState>(
+        bloc: widget.rooms,
+        listenWhen: (previous, current) =>
+            previous.selectedRoomId != current.selectedRoomId,
+        listener: (context, list) => context
+            .read<NotificationsViewModel>()
+            .setOpenRoom(list.selectedRoomId),
+      ),
+      BlocListener<NotificationsViewModel, NotificationsState>(
+        listenWhen: (previous, current) =>
+            current.tappedRoomId != null &&
+            previous.tappedRoomId != current.tappedRoomId,
+        listener: (context, notifications) {
+          widget.rooms.selectRoom(notifications.tappedRoomId!);
+          context.read<NotificationsViewModel>().tapHandled();
+        },
+      ),
+    ],
+    child: widget.child,
+  );
 }
 
 class _SessionWarningBanner extends StatelessWidget {

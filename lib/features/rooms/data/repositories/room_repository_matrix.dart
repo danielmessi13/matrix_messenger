@@ -222,3 +222,13 @@ class RoomRepositoryMatrix implements RoomRepository {
     bridge.SyncStatus.error => SyncState.error,
   };
 }
+
+// O switch quebra se o Rust ganhar um caso novo.
+LatestMessageKind toLatestMessageKind(bridge.LatestMessageKind kind) =>
+    switch (kind) {
+      bridge.LatestMessageKind.text => LatestMessageKind.text,
+      bridge.LatestMessageKind.image => LatestMessageKind.image,
+      bridge.LatestMessageKind.file => LatestMessageKind.file,
+      bridge.LatestMessageKind.encrypted => LatestMessageKind.encrypted,
+      bridge.LatestMessageKind.other => LatestMessageKind.other,
+    };

@@ -5,6 +5,7 @@ mod client_builder;
 mod diff_window;
 mod frb_generated;
 mod media;
+mod notifications;
 mod oidc_callback;
 mod recent_threads;
 mod room_list;
