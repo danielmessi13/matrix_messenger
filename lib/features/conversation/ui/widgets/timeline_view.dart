@@ -413,6 +413,7 @@ class _TimelineEntry extends StatelessWidget {
           followedByOwn: followedByOwn,
           onRetry: () => viewModel.retry(message.id),
           onCancel: () => viewModel.cancel(message.id),
+          onReact: (key) => viewModel.toggleReaction(message.id, key),
           onReply: () => viewModel.startReply(message),
           onStartThread: switch (message.eventId) {
             final eventId?

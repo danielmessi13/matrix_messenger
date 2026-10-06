@@ -6,6 +6,10 @@ import '../../domain/models/timeline_item.dart';
 import 'image_message.dart';
 import 'markdown_text.dart';
 import 'message_labels.dart';
+import 'reaction_chips.dart';
+import 'reaction_picker.dart';
+
+const _quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🎉'];
 
 class MessageTile extends StatelessWidget {
   const MessageTile({
@@ -21,6 +25,7 @@ class MessageTile extends StatelessWidget {
     this.onReply,
     this.onStartThread,
     this.onQuoteTap,
+    this.onReact,
   });
 
   final MessageItem message;
@@ -46,15 +51,27 @@ class MessageTile extends StatelessWidget {
 
   final ValueChanged<String>? onQuoteTap;
 
+  final Future<bool> Function(String key)? onReact;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final react = switch (onReact) {
+      final onReact? when message.canReact => (String key) async {
+        if (await onReact(key) || !context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível reagir.')),
+        );
+      },
+      _ => null,
+    };
     final content = message.isOwn
         ? _OwnMessage(
             message: message,
             onRetry: onRetry,
             onCancel: onCancel,
             onQuoteTap: onQuoteTap,
+            onReact: react,
             compact: compact,
             continuation: continuation,
             continuedBelow: continuedBelow,
@@ -64,6 +81,7 @@ class MessageTile extends StatelessWidget {
         : _OtherMessage(
             message: message,
             onQuoteTap: onQuoteTap,
+            onReact: react,
             compact: compact,
             continuation: continuation,
             continuedBelow: continuedBelow,
@@ -77,6 +95,7 @@ class MessageTile extends StatelessWidget {
       onStartThread: message.canReply ? onStartThread : null,
       time: continuation ? formatMessageTime(message.timestamp) : null,
       thread: thread,
+      onReact: react,
       child: content,
     );
   }
@@ -86,6 +105,7 @@ class _OtherMessage extends StatelessWidget {
   const _OtherMessage({
     required this.message,
     required this.onQuoteTap,
+    required this.onReact,
     required this.compact,
     required this.continuation,
     required this.continuedBelow,
@@ -95,6 +115,8 @@ class _OtherMessage extends StatelessWidget {
   final MessageItem message;
 
   final ValueChanged<String>? onQuoteTap;
+
+  final ValueChanged<String>? onReact;
 
   final bool compact;
 
@@ -189,6 +211,24 @@ class _OtherMessage extends StatelessWidget {
                       italic: false,
                       compact: compact,
                     ),
+                    if (message.reactions.isNotEmpty)
+                      ReactionChips(
+                        messageId: message.id,
+                        reactions: message.reactions,
+                        alignEnd: false,
+                        onReact: onReact,
+                        trailing: switch (onReact) {
+                          final onReact? => ReactionPickerButton(
+                            alignEnd: false,
+                            onSelected: onReact,
+                            builder: (context, open) => _AddReactionChip(
+                              key: Key('reaction_add_${message.id}'),
+                              onTap: open,
+                            ),
+                          ),
+                          null => null,
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -206,6 +246,7 @@ class _OwnMessage extends StatelessWidget {
     required this.onRetry,
     required this.onCancel,
     required this.onQuoteTap,
+    required this.onReact,
     required this.compact,
     required this.continuation,
     required this.continuedBelow,
@@ -220,6 +261,8 @@ class _OwnMessage extends StatelessWidget {
   final Future<bool> Function() onCancel;
 
   final ValueChanged<String>? onQuoteTap;
+
+  final ValueChanged<String>? onReact;
 
   final bool compact;
 
@@ -298,6 +341,24 @@ class _OwnMessage extends StatelessWidget {
                       italic: true,
                       compact: compact,
                     ),
+                    if (message.reactions.isNotEmpty)
+                      ReactionChips(
+                        messageId: message.id,
+                        reactions: message.reactions,
+                        alignEnd: true,
+                        onReact: onReact,
+                        trailing: switch (onReact) {
+                          final onReact? => ReactionPickerButton(
+                            alignEnd: true,
+                            onSelected: onReact,
+                            builder: (context, open) => _AddReactionChip(
+                              key: Key('reaction_add_${message.id}'),
+                              onTap: open,
+                            ),
+                          ),
+                          null => null,
+                        },
+                      ),
                     if (_showsStatus) ...[
                       const SizedBox(height: 6),
                       _Status(
@@ -536,6 +597,7 @@ class _HoverActions extends StatefulWidget {
     required this.onStartThread,
     required this.time,
     required this.thread,
+    required this.onReact,
     required this.child,
   });
 
@@ -550,6 +612,8 @@ class _HoverActions extends StatefulWidget {
   final String? time;
 
   final Widget? thread;
+
+  final ValueChanged<String>? onReact;
 
   final Widget child;
 
@@ -566,15 +630,31 @@ class _HoverActionsState extends State<_HoverActions> {
 
   bool _overBar = false;
 
+  bool _pickerOpen = false;
+
   // Passar do balão para o menu dispara a saída antes da entrada; vale o estado final.
   void _hover({bool? message, bool? bar}) {
     _overMessage = message ?? _overMessage;
     _overBar = bar ?? _overBar;
-    if (_overMessage || _overBar) {
-      _portal.show();
-    } else {
+    // Com o seletor aberto o mouse está nele, fora da mensagem e da barra.
+    if (_overMessage || _overBar || _pickerOpen) {
+      // Mostrar de novo traz a barra para cima do seletor, que é filho dela.
+      if (!_portal.isShowing) _portal.show();
+    } else if (_portal.isShowing) {
       _portal.hide();
     }
+  }
+
+  void _pickerChanged(bool open) {
+    _pickerOpen = open;
+    if (open) {
+      _hover();
+      return;
+    }
+    // Pode vir do dispose do seletor, em plena desmontagem da árvore, onde o portal não aceita hide.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _hover();
+    });
   }
 
   @override
@@ -583,7 +663,12 @@ class _HoverActionsState extends State<_HoverActions> {
     final onStartThread = widget.onStartThread;
     final end = widget.alignEnd;
     final time = widget.time;
-    final hasMenu = onReply != null || onStartThread != null || time != null;
+    final onReact = widget.onReact;
+    final hasMenu =
+        onReply != null ||
+        onStartThread != null ||
+        time != null ||
+        onReact != null;
     Widget row(Widget bubble) => SizedBox(
       width: double.infinity,
       child: Column(
@@ -616,6 +701,9 @@ class _HoverActionsState extends State<_HoverActions> {
               time: time,
               onReply: onReply,
               onStartThread: onStartThread,
+              onReact: onReact,
+              alignEnd: end,
+              onPickerChanged: _pickerChanged,
             ),
           ),
         ),
@@ -636,6 +724,9 @@ class _ActionBar extends StatelessWidget {
     required this.time,
     required this.onReply,
     required this.onStartThread,
+    required this.onReact,
+    required this.alignEnd,
+    required this.onPickerChanged,
   });
 
   final String messageId;
@@ -645,6 +736,12 @@ class _ActionBar extends StatelessWidget {
   final VoidCallback? onReply;
 
   final VoidCallback? onStartThread;
+
+  final ValueChanged<String>? onReact;
+
+  final bool alignEnd;
+
+  final ValueChanged<bool> onPickerChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -680,6 +777,25 @@ class _ActionBar extends StatelessWidget {
                   style: TextStyle(fontSize: 12.5, color: colors.textMuted),
                 ),
               ),
+            if (onReact case final onReact?) ...[
+              for (final emoji in _quickReactions)
+                _QuickReaction(
+                  key: Key('quick_reaction_${messageId}_$emoji'),
+                  emoji: emoji,
+                  onTap: () => onReact(emoji),
+                ),
+              ReactionPickerButton(
+                alignEnd: alignEnd,
+                onSelected: onReact,
+                onOpenChanged: onPickerChanged,
+                builder: (context, open) => _IconAction(
+                  key: Key('reaction_picker_$messageId'),
+                  icon: Icons.add_reaction_outlined,
+                  tooltip: 'Reagir',
+                  onTap: open,
+                ),
+              ),
+            ],
             if (onReply case final onReply?)
               _ActionButton(
                 key: Key('message_reply_$messageId'),
@@ -695,6 +811,108 @@ class _ActionBar extends StatelessWidget {
                 onTap: onStartThread,
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickReaction extends StatefulWidget {
+  const _QuickReaction({super.key, required this.emoji, required this.onTap});
+
+  final String emoji;
+
+  final VoidCallback onTap;
+
+  @override
+  State<_QuickReaction> createState() => _QuickReactionState();
+}
+
+class _QuickReactionState extends State<_QuickReaction> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _hovered = true),
+    onExit: (_) => setState(() => _hovered = false),
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _hovered ? context.colors.surfaceHigh : null,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+          child: Text(widget.emoji, style: const TextStyle(fontSize: 16)),
+        ),
+      ),
+    ),
+  );
+}
+
+class _IconAction extends StatelessWidget {
+  const _IconAction({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+
+  final String tooltip;
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          child: Icon(icon, size: 16, color: context.colors.textSecondary),
+        ),
+      ),
+    ),
+  );
+}
+
+class _AddReactionChip extends StatelessWidget {
+  const _AddReactionChip({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Tooltip(
+      message: 'Reagir',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            height: 26,
+            padding: const EdgeInsets.symmetric(horizontal: 7),
+            decoration: BoxDecoration(
+              color: colors.surfaceHigh,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: colors.borderStrong),
+            ),
+            child: Icon(
+              Icons.add_reaction_outlined,
+              size: 15,
+              color: colors.textSecondary,
+            ),
+          ),
         ),
       ),
     );

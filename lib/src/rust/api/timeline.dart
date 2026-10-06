@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `from_sdk`, `new`, `new`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `drop`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RoomTimeline>>
 abstract class RoomTimeline implements RustOpaqueInterface {
@@ -29,6 +29,8 @@ abstract class RoomTimeline implements RustOpaqueInterface {
   Future<void> sendReply({required String body, required String inReplyTo});
 
   Future<void> setTyping({required bool typing});
+
+  Future<void> toggleReaction({required String itemId, required String key});
 
   Stream<TimelineSnapshot> watch();
 
@@ -83,6 +85,37 @@ enum MessageKind {
   encrypted,
   redacted,
   other,
+}
+
+class Reaction {
+  final String key;
+  final int count;
+  final bool reactedByMe;
+  final List<String> senderNames;
+
+  const Reaction({
+    required this.key,
+    required this.count,
+    required this.reactedByMe,
+    required this.senderNames,
+  });
+
+  @override
+  int get hashCode =>
+      key.hashCode ^
+      count.hashCode ^
+      reactedByMe.hashCode ^
+      senderNames.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Reaction &&
+          runtimeType == other.runtimeType &&
+          key == other.key &&
+          count == other.count &&
+          reactedByMe == other.reactedByMe &&
+          senderNames == other.senderNames;
 }
 
 class ReplyPreview {
@@ -305,6 +338,8 @@ class TimelineMessage {
   final ReplyPreview? replyTo;
   final List<String> readBy;
   final ImageContent? image;
+  final List<Reaction> reactions;
+  final bool canReact;
 
   const TimelineMessage({
     required this.id,
@@ -322,6 +357,8 @@ class TimelineMessage {
     this.replyTo,
     required this.readBy,
     this.image,
+    required this.reactions,
+    required this.canReact,
   });
 
   @override
@@ -340,7 +377,9 @@ class TimelineMessage {
       thread.hashCode ^
       replyTo.hashCode ^
       readBy.hashCode ^
-      image.hashCode;
+      image.hashCode ^
+      reactions.hashCode ^
+      canReact.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -361,7 +400,9 @@ class TimelineMessage {
           thread == other.thread &&
           replyTo == other.replyTo &&
           readBy == other.readBy &&
-          image == other.image;
+          image == other.image &&
+          reactions == other.reactions &&
+          canReact == other.canReact;
 }
 
 class TimelineSnapshot {

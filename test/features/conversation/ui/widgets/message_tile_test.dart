@@ -1,15 +1,33 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/message_labels.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/message_tile.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/reaction_chips.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/models/message.dart';
 
+MessageItem reactable(MessageItem m) => MessageItem(
+  id: m.id,
+  eventId: m.eventId,
+  senderId: m.senderId,
+  senderName: m.senderName,
+  isOwn: m.isOwn,
+  timestamp: m.timestamp,
+  kind: m.kind,
+  body: m.body,
+  canReply: m.canReply,
+  canReact: true,
+);
+
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   Future<({List<String> retried, List<String> cancelled})> pump(
     WidgetTester tester,
     MessageItem message, {
@@ -21,6 +39,7 @@ void main() {
     VoidCallback? onReply,
     VoidCallback? onStartThread,
     ValueChanged<String>? onQuoteTap,
+    Future<bool> Function(String key)? onReact,
   }) async {
     useDesktopSize(tester);
     final retried = <String>[];
@@ -41,6 +60,7 @@ void main() {
               onReply: onReply,
               onStartThread: onStartThread,
               onQuoteTap: onQuoteTap,
+              onReact: onReact,
               onRetry: () async {
                 retried.add(message.id);
                 return succeeds;
@@ -681,5 +701,163 @@ void main() {
       followedByOwn: true,
     );
     expect(find.text('✓✓ Lida por Ana'), findsOneWidget);
+  });
+
+  MessageItem withReactions({bool canReact = true}) => MessageItem(
+    id: '\$other',
+    eventId: '\$other',
+    senderId: '@diego:matrix.org',
+    senderName: 'Diego Alves',
+    isOwn: false,
+    timestamp: DateTime(2026, 10, 4, 10, 5),
+    kind: MessageKind.text,
+    canReply: true,
+    canReact: canReact,
+    body: 'A integração ficou pronta.',
+    reactions: const [
+      MessageReaction(
+        key: '👍',
+        count: 2,
+        reactedByMe: true,
+        senderNames: ['Ana'],
+      ),
+      MessageReaction(key: '🎉', count: 1, senderNames: ['Bruno']),
+    ],
+  );
+
+  testWidgets('chips mostram emoji e contagem', (tester) async {
+    await pump(tester, withReactions(), onReact: (_) async => true);
+
+    expect(find.byKey(const Key('reaction_\$other_👍')), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.byTooltip('Ana e você'), findsOneWidget);
+  });
+
+  testWidgets('clicar no chip chama onReact com a chave', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      withReactions(),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_🎉')));
+    await tester.pump();
+
+    expect(keys, ['🎉']);
+  });
+
+  testWidgets('falha ao reagir mostra snackbar', (tester) async {
+    await pump(tester, withReactions(), onReact: (_) async => false);
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_🎉')));
+    await tester.pump();
+
+    expect(find.text('Não foi possível reagir.'), findsOneWidget);
+  });
+
+  testWidgets('sem canReact os chips não reagem', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      withReactions(canReact: false),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_🎉')));
+    await tester.pump();
+
+    expect(keys, isEmpty);
+    expect(find.byKey(const Key('reaction_\$other_🎉')), findsOneWidget);
+  });
+
+  testWidgets('sem reações não há linha de chips', (tester) async {
+    await pump(tester, kOtherMessage, onReact: (_) async => true);
+
+    expect(find.byType(ReactionChips), findsNothing);
+  });
+
+  testWidgets('hover mostra as rápidas e elas chamam onReact', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await hover(tester, find.textContaining('A integração'));
+    for (final emoji in ['👍', '❤️', '😂', '😮', '😢', '🎉']) {
+      expect(find.byKey(Key('quick_reaction_\$other_$emoji')), findsOneWidget);
+    }
+    await tester.tap(find.byKey(const Key('quick_reaction_\$other_❤️')));
+    await tester.pump();
+
+    expect(keys, ['❤️']);
+  });
+
+  testWidgets('sem canReact o hover não mostra reações', (tester) async {
+    await pump(tester, kOtherMessage, onReact: (_) async => true);
+
+    await hover(tester, find.textContaining('A integração'));
+
+    expect(find.byKey(const Key('quick_reaction_\$other_👍')), findsNothing);
+    expect(find.byKey(const Key('reaction_picker_\$other')), findsNothing);
+  });
+
+  testWidgets('com o seletor aberto a barra fica mesmo sem hover', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      reactable(kOtherMessage),
+      onReact: (_) async => true,
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.textContaining('A integração')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('reaction_picker_\$other')));
+    await tester.pumpAndSettle();
+
+    await mouse.moveTo(const Offset(5, 900));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reaction_picker')), findsOneWidget);
+    expect(find.byKey(const Key('quick_reaction_\$other_👍')), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('quick_reaction_\$other_👍')), findsNothing);
+  });
+
+  testWidgets('chip + abre o seletor e escolher reage', (tester) async {
+    final keys = <String>[];
+    await pump(
+      tester,
+      withReactions(),
+      onReact: (key) async {
+        keys.add(key);
+        return true;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_add_\$other')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😀').first);
+    await tester.pumpAndSettle();
+
+    expect(keys, ['😀']);
   });
 }

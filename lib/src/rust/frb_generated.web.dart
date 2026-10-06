@@ -226,6 +226,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<Reaction> dco_decode_list_reaction(dynamic raw);
+
+  @protected
   List<RecentThread> dco_decode_list_recent_thread(dynamic raw);
 
   @protected
@@ -287,6 +290,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
+  Reaction dco_decode_reaction(dynamic raw);
 
   @protected
   RecentThread dco_decode_recent_thread(dynamic raw);
@@ -573,6 +579,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<Reaction> sse_decode_list_reaction(SseDeserializer deserializer);
+
+  @protected
   List<RecentThread> sse_decode_list_recent_thread(
     SseDeserializer deserializer,
   );
@@ -654,6 +663,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  Reaction sse_decode_reaction(SseDeserializer deserializer);
 
   @protected
   RecentThread sse_decode_recent_thread(SseDeserializer deserializer);
@@ -998,6 +1010,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_reaction(List<Reaction> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_recent_thread(
     List<RecentThread> self,
     SseSerializer serializer,
@@ -1099,6 +1114,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_reaction(Reaction self, SseSerializer serializer);
 
   @protected
   void sse_encode_recent_thread(RecentThread self, SseSerializer serializer);

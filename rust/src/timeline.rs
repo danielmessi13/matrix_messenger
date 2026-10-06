@@ -33,8 +33,8 @@ use tokio::{runtime::Handle, task::AbortHandle};
 
 use crate::{
     api::timeline::{
-        ImageContent, MessageKind, ReplyPreview, ReplyState, RoomEvent, RoomEventKind, SendState,
-        ThreadInfo, TimelineEntry, TimelineError, TimelineErrorKind, TimelineMessage,
+        ImageContent, MessageKind, Reaction, ReplyPreview, ReplyState, RoomEvent, RoomEventKind,
+        SendState, ThreadInfo, TimelineEntry, TimelineError, TimelineErrorKind, TimelineMessage,
         TimelineSnapshot,
     },
     diff_window::next_batch_or,
@@ -275,6 +275,26 @@ impl TimelineHandle {
         Ok(())
     }
 
+    // O SDK identifica pelo event_id ou transaction_id; o Dart só conhece o unique_id.
+    pub(crate) async fn toggle_reaction(
+        &self,
+        item_id: &str,
+        key: &str,
+    ) -> Result<(), TimelineError> {
+        let target = self
+            .timeline
+            .items()
+            .await
+            .iter()
+            .find(|item| item.unique_id().0 == item_id)
+            .and_then(|item| Some(item.as_event()?.identifier()))
+            .ok_or_else(|| {
+                TimelineError::new(TimelineErrorKind::MessageNotFound, item_id.to_owned())
+            })?;
+        self.timeline.toggle_reaction(&target, key).await?;
+        Ok(())
+    }
+
     // O SDK escolhe o recibo pelo foco: `main` na conversa principal, a raiz na thread.
     pub(crate) async fn mark_as_read(&self) -> Result<(), TimelineError> {
         // Inscrito antes do recibo para não perder a mudança que ele causa.
@@ -367,6 +387,37 @@ fn profile_name(sender: &UserId, profile: &TimelineDetails<Profile>) -> String {
         }) if !name.is_empty() => name.clone(),
         _ => sender.localpart().to_owned(),
     }
+}
+
+fn name_of(user: &UserId, names: &HashMap<OwnedUserId, String>) -> String {
+    names
+        .get(user)
+        .cloned()
+        .unwrap_or_else(|| user.localpart().to_owned())
+}
+
+fn reactions(
+    item: &EventTimelineItem,
+    own_user: &UserId,
+    names: &HashMap<OwnedUserId, String>,
+) -> Vec<Reaction> {
+    let Some(by_key) = item.content().reactions() else {
+        return Vec::new();
+    };
+    by_key
+        .iter()
+        .filter(|(_, senders)| !senders.is_empty())
+        .map(|(key, senders)| Reaction {
+            key: key.clone(),
+            count: senders.len() as u32,
+            reacted_by_me: senders.contains_key(own_user),
+            sender_names: senders
+                .keys()
+                .filter(|user| user.as_str() != own_user.as_str())
+                .map(|user| name_of(user, names))
+                .collect(),
+        })
+        .collect()
 }
 
 pub(crate) fn kind_and_body(
@@ -505,8 +556,11 @@ fn message(
     item: &EventTimelineItem,
     own_user: &UserId,
     unread: &HashMap<OwnedEventId, u32>,
+    names: &HashMap<OwnedUserId, String>,
 ) -> Option<TimelineMessage> {
     let (kind, body) = kind_and_body(item.content())?;
+    let can_react = item.event_id().is_some()
+        && !matches!(kind, MessageKind::Redacted | MessageKind::Encrypted);
     Some(TimelineMessage {
         id: id.0.clone(),
         event_id: item.event_id().map(ToString::to_string),
@@ -526,6 +580,8 @@ fn message(
         reply_to: reply_preview(item, own_user),
         read_by: Vec::new(),
         image: image(item.content()),
+        reactions: reactions(item, own_user, names),
+        can_react,
     })
 }
 
@@ -615,7 +671,17 @@ pub(crate) fn snapshot(
     unread: &HashMap<OwnedEventId, u32>,
     paginating: bool,
 ) -> TimelineSnapshot {
-    let mut names: HashMap<OwnedUserId, String> = HashMap::new();
+    // Antes do laço: reação e "Lida por" citam quem pode aparecer depois na janela.
+    let names: HashMap<OwnedUserId, String> = items
+        .iter()
+        .filter_map(|item| item.as_event())
+        .map(|event| {
+            (
+                event.sender().to_owned(),
+                profile_name(event.sender(), event.sender_profile()),
+            )
+        })
+        .collect();
     let mut entries = Vec::new();
     let mut reached_start = false;
     let mut last_read: Option<(usize, Vec<OwnedUserId>)> = None;
@@ -624,11 +690,7 @@ pub(crate) fn snapshot(
             if thread_root.is_some() && event.event_id() == thread_root {
                 continue;
             }
-            names.insert(
-                event.sender().to_owned(),
-                profile_name(event.sender(), event.sender_profile()),
-            );
-            let message = message(item.unique_id(), event, own_user, unread);
+            let message = message(item.unique_id(), event, own_user, unread, &names);
             if message.is_some() && event.is_own() {
                 last_read = Some((entries.len(), Vec::new()));
             }
@@ -675,15 +737,7 @@ pub(crate) fn snapshot(
     drop_trailing_divider(&mut entries);
     if let Some((index, readers)) = last_read {
         if let Some(message) = entries[index].message.as_mut() {
-            message.read_by = readers
-                .iter()
-                .map(|user| {
-                    names
-                        .get(user)
-                        .cloned()
-                        .unwrap_or_else(|| user.localpart().to_owned())
-                })
-                .collect();
+            message.read_by = readers.iter().map(|user| name_of(user, &names)).collect();
         }
     }
     TimelineSnapshot {
@@ -1684,6 +1738,86 @@ mod tests {
         let echo = messages(&current)[0];
         assert_eq!(echo.event_id, None);
         assert!(!echo.can_reply);
+        assert!(!echo.can_react);
+    }
+
+    #[tokio::test]
+    async fn snapshot_groups_reactions_by_key_and_hides_unknown_targets() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let own = client.user_id().unwrap().to_owned();
+        let room_id = room_id!("!a:b.c");
+        let bob = user_id!("@bob:b.c");
+        let carol = user_id!("@carol:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("oi").sender(bob).event_id(event_id!("$1")))
+                    .add_timeline_event(f.reaction(event_id!("$1"), "👍").sender(bob))
+                    .add_timeline_event(f.reaction(event_id!("$1"), "👍").sender(&own))
+                    .add_timeline_event(f.reaction(event_id!("$1"), "👍").sender(carol))
+                    .add_timeline_event(f.reaction(event_id!("$1"), "🎉").sender(carol))
+                    .add_timeline_event(f.reaction(event_id!("$nope"), "😢").sender(carol)),
+            )
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+
+        let current = wait_for(&handle, |s| {
+            messages(s).first().is_some_and(|m| m.reactions.len() == 2)
+        })
+        .await;
+
+        let message = messages(&current)[0];
+        assert_eq!(
+            message.reactions,
+            vec![
+                Reaction {
+                    key: "👍".to_owned(),
+                    count: 3,
+                    reacted_by_me: true,
+                    sender_names: vec!["bob".to_owned(), "carol".to_owned()],
+                },
+                Reaction {
+                    key: "🎉".to_owned(),
+                    count: 1,
+                    reacted_by_me: false,
+                    sender_names: vec!["carol".to_owned()],
+                },
+            ]
+        );
+        assert!(message.can_react);
+        assert_eq!(messages(&current).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn redacted_message_cannot_be_reacted() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let bob = user_id!("@bob:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("oi").sender(bob).event_id(event_id!("$1")))
+                    .add_timeline_event(f.redaction(event_id!("$1")).sender(bob)),
+            )
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+
+        let current = wait_for(&handle, |s| {
+            messages(s).first().is_some_and(|m| m.kind == MessageKind::Redacted)
+        })
+        .await;
+
+        assert!(!messages(&current)[0].can_react);
     }
 
     fn hidden_events(f: &EventFactory, count: usize) -> Vec<Raw<AnyTimelineEvent>> {
@@ -2079,5 +2213,61 @@ mod tests {
             current.items[1].room_event.as_ref().map(|e| e.kind),
             Some(RoomEventKind::NameChanged)
         );
+    }
+
+    #[tokio::test]
+    async fn toggle_reaction_adds_then_removes_mine() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let bob = user_id!("@bob:b.c");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("oi").sender(bob).event_id(event_id!("$1"))),
+            )
+            .await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server
+            .mock_room_send()
+            .ok(event_id!("$reaction"))
+            .mount()
+            .await;
+        server
+            .mock_room_redact()
+            .ok(event_id!("$redaction"))
+            .mount()
+            .await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+        let first = wait_for(&handle, |s| messages(s).len() == 1).await;
+        let id = messages(&first)[0].id.clone();
+
+        handle.toggle_reaction(&id, "👍").await.unwrap();
+        let added = wait_for(&handle, |s| {
+            messages(s)[0].reactions.iter().any(|r| r.reacted_by_me)
+        })
+        .await;
+        assert_eq!(messages(&added)[0].reactions[0].key, "👍");
+
+        handle.toggle_reaction(&id, "👍").await.unwrap();
+        wait_for(&handle, |s| messages(s)[0].reactions.is_empty()).await;
+    }
+
+    #[tokio::test]
+    async fn toggle_reaction_with_unknown_id_is_message_not_found() {
+        let server = MatrixMockServer::new().await;
+        let client = client(&server).await;
+        let room = server.sync_joined_room(&client, room_id!("!a:b.c")).await;
+        let handle = TimelineHandle::open(room, None, ThreadReads::default(), Handle::current())
+            .await
+            .unwrap();
+
+        let error = handle.toggle_reaction("nada", "👍").await.unwrap_err();
+
+        assert_eq!(error.kind, TimelineErrorKind::MessageNotFound);
     }
 }

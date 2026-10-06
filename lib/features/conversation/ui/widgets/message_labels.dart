@@ -115,3 +115,12 @@ String? kindPlaceholder(MessageKind kind) => switch (kind) {
   MessageKind.redacted => 'Mensagem apagada',
   MessageKind.other => 'Mensagem de um tipo não suportado',
 };
+
+String reactionTooltip(MessageReaction reaction) {
+  final names = [...reaction.senderNames, if (reaction.reactedByMe) 'você'];
+  if (names.length > 10) {
+    return '${names[0]}, ${names[1]} e mais ${names.length - 2}';
+  }
+  if (names.length == 1) return names.single;
+  return '${names.sublist(0, names.length - 1).join(', ')} e ${names.last}';
+}

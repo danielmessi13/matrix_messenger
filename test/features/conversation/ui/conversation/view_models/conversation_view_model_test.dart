@@ -218,6 +218,28 @@ void main() {
   });
 
   test(
+    'toggleReaction repassa o id e a chave, e devolve o resultado',
+    () async {
+      final viewModel = build();
+      await viewModel.open();
+
+      expect(await viewModel.toggleReaction('\$1', '👍'), isTrue);
+      expect(await viewModel.toggleReaction('\$1', '👍'), isTrue);
+      conversation.reactResult = const Result.error(
+        FakeConversationRepository.notFound,
+      );
+      expect(await viewModel.toggleReaction('\$2', '🎉'), isFalse);
+
+      expect(conversation.reacted, [
+        ('\$1', '👍'),
+        ('\$1', '👍'),
+        ('\$2', '🎉'),
+      ]);
+      await viewModel.close();
+    },
+  );
+
+  test(
     'erro no stream antes do primeiro snapshot vira falha e reabre',
     () async {
       final viewModel = build();

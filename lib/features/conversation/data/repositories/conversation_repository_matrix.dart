@@ -56,6 +56,10 @@ class _MatrixConversation implements Conversation {
       _run(() => _timeline.cancel(itemId: messageId));
 
   @override
+  Future<Result<void>> toggleReaction(String messageId, String key) =>
+      _run(() => _timeline.toggleReaction(itemId: messageId, key: key));
+
+  @override
   Future<void> markAsRead() => _run(_timeline.markAsRead);
 
   @override
@@ -202,6 +206,16 @@ MessageItem _toMessage(bridge.TimelineMessage message) => MessageItem(
       mimetype: image.mimetype,
     ),
   },
+  reactions: [
+    for (final reaction in message.reactions)
+      MessageReaction(
+        key: reaction.key,
+        count: reaction.count,
+        reactedByMe: reaction.reactedByMe,
+        senderNames: List.unmodifiable(reaction.senderNames),
+      ),
+  ],
+  canReact: message.canReact,
 );
 
 MessageKind _toKind(bridge.MessageKind kind) => switch (kind) {

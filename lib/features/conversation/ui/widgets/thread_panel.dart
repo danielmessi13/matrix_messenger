@@ -241,6 +241,8 @@ class _RepliesState extends State<_Replies> with FocusFlash<_Replies> {
                               false,
                           onRetry: () => viewModel.retry(reply.id),
                           onCancel: () => viewModel.cancel(reply.id),
+                          onReact: (key) =>
+                              viewModel.toggleReaction(reply.id, key),
                           onReply: () => viewModel.startReply(reply),
                           onQuoteTap: _onQuoteTap,
                         ),

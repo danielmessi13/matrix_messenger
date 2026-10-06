@@ -33,6 +33,8 @@ void main() {
     bridge.ThreadInfo? thread,
     bridge.ReplyPreview? replyTo,
     List<String> readBy = const [],
+    List<bridge.Reaction> reactions = const [],
+    bool canReact = true,
   }) => bridge.TimelineMessage(
     id: id,
     eventId: eventId,
@@ -48,6 +50,8 @@ void main() {
     thread: thread,
     replyTo: replyTo,
     readBy: readBy,
+    reactions: reactions,
+    canReact: canReact,
   );
 
   test('converte o snapshot da ponte em domínio', () async {
@@ -113,6 +117,7 @@ void main() {
               kind: MessageKind.image,
             ),
             readBy: const ['Ana'],
+            canReact: true,
           ),
         ],
         reachedStart: true,
@@ -301,6 +306,61 @@ void main() {
     );
   });
 
+  test('converte reações e canReact', () async {
+    final conversation = await open();
+    final received = conversation.updates.first;
+    timeline.snapshots.add(
+      bridge.TimelineSnapshot(
+        items: [
+          bridge.TimelineEntry(
+            message: bridgeMessage(
+              canReact: false,
+              reactions: const [
+                bridge.Reaction(
+                  key: '👍',
+                  count: 2,
+                  reactedByMe: true,
+                  senderNames: ['Ana'],
+                ),
+              ],
+            ),
+          ),
+        ],
+        reachedStart: true,
+        paginating: false,
+      ),
+    );
+
+    final message = (await received).items.single as MessageItem;
+    expect(message.canReact, isFalse);
+    expect(message.reactions, const [
+      MessageReaction(
+        key: '👍',
+        count: 2,
+        reactedByMe: true,
+        senderNames: ['Ana'],
+      ),
+    ]);
+  });
+
+  test('toggleReaction repassa o id e a chave', () async {
+    final conversation = await open();
+
+    final result = await conversation.toggleReaction('\$1', '🎉');
+
+    expect(result, isA<Ok<void>>());
+    expect(timeline.reactions, [('\$1', '🎉')]);
+  });
+
+  test('toggleReaction com erro da ponte vira Result.error', () async {
+    final conversation = await open();
+    timeline.error = Exception('rede');
+
+    final result = await conversation.toggleReaction('\$1', '🎉');
+
+    expect(result, isA<Error<void>>());
+  });
+
   test('converte a imagem da mensagem', () async {
     final conversation = await open();
     final received = conversation.updates.first;
@@ -319,6 +379,8 @@ void main() {
               sendState: bridge.SendState.sent,
               canReply: true,
               readBy: [],
+              reactions: [],
+              canReact: true,
               image: bridge.ImageContent(
                 filename: 'gato.png',
                 caption: 'olha',

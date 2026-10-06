@@ -60,6 +60,8 @@ pub struct TimelineMessage {
     pub reply_to: Option<ReplyPreview>,
     pub read_by: Vec<String>,
     pub image: Option<ImageContent>,
+    pub reactions: Vec<Reaction>,
+    pub can_react: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,6 +72,15 @@ pub struct ImageContent {
     pub height: Option<u32>,
     pub mimetype: Option<String>,
     pub media: String,
+}
+
+// `sender_names` sem o próprio usuário; o Dart põe "você" pelo `reacted_by_me`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reaction {
+    pub key: String,
+    pub count: u32,
+    pub reacted_by_me: bool,
+    pub sender_names: Vec<String>,
 }
 
 // Remetente, tipo e texto só vêm em `Ready`.
@@ -227,6 +238,14 @@ impl RoomTimeline {
 
     pub async fn cancel(&self, item_id: String) -> Result<(), TimelineError> {
         self.handle.cancel(&item_id).await
+    }
+
+    pub async fn toggle_reaction(
+        &self,
+        item_id: String,
+        key: String,
+    ) -> Result<(), TimelineError> {
+        self.handle.toggle_reaction(&item_id, &key).await
     }
 
     pub async fn mark_as_read(&self) -> Result<(), TimelineError> {

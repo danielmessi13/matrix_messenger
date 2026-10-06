@@ -81,7 +81,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1962965601;
+  int get rustContentHash => -2107176948;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -244,6 +244,12 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiTimelineRoomTimelineSetTyping({
     required RoomTimeline that,
     required bool typing,
+  });
+
+  Future<void> crateApiTimelineRoomTimelineToggleReaction({
+    required RoomTimeline that,
+    required String itemId,
+    required String key,
   });
 
   Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
@@ -1599,6 +1605,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiTimelineRoomTimelineToggleReaction({
+    required RoomTimeline that,
+    required String itemId,
+    required String key,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_String(itemId, serializer);
+          sse_encode_String(key, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 36,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineToggleReactionConstMeta,
+        argValues: [that, itemId, key],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineToggleReactionConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_toggle_reaction",
+        argNames: ["that", "itemId", "key"],
+      );
+
+  @override
   Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
     required RoomTimeline that,
   }) {
@@ -1616,7 +1662,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 36,
+              funcId: 37,
               port: port_,
             );
           },
@@ -1657,7 +1703,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 37,
+              funcId: 38,
               port: port_,
             );
           },
@@ -1689,7 +1735,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 39,
             port: port_,
           );
         },
@@ -2110,6 +2156,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<Reaction> dco_decode_list_reaction(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_reaction).toList();
+  }
+
+  @protected
   List<RecentThread> dco_decode_list_recent_thread(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_recent_thread).toList();
@@ -2266,6 +2318,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_32(raw);
+  }
+
+  @protected
+  Reaction dco_decode_reaction(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return Reaction(
+      key: dco_decode_String(arr[0]),
+      count: dco_decode_u_32(arr[1]),
+      reactedByMe: dco_decode_bool(arr[2]),
+      senderNames: dco_decode_list_String(arr[3]),
+    );
   }
 
   @protected
@@ -2478,8 +2544,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TimelineMessage dco_decode_timeline_message(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 15)
-      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
+    if (arr.length != 17)
+      throw Exception('unexpected arr length: expect 17 but see ${arr.length}');
     return TimelineMessage(
       id: dco_decode_String(arr[0]),
       eventId: dco_decode_opt_String(arr[1]),
@@ -2496,6 +2562,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       replyTo: dco_decode_opt_box_autoadd_reply_preview(arr[12]),
       readBy: dco_decode_list_String(arr[13]),
       image: dco_decode_opt_box_autoadd_image_content(arr[14]),
+      reactions: dco_decode_list_reaction(arr[15]),
+      canReact: dco_decode_bool(arr[16]),
     );
   }
 
@@ -2981,6 +3049,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<Reaction> sse_decode_list_reaction(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <Reaction>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_reaction(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<RecentThread> sse_decode_list_recent_thread(
     SseDeserializer deserializer,
   ) {
@@ -3231,6 +3311,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Reaction sse_decode_reaction(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_key = sse_decode_String(deserializer);
+    var var_count = sse_decode_u_32(deserializer);
+    var var_reactedByMe = sse_decode_bool(deserializer);
+    var var_senderNames = sse_decode_list_String(deserializer);
+    return Reaction(
+      key: var_key,
+      count: var_count,
+      reactedByMe: var_reactedByMe,
+      senderNames: var_senderNames,
+    );
+  }
+
+  @protected
   RecentThread sse_decode_recent_thread(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_roomId = sse_decode_String(deserializer);
@@ -3478,6 +3573,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_replyTo = sse_decode_opt_box_autoadd_reply_preview(deserializer);
     var var_readBy = sse_decode_list_String(deserializer);
     var var_image = sse_decode_opt_box_autoadd_image_content(deserializer);
+    var var_reactions = sse_decode_list_reaction(deserializer);
+    var var_canReact = sse_decode_bool(deserializer);
     return TimelineMessage(
       id: var_id,
       eventId: var_eventId,
@@ -3494,6 +3591,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       replyTo: var_replyTo,
       readBy: var_readBy,
       image: var_image,
+      reactions: var_reactions,
+      canReact: var_canReact,
     );
   }
 
@@ -4053,6 +4152,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_reaction(List<Reaction> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_reaction(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_recent_thread(
     List<RecentThread> self,
     SseSerializer serializer,
@@ -4284,6 +4392,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_reaction(Reaction self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.key, serializer);
+    sse_encode_u_32(self.count, serializer);
+    sse_encode_bool(self.reactedByMe, serializer);
+    sse_encode_list_String(self.senderNames, serializer);
+  }
+
+  @protected
   void sse_encode_recent_thread(RecentThread self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.roomId, serializer);
@@ -4481,6 +4598,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_reply_preview(self.replyTo, serializer);
     sse_encode_list_String(self.readBy, serializer);
     sse_encode_opt_box_autoadd_image_content(self.image, serializer);
+    sse_encode_list_reaction(self.reactions, serializer);
+    sse_encode_bool(self.canReact, serializer);
   }
 
   @protected
@@ -4743,6 +4862,13 @@ class RoomTimelineImpl extends RustOpaque implements RoomTimeline {
 
   Future<void> setTyping({required bool typing}) => RustLib.instance.api
       .crateApiTimelineRoomTimelineSetTyping(that: this, typing: typing);
+
+  Future<void> toggleReaction({required String itemId, required String key}) =>
+      RustLib.instance.api.crateApiTimelineRoomTimelineToggleReaction(
+        that: this,
+        itemId: itemId,
+        key: key,
+      );
 
   Stream<TimelineSnapshot> watch() =>
       RustLib.instance.api.crateApiTimelineRoomTimelineWatch(

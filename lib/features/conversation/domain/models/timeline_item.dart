@@ -103,6 +103,27 @@ class ImageContent extends Equatable {
   ];
 }
 
+class MessageReaction extends Equatable {
+  const MessageReaction({
+    required this.key,
+    required this.count,
+    this.reactedByMe = false,
+    this.senderNames = const [],
+  });
+
+  final String key;
+
+  final int count;
+
+  final bool reactedByMe;
+
+  // Sem o próprio usuário; "você" entra pelo [reactedByMe].
+  final List<String> senderNames;
+
+  @override
+  List<Object?> get props => [key, count, reactedByMe, senderNames];
+}
+
 sealed class TimelineItem extends Equatable {
   const TimelineItem();
 }
@@ -133,6 +154,8 @@ final class MessageItem extends TimelineItem {
     this.replyTo,
     this.readBy = const [],
     this.image,
+    this.reactions = const [],
+    this.canReact = false,
   });
 
   final String id;
@@ -165,6 +188,10 @@ final class MessageItem extends TimelineItem {
 
   final ImageContent? image;
 
+  final List<MessageReaction> reactions;
+
+  final bool canReact;
+
   @override
   List<Object?> get props => [
     id,
@@ -182,6 +209,8 @@ final class MessageItem extends TimelineItem {
     replyTo,
     readBy,
     image,
+    reactions,
+    canReact,
   ];
 }
 

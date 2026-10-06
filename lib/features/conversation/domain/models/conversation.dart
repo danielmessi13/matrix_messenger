@@ -20,6 +20,8 @@ abstract interface class Conversation {
 
   Future<Result<void>> cancel(String messageId);
 
+  Future<Result<void>> toggleReaction(String messageId, String key);
+
   Future<void> markAsRead();
 
   Future<void> setTyping(bool typing);

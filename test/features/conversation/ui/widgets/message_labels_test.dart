@@ -195,4 +195,40 @@ void main() {
     );
     expect(typingLabel(['Diego Alves']), 'Diego está digitando…');
   });
+
+  group('reactionTooltip', () {
+    MessageReaction reaction(List<String> names, {bool mine = false}) =>
+        MessageReaction(
+          key: '👍',
+          count: names.length + (mine ? 1 : 0),
+          reactedByMe: mine,
+          senderNames: names,
+        );
+
+    test('um nome', () => expect(reactionTooltip(reaction(['Ana'])), 'Ana'));
+    test(
+      'só eu',
+      () => expect(reactionTooltip(reaction([], mine: true)), 'você'),
+    );
+    test('dois com você', () {
+      expect(reactionTooltip(reaction(['Ana'], mine: true)), 'Ana e você');
+    });
+    test('três sem você', () {
+      expect(
+        reactionTooltip(reaction(['Ana', 'Bruno', 'Caio'])),
+        'Ana, Bruno e Caio',
+      );
+    });
+    test('dez listam todos', () {
+      final names = [for (var i = 0; i < 9; i++) 'P$i'];
+      expect(
+        reactionTooltip(reaction(names, mine: true)),
+        'P0, P1, P2, P3, P4, P5, P6, P7, P8 e você',
+      );
+    });
+    test('mais de dez resumem', () {
+      final names = [for (var i = 0; i < 11; i++) 'P$i'];
+      expect(reactionTooltip(reaction(names)), 'P0, P1 e mais 9');
+    });
+  });
 }

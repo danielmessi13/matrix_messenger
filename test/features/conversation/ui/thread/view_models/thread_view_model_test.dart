@@ -288,4 +288,17 @@ void main() {
     expect(thread.cancelled, ['txn2']);
     await viewModel.close();
   });
+
+  test('toggleReaction repassa o id e o resultado', () async {
+    final viewModel = await opened();
+
+    expect(await viewModel.toggleReaction('\$r1', '❤️'), isTrue);
+    thread.reactResult = const Result.error(
+      FakeConversationRepository.notFound,
+    );
+    expect(await viewModel.toggleReaction('\$r1', '❤️'), isFalse);
+
+    expect(thread.reacted, [('\$r1', '❤️'), ('\$r1', '❤️')]);
+    await viewModel.close();
+  });
 }

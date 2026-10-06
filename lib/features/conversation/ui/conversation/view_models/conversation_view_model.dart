@@ -184,6 +184,9 @@ class ConversationViewModel extends Cubit<ConversationState> {
   Future<bool> cancel(String messageId) async =>
       await _conversation?.cancel(messageId) is Ok;
 
+  Future<bool> toggleReaction(String messageId, String key) async =>
+      await _conversation?.toggleReaction(messageId, key) is Ok;
+
   void onDraftChanged(String text) =>
       unawaited(_setTyping(text.trim().isNotEmpty));
 

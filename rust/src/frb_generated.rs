@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1962965601;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2107176948;
 
 // Section: executor
 
@@ -2022,6 +2022,68 @@ fn wire__crate__api__timeline__RoomTimeline_set_typing_impl(
         },
     )
 }
+fn wire__crate__api__timeline__RoomTimeline_toggle_reaction_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RoomTimeline_toggle_reaction",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RoomTimeline>,
+            >>::sse_decode(&mut deserializer);
+            let api_item_id = <String>::sse_decode(&mut deserializer);
+            let api_key = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::timeline::TimelineError>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = crate::api::timeline::RoomTimeline::toggle_reaction(
+                            &*api_that_guard,
+                            api_item_id,
+                            api_key,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__timeline__RoomTimeline_watch_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2571,6 +2633,18 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Vec<crate::api::timeline::Reaction> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::timeline::Reaction>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::threads::RecentThread> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2832,6 +2906,22 @@ impl SseDecode for Option<u32> {
         } else {
             return None;
         }
+    }
+}
+
+impl SseDecode for crate::api::timeline::Reaction {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_key = <String>::sse_decode(deserializer);
+        let mut var_count = <u32>::sse_decode(deserializer);
+        let mut var_reactedByMe = <bool>::sse_decode(deserializer);
+        let mut var_senderNames = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::timeline::Reaction {
+            key: var_key,
+            count: var_count,
+            reacted_by_me: var_reactedByMe,
+            sender_names: var_senderNames,
+        };
     }
 }
 
@@ -3171,6 +3261,8 @@ impl SseDecode for crate::api::timeline::TimelineMessage {
             <Option<crate::api::timeline::ReplyPreview>>::sse_decode(deserializer);
         let mut var_readBy = <Vec<String>>::sse_decode(deserializer);
         let mut var_image = <Option<crate::api::timeline::ImageContent>>::sse_decode(deserializer);
+        let mut var_reactions = <Vec<crate::api::timeline::Reaction>>::sse_decode(deserializer);
+        let mut var_canReact = <bool>::sse_decode(deserializer);
         return crate::api::timeline::TimelineMessage {
             id: var_id,
             event_id: var_eventId,
@@ -3187,6 +3279,8 @@ impl SseDecode for crate::api::timeline::TimelineMessage {
             reply_to: var_replyTo,
             read_by: var_readBy,
             image: var_image,
+            reactions: var_reactions,
+            can_react: var_canReact,
         };
     }
 }
@@ -3411,16 +3505,22 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        36 => {
-            wire__crate__api__timeline__RoomTimeline_watch_impl(port, ptr, rust_vec_len, data_len)
-        }
-        37 => wire__crate__api__timeline__RoomTimeline_watch_typing_impl(
+        36 => wire__crate__api__timeline__RoomTimeline_toggle_reaction_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        38 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
+        37 => {
+            wire__crate__api__timeline__RoomTimeline_watch_impl(port, ptr, rust_vec_len, data_len)
+        }
+        38 => wire__crate__api__timeline__RoomTimeline_watch_typing_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        39 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3892,6 +3992,29 @@ impl flutter_rust_bridge::IntoDart for crate::api::rooms::NewRoom {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::rooms::NewRoom {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::rooms::NewRoom> for crate::api::rooms::NewRoom {
     fn into_into_dart(self) -> crate::api::rooms::NewRoom {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::timeline::Reaction {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.key.into_into_dart().into_dart(),
+            self.count.into_into_dart().into_dart(),
+            self.reacted_by_me.into_into_dart().into_dart(),
+            self.sender_names.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::timeline::Reaction
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::timeline::Reaction>
+    for crate::api::timeline::Reaction
+{
+    fn into_into_dart(self) -> crate::api::timeline::Reaction {
         self
     }
 }
@@ -4380,6 +4503,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::timeline::TimelineMessage {
             self.reply_to.into_into_dart().into_dart(),
             self.read_by.into_into_dart().into_dart(),
             self.image.into_into_dart().into_dart(),
+            self.reactions.into_into_dart().into_dart(),
+            self.can_react.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4809,6 +4934,16 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Vec<crate::api::timeline::Reaction> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::timeline::Reaction>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::threads::RecentThread> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5025,6 +5160,16 @@ impl SseEncode for Option<u32> {
         if let Some(value) = self {
             <u32>::sse_encode(value, serializer);
         }
+    }
+}
+
+impl SseEncode for crate::api::timeline::Reaction {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.key, serializer);
+        <u32>::sse_encode(self.count, serializer);
+        <bool>::sse_encode(self.reacted_by_me, serializer);
+        <Vec<String>>::sse_encode(self.sender_names, serializer);
     }
 }
 
@@ -5335,6 +5480,8 @@ impl SseEncode for crate::api::timeline::TimelineMessage {
         <Option<crate::api::timeline::ReplyPreview>>::sse_encode(self.reply_to, serializer);
         <Vec<String>>::sse_encode(self.read_by, serializer);
         <Option<crate::api::timeline::ImageContent>>::sse_encode(self.image, serializer);
+        <Vec<crate::api::timeline::Reaction>>::sse_encode(self.reactions, serializer);
+        <bool>::sse_encode(self.can_react, serializer);
     }
 }
 

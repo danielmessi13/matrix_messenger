@@ -30,8 +30,10 @@ class FakeConversation implements Conversation {
   void Function()? onLoadOlder;
   final retried = <String>[];
   final cancelled = <String>[];
+  final reacted = <(String, String)>[];
   Result<void> retryResult = const Result.ok(null);
   Result<void> cancelResult = const Result.ok(null);
+  Result<void> reactResult = const Result.ok(null);
   int markAsReadCalls = 0;
   Result<Conversation>? threadResult;
   final openedThreads = <String>[];
@@ -77,6 +79,12 @@ class FakeConversation implements Conversation {
   Future<Result<void>> cancel(String messageId) async {
     cancelled.add(messageId);
     return cancelResult;
+  }
+
+  @override
+  Future<Result<void>> toggleReaction(String messageId, String key) async {
+    reacted.add((messageId, key));
+    return reactResult;
   }
 
   @override

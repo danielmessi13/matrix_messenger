@@ -14,6 +14,7 @@ class FakeRoomTimeline implements RoomTimeline {
   final images = <(String, String?)>[];
   final retried = <String>[];
   final cancelled = <String>[];
+  final reactions = <(String, String)>[];
   int markAsReadCalls = 0;
   final openedThreads = <String>[];
   RoomTimeline? thread;
@@ -58,6 +59,15 @@ class FakeRoomTimeline implements RoomTimeline {
 
   @override
   Future<void> cancel({required String itemId}) async => cancelled.add(itemId);
+
+  @override
+  Future<void> toggleReaction({
+    required String itemId,
+    required String key,
+  }) async {
+    _throwIfError();
+    reactions.add((itemId, key));
+  }
 
   @override
   Future<void> markAsRead() async => markAsReadCalls++;

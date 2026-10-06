@@ -1491,4 +1491,35 @@ void main() {
       expect(find.byKey(summary), findsOneWidget);
     });
   });
+
+  testWidgets('clicar no chip de reação reage pela conversa', (tester) async {
+    await pump(tester, kTeamRoom);
+    await show(
+      tester,
+      ConversationSnapshot(
+        items: [
+          MessageItem(
+            id: '\$other',
+            eventId: '\$other',
+            senderId: '@diego:matrix.org',
+            senderName: 'Diego Alves',
+            isOwn: false,
+            timestamp: DateTime(2026, 10, 4, 10, 5),
+            kind: MessageKind.text,
+            body: 'A integração ficou pronta.',
+            canReact: true,
+            reactions: const [
+              MessageReaction(key: '👍', count: 1, reactedByMe: true),
+            ],
+          ),
+        ],
+        reachedStart: true,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('reaction_\$other_👍')));
+    await tester.pump();
+
+    expect(repository.conversation.reacted, [('\$other', '👍')]);
+  });
 }
