@@ -6,13 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
+import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
+import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
+import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../testing/models/room.dart';
 import '../../../../../testing/models/user_session.dart';
@@ -20,15 +25,18 @@ import '../../../../../testing/models/user_session.dart';
 void main() {
   late FakeAuthRepository authRepository;
   late FakeRoomRepository roomRepository;
+  late FakeRecoveryRepository recoveryRepository;
 
   setUp(() {
     authRepository = FakeAuthRepository(savedSession: kUserSession);
     roomRepository = FakeRoomRepository();
+    recoveryRepository = FakeRecoveryRepository();
   });
 
   tearDown(() async {
     await authRepository.dispose();
     await roomRepository.dispose();
+    await recoveryRepository.dispose();
   });
 
   Future<void> pumpScreen(
@@ -42,8 +50,16 @@ void main() {
     addTearDown(viewModel.close);
     addTearDown(roomListViewModel.close);
     await tester.pumpWidget(
-      RepositoryProvider<AuthRepository>.value(
-        value: authRepository,
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<AuthRepository>.value(value: authRepository),
+          RepositoryProvider<RecoveryRepository>.value(
+            value: recoveryRepository,
+          ),
+          RepositoryProvider<ConversationRepository>.value(
+            value: FakeConversationRepository(),
+          ),
+        ],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: HomeScreen(
@@ -237,4 +253,19 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'mostra o banner de recuperação quando o backup está incompleto',
+    (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      expect(find.byKey(const Key('recovery_banner')), findsNothing);
+
+      recoveryRepository.statusController.add(RecoveryStatus.incomplete);
+      await tester.pump();
+
+      expect(find.byKey(const Key('recovery_banner')), findsOneWidget);
+    },
+  );
 }

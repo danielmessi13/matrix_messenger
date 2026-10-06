@@ -4,10 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/app.dart';
 import 'package:matrix_messenger/core/services/browser_launcher.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
+import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
+import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 
 import '../../testing/desktop_size.dart';
 import '../../testing/fakes/repositories/fake_auth_repository.dart';
+import '../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../testing/fakes/services/fake_browser_launcher.dart';
 import '../../testing/models/user_session.dart';
@@ -21,11 +25,19 @@ void main() {
     final roomRepository = FakeRoomRepository();
     addTearDown(repository.dispose);
     addTearDown(roomRepository.dispose);
+    final recoveryRepository = FakeRecoveryRepository();
+    addTearDown(recoveryRepository.dispose);
     await tester.pumpWidget(
       MultiRepositoryProvider(
         providers: [
           RepositoryProvider<AuthRepository>.value(value: repository),
           RepositoryProvider<RoomRepository>.value(value: roomRepository),
+          RepositoryProvider<RecoveryRepository>.value(
+            value: recoveryRepository,
+          ),
+          RepositoryProvider<ConversationRepository>.value(
+            value: FakeConversationRepository(),
+          ),
           RepositoryProvider<BrowserLauncher>.value(
             value: FakeBrowserLauncher(),
           ),
@@ -47,6 +59,6 @@ void main() {
   ) async {
     await pumpApp(tester, FakeAuthRepository(savedSession: kUserSession));
 
-    expect(find.byTooltip('@alice:matrix.org'), findsOneWidget);
+    expect(find.text('alice'), findsOneWidget);
   });
 }

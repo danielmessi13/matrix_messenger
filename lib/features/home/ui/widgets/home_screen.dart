@@ -7,6 +7,9 @@ import '../../../auth/data/repositories/auth_repository.dart';
 import '../../../auth/ui/logout/view_models/logout_view_model.dart';
 import '../../../auth/ui/logout/widgets/user_menu.dart';
 import '../../../conversation/ui/widgets/conversation_pane.dart';
+import '../../../recovery/data/repositories/recovery_repository.dart';
+import '../../../recovery/ui/view_models/recovery_view_model.dart';
+import '../../../recovery/ui/widgets/recovery_banner.dart';
 import '../../../rooms/ui/room_list/view_models/room_list_state.dart';
 import '../../../rooms/ui/room_list/view_models/room_list_view_model.dart';
 import '../../../rooms/ui/room_list/widgets/filter_rail.dart';
@@ -49,8 +52,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final rooms = widget.roomListViewModel;
     final isMac = defaultTargetPlatform == TargetPlatform.macOS;
-    return BlocProvider(
-      create: (context) => LogoutViewModel(context.read<AuthRepository>()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => LogoutViewModel(context.read<AuthRepository>()),
+        ),
+        BlocProvider(
+          create: (context) =>
+              RecoveryViewModel(context.read<RecoveryRepository>())..init(),
+        ),
+      ],
       child: CallbackShortcuts(
         bindings: {
           SingleActivator(
@@ -86,6 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SessionWarningBanner(
                             onDismiss: widget.viewModel.dismissSessionWarning,
                           ),
+                        RecoveryBanner(
+                          viewModel: context.read<RecoveryViewModel>(),
+                        ),
                         Expanded(
                           child: _Panes(
                             home: home,
@@ -159,7 +173,9 @@ class _Panes extends StatelessWidget {
         onSelect: roomListViewModel.selectRoom,
         onToggle: viewModel.toggleRoomList,
       ),
-      Expanded(child: ConversationPane(room: list.selectedRoom)),
+      Expanded(
+        child: ConversationPane(room: list.selectedRoom, now: now),
+      ),
     ],
   );
 }
