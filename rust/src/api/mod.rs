@@ -5,4 +5,5 @@ pub mod media;
 pub mod oidc;
 pub mod recovery;
 pub mod rooms;
+pub mod search;
 pub mod timeline;

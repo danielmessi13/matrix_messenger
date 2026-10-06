@@ -302,11 +302,15 @@ class _Panes extends StatelessWidget {
             onToggle: panes.list
                 ? viewModel.toggleRoomList
                 : () => viewModel.expandRoomList(width: box.maxWidth),
+            onOpenMessage: roomListViewModel.openMessage,
+            onLoadMoreMessages: roomListViewModel.loadMoreMessages,
+            onRetryMessages: roomListViewModel.retryMessageSearch,
           ),
           Expanded(
             child: ConversationPane(
               room: list.selectedRoom,
               now: now,
+              focus: list.focus,
               onThreadOpenChanged: viewModel.threadVisibilityChanged,
             ),
           ),

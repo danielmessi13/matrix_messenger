@@ -414,6 +414,32 @@ void main() {
     expect(viewModel.state.focusRequest, const FocusRequest('\$own', 1));
   });
 
+  test('focusEvent espera a conversa abrir e então foca', () async {
+    final viewModel = build();
+    addTearDown(viewModel.close);
+    unawaited(viewModel.open());
+
+    final focusing = viewModel.focusEvent('\$own');
+    await flush();
+    expect(viewModel.state.focusRequest, isNull);
+
+    conversation.snapshots.add(kSnapshot);
+    await focusing;
+
+    expect(viewModel.state.focusRequest, const FocusRequest('\$own', 1));
+  });
+
+  test('focusEvent em conversa que falhou ao abrir não foca', () async {
+    repository.openFailure = FakeConversationRepository.notFound;
+    final viewModel = build();
+    addTearDown(viewModel.close);
+
+    await viewModel.focusEvent('\$own');
+
+    expect(viewModel.state.status, ConversationStatus.failed);
+    expect(viewModel.state.focusRequest, isNull);
+  });
+
   test('goTo pagina e avisa quando não acha', () async {
     final viewModel = await ready();
     conversation.loadOlderResult = const Result.ok(true);

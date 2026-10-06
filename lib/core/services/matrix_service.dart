@@ -10,6 +10,7 @@ import '../../src/rust/api/media.dart';
 import '../../src/rust/api/oidc.dart';
 import '../../src/rust/api/recovery.dart';
 import '../../src/rust/api/rooms.dart';
+import '../../src/rust/api/search.dart';
 import '../../src/rust/api/timeline.dart';
 import '../utils/result.dart';
 import 'local_storage_exception.dart';
@@ -150,6 +151,15 @@ class MatrixService {
     return client.joinRoom(target: target);
   });
 
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  }) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.searchMessages(term: term, nextBatch: nextBatch);
+  });
+
   Future<Result<void>> logout() => _guard(() async {
     final client = _client;
     if (client == null) return;
@@ -210,5 +220,6 @@ class MatrixService {
       error is InviteError ||
       error is CreateRoomError ||
       error is JoinRoomError ||
+      error is SearchError ||
       error is LocalStorageException;
 }

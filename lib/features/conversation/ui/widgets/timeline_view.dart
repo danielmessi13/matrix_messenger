@@ -51,6 +51,7 @@ class _TimelineViewState extends State<TimelineView>
     super.initState();
     _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOlderIfNeeded());
+    if (widget.state.focusRequest case final request?) focusOn(request);
   }
 
   @override

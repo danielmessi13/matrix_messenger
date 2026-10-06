@@ -3,11 +3,14 @@ import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository_matrix.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/create_room_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/join_room_failure.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_search_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/user_check.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart' as bridge;
+import 'package:matrix_messenger/src/rust/api/search.dart' as search;
 
 import '../../../../../testing/fakes/services/fake_matrix_service.dart';
 
@@ -230,5 +233,72 @@ void main() {
       ((result as Error).error as JoinRoomFailure).type,
       JoinRoomFailureType.unknown,
     );
+  });
+
+  test('busca de mensagens converte a página e repassa o next_batch', () async {
+    service.searchMessagesResult = const Result.ok(
+      search.MessageSearchPage(
+        hits: [
+          search.MessageHit(
+            roomId: '!a:b.c',
+            roomName: 'Geral',
+            isDirect: true,
+            eventId: r'$e',
+            senderName: 'Bob',
+            isOwn: false,
+            body: 'deploy',
+            timestampMs: 1000,
+          ),
+        ],
+        nextBatch: 'b3',
+      ),
+    );
+
+    final result = await repository.searchMessages('deploy', nextBatch: 'b2');
+
+    expect(
+      (result as Ok<MessageSearchPage>).value,
+      MessageSearchPage(
+        hits: [
+          MessageHit(
+            roomId: '!a:b.c',
+            roomName: 'Geral',
+            isDirect: true,
+            eventId: r'$e',
+            senderName: 'Bob',
+            body: 'deploy',
+            timestamp: DateTime.fromMillisecondsSinceEpoch(1000),
+          ),
+        ],
+        nextBatch: 'b3',
+      ),
+    );
+    expect(service.searches, [('deploy', 'b2')]);
+  });
+
+  test('falha na busca vira MessageSearchFailure com o tipo', () async {
+    for (final (error, type) in [
+      (
+        const search.SearchError(
+          kind: search.SearchErrorKind.network,
+          message: 'x',
+        ),
+        MessageSearchFailureType.network,
+      ),
+      (
+        const search.SearchError(
+          kind: search.SearchErrorKind.unknown,
+          message: 'x',
+        ),
+        MessageSearchFailureType.unknown,
+      ),
+      (Exception('sem sessão'), MessageSearchFailureType.unknown),
+    ]) {
+      service.searchMessagesResult = Result.error(error);
+
+      final result = await repository.searchMessages('deploy');
+
+      expect(((result as Error).error as MessageSearchFailure).type, type);
+    }
   });
 }

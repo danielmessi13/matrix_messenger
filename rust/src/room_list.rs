@@ -13,7 +13,7 @@ use matrix_sdk::{
     ruma::{
         api::FeatureFlag,
         events::{room::message::MessageType, AnySyncMessageLikeEvent, AnySyncTimelineEvent},
-        OwnedUserId,
+        UserId,
     },
     Client, Room, RoomDisplayName, RoomHeroWithProfile, RoomState,
 };
@@ -348,18 +348,20 @@ fn count(value: u64) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
 
-async fn summarize(room: &Room) -> RoomSummary {
-    // Vazio quando a sala não tem nome nem outros membros; o Dart mostra o texto traduzido.
-    let name = match room.display_name().await {
+pub(crate) async fn room_name(room: &Room) -> String {
+    match room.display_name().await {
         Ok(RoomDisplayName::Named(name))
         | Ok(RoomDisplayName::Aliased(name))
         | Ok(RoomDisplayName::Calculated(name))
         | Ok(RoomDisplayName::EmptyWas(name)) => name,
         Ok(RoomDisplayName::Empty) | Err(_) => String::new(),
-    };
+    }
+}
+
+async fn summarize(room: &Room) -> RoomSummary {
     RoomSummary {
         id: room.room_id().to_string(),
-        name,
+        name: room_name(room).await,
         is_direct: room.is_dm(),
         is_invite: room.state() == RoomState::Invited,
         is_public: room.is_public().unwrap_or(false),
@@ -401,7 +403,7 @@ async fn latest_message(room: &Room) -> Option<LatestMessage> {
     })
 }
 
-async fn sender_name(room: &Room, sender: &OwnedUserId) -> String {
+pub(crate) async fn sender_name(room: &Room, sender: &UserId) -> String {
     match room.get_member_no_sync(sender).await {
         Ok(Some(member)) => member.name().to_owned(),
         _ => sender.localpart().to_owned(),

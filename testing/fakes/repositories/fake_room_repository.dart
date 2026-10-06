@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
@@ -95,6 +96,24 @@ class FakeRoomRepository implements RoomRepository {
     joinedTargets.add(target);
     await joinRoomGate?.future;
     return joinRoomResult;
+  }
+
+  Result<MessageSearchPage> searchResult = const Result.ok(
+    MessageSearchPage(hits: []),
+  );
+
+  Completer<void>? searchGate;
+
+  final searches = <(String, String?)>[];
+
+  @override
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  }) async {
+    searches.add((term, nextBatch));
+    await searchGate?.future;
+    return searchResult;
   }
 
   Future<void> dispose() async {

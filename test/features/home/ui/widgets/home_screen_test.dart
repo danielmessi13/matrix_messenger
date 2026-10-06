@@ -9,11 +9,13 @@ import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
+import 'package:matrix_messenger/features/conversation/ui/widgets/focus_flash.dart';
 import 'package:matrix_messenger/features/home/ui/view_models/home_view_model.dart';
 import 'package:matrix_messenger/features/home/ui/widgets/home_screen.dart';
 import 'package:matrix_messenger/features/recovery/data/repositories/recovery_repository.dart';
 import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/new_room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
@@ -118,16 +120,47 @@ void main() {
     expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
   });
 
-  testWidgets('busca filtra pelo nome', (tester) async {
+  testWidgets('busca no servidor e o resultado abre a sala focada', (
+    tester,
+  ) async {
+    roomRepository.searchResult = Result.ok(
+      MessageSearchPage(
+        hits: [
+          MessageHit(
+            roomId: kTeamRoom.id,
+            roomName: kTeamRoom.name,
+            eventId: kOtherMessage.eventId!,
+            senderName: kOtherMessage.senderName,
+            body: 'A integração com o gateway novo ficou pronta.',
+            timestamp: kOtherMessage.timestamp,
+          ),
+        ],
+      ),
+    );
     await pumpScreen(tester);
     await showRooms(tester);
 
-    await tester.enterText(find.byKey(const Key('room_search')), 'design');
+    await tester.enterText(find.byKey(const Key('room_search')), 'gateway');
+    await tester.pump(kMessageSearchDebounce);
     await tester.pump();
 
-    expect(find.byKey(Key('room_${kQuietRoom.id}')), findsOneWidget);
+    expect(roomRepository.searches, [('gateway', null)]);
     expect(find.byKey(Key('room_${kTeamRoom.id}')), findsNothing);
-    expect(find.text('Resultados'), findsOneWidget);
+    final hit = find.byKey(Key('message_hit_${kOtherMessage.eventId}'));
+    expect(hit, findsOneWidget);
+
+    await tester.tap(hit);
+    await tester.pump();
+    conversationRepository.conversation.snapshots.add(kSnapshot);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('conversation_title')), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) => w is MessageHighlight && w.flashing),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 2));
   });
 
   const desktopPlatforms = TargetPlatformVariant({

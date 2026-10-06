@@ -10,6 +10,7 @@ import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/room.dart';
 import '../../../rooms/ui/invite/view_models/invite_view_model.dart';
 import '../../../rooms/ui/invite/widgets/invite_actions.dart';
+import '../../../rooms/ui/room_list/view_models/message_search_state.dart';
 import '../../../rooms/ui/room_list/widgets/room_labels.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../domain/models/timeline_item.dart';
@@ -30,12 +31,15 @@ class ConversationPane extends StatelessWidget {
     super.key,
     required this.room,
     required this.now,
+    this.focus,
     this.onThreadOpenChanged,
   });
 
   final Room? room;
 
   final DateTime now;
+
+  final EventFocus? focus;
 
   // A home recolhe a lista de salas para a thread caber ao lado.
   final ValueChanged<bool>? onThreadOpenChanged;
@@ -75,9 +79,12 @@ class ConversationPane extends StatelessWidget {
             context.read<ConversationRepository>(),
             room.id,
           )..open(),
-          child: _ThreadVisibility(
-            onChanged: onThreadOpenChanged,
-            child: _Conversation(room: room, now: now),
+          child: _FocusOnEvent(
+            focus: focus,
+            child: _ThreadVisibility(
+              onChanged: onThreadOpenChanged,
+              child: _Conversation(room: room, now: now),
+            ),
           ),
         ),
       },
@@ -90,6 +97,41 @@ class ConversationPane extends StatelessWidget {
     fontSize: size,
     color: colors.textMuted,
   );
+}
+
+class _FocusOnEvent extends StatefulWidget {
+  const _FocusOnEvent({required this.focus, required this.child});
+
+  final EventFocus? focus;
+
+  final Widget child;
+
+  @override
+  State<_FocusOnEvent> createState() => _FocusOnEventState();
+}
+
+class _FocusOnEventState extends State<_FocusOnEvent> {
+  @override
+  void initState() {
+    super.initState();
+    _focus();
+  }
+
+  @override
+  void didUpdateWidget(_FocusOnEvent old) {
+    super.didUpdateWidget(old);
+    if (widget.focus != old.focus) _focus();
+  }
+
+  void _focus() {
+    final eventId = widget.focus?.eventId;
+    if (eventId != null) {
+      context.read<ConversationViewModel>().focusEvent(eventId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _ThreadVisibility extends StatefulWidget {

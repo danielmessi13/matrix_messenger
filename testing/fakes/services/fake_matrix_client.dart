@@ -5,6 +5,7 @@ import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/search.dart';
 import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 import 'fake_room_timeline.dart';
@@ -140,6 +141,14 @@ class FakeMatrixClient implements MatrixClient {
 
   @override
   Future<UserCheck> checkUser({required String userId}) async => userCheck;
+
+  MessageSearchPage searchPage = const MessageSearchPage(hits: []);
+
+  @override
+  Future<MessageSearchPage> searchMessages({
+    required String term,
+    String? nextBatch,
+  }) async => searchPage;
 
   final loadedMedia = <(String, bool)>[];
 

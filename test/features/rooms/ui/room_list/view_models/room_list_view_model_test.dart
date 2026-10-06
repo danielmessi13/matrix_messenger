@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/core/utils/result.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_hit.dart';
+import 'package:matrix_messenger/features/rooms/domain/models/message_search_failure.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room_filter.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
+import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/message_search_state.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_state.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
 
@@ -36,22 +42,6 @@ void main() {
     expect: () => const [RoomListState(syncState: SyncState.offline)],
   );
 
-  test('filtro e busca combinados, sem diferenciar acento nem maiúscula', () {
-    final state = RoomListState(
-      rooms: kRooms,
-      loaded: true,
-      filter: RoomFilter.rooms,
-      query: 'LANCAMENTO',
-    );
-    expect(state.visibleRooms, [kTeamRoom]);
-    expect(state.searching, isTrue);
-  });
-
-  test('busca sem resultado deixa a lista visível vazia', () {
-    final state = RoomListState(rooms: kRooms, loaded: true, query: 'xyz');
-    expect(state.visibleRooms, isEmpty);
-  });
-
   test('não lidas por filtro somam o contador de cada filtro', () {
     final state = RoomListState(
       rooms: [
@@ -84,7 +74,17 @@ void main() {
     act: (viewModel) => viewModel
       ..search('ana')
       ..clearSearch(),
-    expect: () => const [RoomListState(query: 'ana'), RoomListState()],
+    expect: () => const [
+      RoomListState(query: 'ana'),
+      RoomListState(
+        query: 'ana',
+        messages: MessageSearch(status: MessageSearchStatus.loading),
+      ),
+      RoomListState(
+        messages: MessageSearch(status: MessageSearchStatus.loading),
+      ),
+      RoomListState(),
+    ],
   );
 
   blocTest<RoomListViewModel, RoomListState>(
@@ -212,5 +212,202 @@ void main() {
 
     expect(viewModel.state.selectedRoomId, kTeamRoom.id);
     expect(viewModel.state.pendingRoomId, isNull);
+  });
+
+  group('busca de mensagens', () {
+    MessageHit hit(
+      String eventId, {
+      String roomId = '!lancamento:matrix.org',
+    }) => MessageHit(
+      roomId: roomId,
+      roomName: 'lançamento-q4',
+      eventId: eventId,
+      senderName: 'Diego',
+      body: 'deploy',
+      timestamp: DateTime(2026, 10, 4),
+    );
+
+    blocTest<RoomListViewModel, RoomListState>(
+      'digitando rápido faz uma busca só, com o último termo',
+      setUp: () => repository.searchResult = Result.ok(
+        MessageSearchPage(hits: [hit(r'$a')], nextBatch: 'b2'),
+      ),
+      build: () => RoomListViewModel(repository),
+      act: (viewModel) => viewModel
+        ..search('de')
+        ..search('dep')
+        ..search('deploy '),
+      wait: kMessageSearchDebounce + const Duration(milliseconds: 50),
+      skip: 4,
+      expect: () => [
+        RoomListState(
+          query: 'deploy ',
+          messages: MessageSearch(
+            status: MessageSearchStatus.ready,
+            hits: [hit(r'$a')],
+            nextBatch: 'b2',
+          ),
+        ),
+      ],
+      verify: (_) => expect(repository.searches, [('deploy', null)]),
+    );
+
+    blocTest<RoomListViewModel, RoomListState>(
+      'mudar só espaços no fim não busca de novo',
+      build: () => RoomListViewModel(repository, debounce: Duration.zero),
+      act: (viewModel) async {
+        viewModel.search('deploy');
+        await pumpEventQueue();
+        viewModel.search('deploy  ');
+        await pumpEventQueue();
+      },
+      verify: (viewModel) {
+        expect(repository.searches, [('deploy', null)]);
+        expect(viewModel.state.messages.status, MessageSearchStatus.ready);
+      },
+    );
+
+    blocTest<RoomListViewModel, RoomListState>(
+      'erro vira falha com o tipo e tentar de novo busca outra vez',
+      setUp: () => repository.searchResult = const Result.error(
+        MessageSearchFailure(MessageSearchFailureType.network),
+      ),
+      build: () => RoomListViewModel(repository),
+      seed: () => const RoomListState(
+        query: 'deploy',
+      ),
+      act: (viewModel) async {
+        viewModel.retryMessageSearch();
+        await pumpEventQueue();
+        repository.searchResult = const Result.ok(MessageSearchPage(hits: []));
+        viewModel.retryMessageSearch();
+        await pumpEventQueue();
+      },
+      expect: () => const [
+        RoomListState(
+          query: 'deploy',
+          messages: MessageSearch(status: MessageSearchStatus.loading),
+        ),
+        RoomListState(
+          query: 'deploy',
+          messages: MessageSearch(
+            status: MessageSearchStatus.failed,
+            failure: MessageSearchFailureType.network,
+          ),
+        ),
+        RoomListState(
+          query: 'deploy',
+          messages: MessageSearch(status: MessageSearchStatus.loading),
+        ),
+        RoomListState(
+          query: 'deploy',
+          messages: MessageSearch(status: MessageSearchStatus.ready),
+        ),
+      ],
+    );
+
+    blocTest<RoomListViewModel, RoomListState>(
+      'mais resultados acrescenta a próxima página pelo next_batch',
+      setUp: () => repository.searchResult = Result.ok(
+        MessageSearchPage(hits: [hit(r'$b')]),
+      ),
+      build: () => RoomListViewModel(repository),
+      seed: () => RoomListState(
+        query: 'deploy',
+        messages: MessageSearch(
+          status: MessageSearchStatus.ready,
+          hits: [hit(r'$a')],
+          nextBatch: 'b2',
+        ),
+      ),
+      act: (viewModel) => viewModel.loadMoreMessages(),
+      expect: () => [
+        RoomListState(
+          query: 'deploy',
+          messages: MessageSearch(
+            status: MessageSearchStatus.ready,
+            hits: [hit(r'$a')],
+            nextBatch: 'b2',
+            loadingMore: true,
+          ),
+        ),
+        RoomListState(
+          query: 'deploy',
+          messages: MessageSearch(
+            status: MessageSearchStatus.ready,
+            hits: [hit(r'$a'), hit(r'$b')],
+          ),
+        ),
+      ],
+      verify: (_) => expect(repository.searches, [('deploy', 'b2')]),
+    );
+
+    test('resposta de uma busca já substituída é descartada', () async {
+      final gate = repository.searchGate = Completer<void>();
+      repository.searchResult = Result.ok(
+        MessageSearchPage(hits: [hit(r'$velho')]),
+      );
+      final viewModel = RoomListViewModel(repository, debounce: Duration.zero)
+        ..search('velho');
+      addTearDown(viewModel.close);
+      await pumpEventQueue();
+      expect(repository.searches, [('velho', null)]);
+
+      viewModel.clearSearch();
+      gate.complete();
+      await pumpEventQueue();
+
+      expect(viewModel.state.messages, const MessageSearch());
+    });
+
+    blocTest<RoomListViewModel, RoomListState>(
+      'abrir resultado seleciona a sala e pede o foco; tocar na sala limpa',
+      build: () => RoomListViewModel(repository),
+      seed: () => RoomListState(rooms: kRooms, loaded: true),
+      act: (viewModel) => viewModel
+        ..openMessage(hit(r'$fora', roomId: '!sumiu:b.c'))
+        ..openMessage(hit(r'$a', roomId: kTeamRoom.id))
+        ..openMessage(hit(r'$a', roomId: kTeamRoom.id))
+        ..selectRoom(kTeamRoom.id),
+      expect: () => [
+        RoomListState(
+          rooms: kRooms,
+          loaded: true,
+          selectedRoomId: kTeamRoom.id,
+          focus: const EventFocus(r'$a', 1),
+        ),
+        RoomListState(
+          rooms: kRooms,
+          loaded: true,
+          selectedRoomId: kTeamRoom.id,
+          focus: const EventFocus(r'$a', 2),
+        ),
+        RoomListState(
+          rooms: kRooms,
+          loaded: true,
+          selectedRoomId: kTeamRoom.id,
+        ),
+      ],
+    );
+
+    test('sala nova que chega depois descarta o foco da busca', () async {
+      final viewModel = RoomListViewModel(repository)..init();
+      addTearDown(viewModel.close);
+      repository.roomsController.add(kRooms);
+      await pumpEventQueue();
+      viewModel
+        ..openMessage(hit(r'$a', roomId: kTeamRoom.id))
+        ..selectWhenAvailable('!nova:b.c');
+      expect(viewModel.state.focus, isNotNull);
+
+      repository.roomsController.add([
+        ...kRooms,
+        const Room(id: '!nova:b.c', name: 'Plantão'),
+      ]);
+      await pumpEventQueue();
+
+      expect(viewModel.state.selectedRoomId, '!nova:b.c');
+      expect(viewModel.state.focus, isNull);
+    });
   });
 }

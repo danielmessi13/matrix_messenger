@@ -9,6 +9,7 @@ import 'api/media.dart';
 import 'api/oidc.dart';
 import 'api/recovery.dart';
 import 'api/rooms.dart';
+import 'api/search.dart';
 import 'api/timeline.dart';
 
 import 'dart:async';
@@ -212,6 +213,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<MessageHit> dco_decode_list_message_hit(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -227,7 +231,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MediaErrorKind dco_decode_media_error_kind(dynamic raw);
 
   @protected
+  MessageHit dco_decode_message_hit(dynamic raw);
+
+  @protected
   MessageKind dco_decode_message_kind(dynamic raw);
+
+  @protected
+  MessageSearchPage dco_decode_message_search_page(dynamic raw);
 
   @protected
   NewRoom dco_decode_new_room(dynamic raw);
@@ -291,6 +301,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RoomSummary dco_decode_room_summary(dynamic raw);
+
+  @protected
+  SearchError dco_decode_search_error(dynamic raw);
+
+  @protected
+  SearchErrorKind dco_decode_search_error_kind(dynamic raw);
 
   @protected
   SendState dco_decode_send_state(dynamic raw);
@@ -526,6 +542,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<MessageHit> sse_decode_list_message_hit(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -543,7 +562,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MediaErrorKind sse_decode_media_error_kind(SseDeserializer deserializer);
 
   @protected
+  MessageHit sse_decode_message_hit(SseDeserializer deserializer);
+
+  @protected
   MessageKind sse_decode_message_kind(SseDeserializer deserializer);
+
+  @protected
+  MessageSearchPage sse_decode_message_search_page(
+    SseDeserializer deserializer,
+  );
 
   @protected
   NewRoom sse_decode_new_room(SseDeserializer deserializer);
@@ -623,6 +650,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer);
+
+  @protected
+  SearchError sse_decode_search_error(SseDeserializer deserializer);
+
+  @protected
+  SearchErrorKind sse_decode_search_error_kind(SseDeserializer deserializer);
 
   @protected
   SendState sse_decode_send_state(SseDeserializer deserializer);
@@ -904,6 +937,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_message_hit(
+    List<MessageHit> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -931,7 +970,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_message_hit(MessageHit self, SseSerializer serializer);
+
+  @protected
   void sse_encode_message_kind(MessageKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_message_search_page(
+    MessageSearchPage self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_new_room(NewRoom self, SseSerializer serializer);
@@ -1026,6 +1074,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_error(SearchError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_error_kind(
+    SearchErrorKind self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_send_state(SendState self, SseSerializer serializer);

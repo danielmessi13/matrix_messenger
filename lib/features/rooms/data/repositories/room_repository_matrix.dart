@@ -1,8 +1,11 @@
 import '../../../../core/services/matrix_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../src/rust/api/rooms.dart' as bridge;
+import '../../../../src/rust/api/search.dart' as search;
 import '../../domain/models/create_room_failure.dart';
 import '../../domain/models/join_room_failure.dart';
+import '../../domain/models/message_hit.dart';
+import '../../domain/models/message_search_failure.dart';
 import '../../domain/models/new_room.dart';
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
@@ -79,6 +82,46 @@ class RoomRepositoryMatrix implements RoomRepository {
         return Result.error(_toJoinFailure(error));
     }
   }
+
+  @override
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  }) async {
+    switch (await _service.searchMessages(term, nextBatch: nextBatch)) {
+      case Ok(:final value):
+        return Result.ok(
+          MessageSearchPage(
+            hits: List.unmodifiable(value.hits.map(_toHit)),
+            nextBatch: value.nextBatch,
+          ),
+        );
+      case Error(:final error):
+        return Result.error(_toSearchFailure(error));
+    }
+  }
+
+  MessageHit _toHit(search.MessageHit hit) => MessageHit(
+    roomId: hit.roomId,
+    roomName: hit.roomName,
+    isDirect: hit.isDirect,
+    eventId: hit.eventId,
+    senderName: hit.senderName,
+    isOwn: hit.isOwn,
+    body: hit.body,
+    timestamp: DateTime.fromMillisecondsSinceEpoch(hit.timestampMs),
+  );
+
+  MessageSearchFailure _toSearchFailure(Exception error) => switch (error) {
+    search.SearchError(:final kind, :final message) => MessageSearchFailure(
+      switch (kind) {
+        search.SearchErrorKind.network => MessageSearchFailureType.network,
+        search.SearchErrorKind.unknown => MessageSearchFailureType.unknown,
+      },
+      message,
+    ),
+    _ => MessageSearchFailure(MessageSearchFailureType.unknown, '$error'),
+  };
 
   JoinRoomFailure _toJoinFailure(Exception error) => switch (error) {
     bridge.JoinRoomError(:final kind, :final message) => JoinRoomFailure(

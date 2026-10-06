@@ -260,6 +260,19 @@ class ConversationViewModel extends Cubit<ConversationState> {
     emit(state.copyWith(focusRequest: FocusRequest(id, ++_focusSeq)));
   }
 
+  Future<void> focusEvent(String eventId) async {
+    await open();
+    if (state.status == ConversationStatus.opening) {
+      await stream
+          .firstWhere((s) => s.status != ConversationStatus.opening)
+          .then((_) {}, onError: (Object _) {});
+    }
+    if (_closing || isClosed || state.status != ConversationStatus.ready) {
+      return;
+    }
+    await goTo(eventId);
+  }
+
   // Esc: resposta na thread, depois resposta na conversa, depois o painel.
   bool escape() {
     final thread = _thread;

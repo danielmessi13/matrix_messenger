@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../app/theme.dart';
 import '../../../../../core/ui/animated_pane.dart';
+import '../../../domain/models/message_hit.dart';
 import '../view_models/room_list_state.dart';
 import 'room_list_collapsed.dart';
 import 'room_list_expanded.dart';
@@ -18,6 +19,9 @@ class RoomListPane extends StatelessWidget {
     required this.now,
     required this.onSelect,
     required this.onToggle,
+    required this.onOpenMessage,
+    required this.onLoadMoreMessages,
+    required this.onRetryMessages,
   });
 
   final bool expanded;
@@ -29,6 +33,12 @@ class RoomListPane extends StatelessWidget {
   final ValueChanged<String> onSelect;
 
   final VoidCallback onToggle;
+
+  final ValueChanged<MessageHit> onOpenMessage;
+
+  final VoidCallback onLoadMoreMessages;
+
+  final VoidCallback onRetryMessages;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +60,9 @@ class RoomListPane extends StatelessWidget {
         now: now,
         onSelect: onSelect,
         onToggle: onToggle,
+        onOpenMessage: onOpenMessage,
+        onLoadMoreMessages: onLoadMoreMessages,
+        onRetryMessages: onRetryMessages,
       ),
       compactChild: RoomListCollapsed(
         state: state,

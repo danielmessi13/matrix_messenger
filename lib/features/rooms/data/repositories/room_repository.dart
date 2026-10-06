@@ -1,4 +1,5 @@
 import '../../../../core/utils/result.dart';
+import '../../domain/models/message_hit.dart';
 import '../../domain/models/new_room.dart';
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
@@ -20,4 +21,9 @@ abstract interface class RoomRepository {
   Future<String?> roomLink(String roomId);
 
   Future<Result<String>> joinRoom(String target);
+
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  });
 }

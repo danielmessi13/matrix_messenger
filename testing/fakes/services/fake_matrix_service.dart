@@ -6,6 +6,7 @@ import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/src/rust/api/client.dart';
 import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/search.dart';
 import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 import '../../models/user_session.dart';
@@ -166,6 +167,21 @@ class FakeMatrixService implements MatrixService {
   Future<Result<String>> joinRoom(String target) async {
     joinedTargets.add(target);
     return joinRoomResult;
+  }
+
+  Result<MessageSearchPage> searchMessagesResult = const Result.ok(
+    MessageSearchPage(hits: []),
+  );
+
+  final searches = <(String, String?)>[];
+
+  @override
+  Future<Result<MessageSearchPage>> searchMessages(
+    String term, {
+    String? nextBatch,
+  }) async {
+    searches.add((term, nextBatch));
+    return searchMessagesResult;
   }
 
   Future<void> dispose() async {

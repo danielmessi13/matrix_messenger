@@ -11,6 +11,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'recovery.dart';
 import 'rooms.dart';
+import 'search.dart';
 import 'timeline.dart';
 
 // These functions are ignored because they are not marked as `pub`: `find_room`, `forget`, `new`, `new`, `run_blocking`, `save_on_refresh`, `save_tokens`, `stored`, `watch_action`, `watch_session`
@@ -57,6 +58,11 @@ abstract class MatrixClient implements RustOpaqueInterface {
       );
 
   Future<String?> roomLink({required String roomId});
+
+  Future<MessageSearchPage> searchMessages({
+    required String term,
+    String? nextBatch,
+  });
 
   Stream<SessionEvent> sessionEvents();
 
