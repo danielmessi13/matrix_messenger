@@ -15,7 +15,7 @@ use matrix_sdk::{
         OAuthError,
     },
     ruma::{api::error::ErrorKind, OwnedRoomId},
-    AuthSession, Client, ClientBuildError, HttpError, SessionChange,
+    AuthSession, Client, ClientBuildError, HttpError, Room, SessionChange,
 };
 use tokio::{
     runtime::Handle,
@@ -26,7 +26,7 @@ use tokio::{
 use crate::{
     api::{
         recovery::{self, RecoveryError, RecoveryStatus},
-        rooms::{RoomSummary, SyncStatus},
+        rooms::{InviteError, InviteErrorKind, RoomSummary, SyncStatus},
         timeline::{RoomTimeline, TimelineError, TimelineErrorKind},
     },
     frb_generated::StreamSink,
@@ -193,12 +193,32 @@ impl MatrixClient {
     }
 
     pub async fn open_timeline(&self, room_id: String) -> Result<RoomTimeline, TimelineError> {
-        let room = OwnedRoomId::try_from(room_id.as_str())
-            .ok()
-            .and_then(|room_id| self.client.get_room(&room_id))
+        let room = self
+            .find_room(&room_id)
             .ok_or_else(|| TimelineError::new(TimelineErrorKind::RoomNotFound, room_id))?;
         let handle = TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone()).await?;
         Ok(RoomTimeline::new(handle))
+    }
+
+    pub async fn accept_invite(&self, room_id: String) -> Result<(), InviteError> {
+        Ok(self.invited_room(room_id)?.join().await?)
+    }
+
+    pub async fn decline_invite(&self, room_id: String) -> Result<(), InviteError> {
+        Ok(self.invited_room(room_id)?.leave().await?)
+    }
+
+    fn invited_room(&self, room_id: String) -> Result<Room, InviteError> {
+        self.find_room(&room_id).ok_or(InviteError {
+            kind: InviteErrorKind::RoomNotFound,
+            message: room_id,
+        })
+    }
+
+    fn find_room(&self, room_id: &str) -> Option<Room> {
+        OwnedRoomId::try_from(room_id)
+            .ok()
+            .and_then(|room_id| self.client.get_room(&room_id))
     }
 
     #[cfg(test)]
@@ -540,7 +560,8 @@ mod tests {
     use super::*;
     use matrix_sdk::{
         authentication::oauth::{ClientId, OAuthSession, UserSession},
-        ruma::api::error::UnknownTokenErrorData,
+        ruma::{api::error::UnknownTokenErrorData, room_id},
+        RoomState,
     };
 
     use crate::api::timeline::{SendState, TimelineErrorKind};
@@ -669,6 +690,71 @@ mod tests {
         for room_id in ["!naoexiste:b.c", "isto não é um id"] {
             let error = client.open_timeline(room_id.to_owned()).await.err().unwrap();
             assert_eq!(error.kind, TimelineErrorKind::RoomNotFound, "{room_id}");
+        }
+    }
+
+    async fn client_with_invite(
+        server: &matrix_sdk::test_utils::mocks::MatrixMockServer,
+        name: &str,
+    ) -> (MatrixClient, Room) {
+        use matrix_sdk_test::InvitedRoomBuilder;
+
+        let client = server.client_builder().build().await;
+        let room = server
+            .sync_room(&client, InvitedRoomBuilder::new(room_id!("!convite:example.org")))
+            .await;
+        (MatrixClient::new(client, temp_data_dir(name), None), room)
+    }
+
+    #[tokio::test]
+    async fn accept_invite_joins_the_room() {
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let (client, room) = client_with_invite(&server, "accept_invite").await;
+        server.mock_room_join(room.room_id()).ok().expect(1).mount().await;
+
+        client.accept_invite(room.room_id().to_string()).await.unwrap();
+
+        assert_eq!(room.state(), RoomState::Joined);
+    }
+
+    #[tokio::test]
+    async fn decline_invite_leaves_and_forgets_the_room() {
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let (client, room) = client_with_invite(&server, "decline_invite").await;
+        server.mock_room_leave().ok(room.room_id()).expect(1).mount().await;
+        server.mock_room_forget().ok().expect(1).mount().await;
+
+        client.decline_invite(room.room_id().to_string()).await.unwrap();
+
+        assert!(client.find_room(room.room_id().as_str()).is_none());
+    }
+
+    #[tokio::test]
+    async fn failed_accept_invite_is_network_error() {
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let (client, room) = client_with_invite(&server, "accept_invite_fails").await;
+        server.mock_room_join(room.room_id()).error500().mount().await;
+
+        let error = client.accept_invite(room.room_id().to_string()).await.unwrap_err();
+
+        assert_eq!(error.kind, InviteErrorKind::Network);
+        assert_eq!(room.state(), RoomState::Invited);
+    }
+
+    #[tokio::test]
+    async fn invite_of_unknown_room_is_room_not_found() {
+        let store_path = std::path::PathBuf::from(temp_data_dir("invite_unknown")).join("store");
+        let client = MatrixClient::new(
+            offline_client(&store_path).await,
+            temp_data_dir("invite_unknown_data"),
+            None,
+        );
+
+        for room_id in ["!naoexiste:b.c", "isto não é um id"] {
+            let accept = client.accept_invite(room_id.to_owned()).await.unwrap_err();
+            let decline = client.decline_invite(room_id.to_owned()).await.unwrap_err();
+            assert_eq!(accept.kind, InviteErrorKind::RoomNotFound, "{room_id}");
+            assert_eq!(decline.kind, InviteErrorKind::RoomNotFound, "{room_id}");
         }
     }
 

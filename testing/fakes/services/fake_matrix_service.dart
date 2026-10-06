@@ -97,6 +97,24 @@ class FakeMatrixService implements MatrixService {
   Future<Result<RoomTimeline>> openTimeline(String roomId) async =>
       openTimelineResult;
 
+  Result<void> inviteResult = const Result.ok(null);
+
+  final accepted = <String>[];
+
+  final declined = <String>[];
+
+  @override
+  Future<Result<void>> acceptInvite(String roomId) async {
+    accepted.add(roomId);
+    return inviteResult;
+  }
+
+  @override
+  Future<Result<void>> declineInvite(String roomId) async {
+    declined.add(roomId);
+    return inviteResult;
+  }
+
   Future<void> dispose() async {
     await revokedController.close();
     await roomsController.close();

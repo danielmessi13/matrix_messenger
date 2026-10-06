@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/rooms/data/repositories/room_repository_matrix.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/sync_state.dart';
@@ -73,5 +74,13 @@ void main() {
       SyncState.unsupported,
       SyncState.error,
     ]);
+  });
+
+  test('aceitar e recusar convite repassam ao serviço', () async {
+    expect(await repository.acceptInvite('!a:b.c'), isA<Ok<void>>());
+    expect(await repository.declineInvite('!b:b.c'), isA<Ok<void>>());
+
+    expect(service.accepted, ['!a:b.c']);
+    expect(service.declined, ['!b:b.c']);
   });
 }

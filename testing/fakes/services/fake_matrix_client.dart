@@ -84,6 +84,28 @@ class FakeMatrixClient implements MatrixClient {
     return openTimelineResult ?? FakeRoomTimeline();
   }
 
+  Object? inviteError;
+
+  final accepted = <String>[];
+
+  final declined = <String>[];
+
+  @override
+  Future<void> acceptInvite({required String roomId}) async {
+    accepted.add(roomId);
+    if (inviteError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  @override
+  Future<void> declineInvite({required String roomId}) async {
+    declined.add(roomId);
+    if (inviteError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
   @override
   void dispose() {
     isDisposed = true;

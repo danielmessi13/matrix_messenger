@@ -169,6 +169,40 @@ void main() {
     expect(await service.openTimeline('!a:b.c'), isA<Error<RoomTimeline>>());
   });
 
+  test('acceptInvite e declineInvite chamam o cliente atual', () async {
+    final client = FakeMatrixClient.of(kUserSession);
+    bridge.loginClient = client;
+    await login();
+
+    expect(await service.acceptInvite('!a:b.c'), isA<Ok<void>>());
+    expect(await service.declineInvite('!b:b.c'), isA<Ok<void>>());
+
+    expect(client.accepted, ['!a:b.c']);
+    expect(client.declined, ['!b:b.c']);
+  });
+
+  test('acceptInvite devolve o InviteError do Rust', () async {
+    final client = FakeMatrixClient.of(kUserSession);
+    client.inviteError = const InviteError(
+      kind: InviteErrorKind.network,
+      message: 'offline',
+    );
+    bridge.loginClient = client;
+    await login();
+
+    final result = await service.acceptInvite('!a:b.c');
+
+    expect(
+      (result as Error<void>).error,
+      isA<InviteError>().having((e) => e.kind, 'kind', InviteErrorKind.network),
+    );
+  });
+
+  test('responder convite sem cliente é erro', () async {
+    expect(await service.acceptInvite('!a:b.c'), isA<Error<void>>());
+    expect(await service.declineInvite('!a:b.c'), isA<Error<void>>());
+  });
+
   test('recover devolve o RecoveryError do Rust', () async {
     final client = FakeMatrixClient.of(kUserSession);
     client.recoverError = const RecoveryError(

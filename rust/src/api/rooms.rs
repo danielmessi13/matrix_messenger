@@ -38,3 +38,29 @@ pub enum SyncStatus {
     Unsupported,
     Error,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InviteErrorKind {
+    RoomNotFound,
+    Network,
+    Unknown,
+}
+
+#[derive(Debug)]
+pub struct InviteError {
+    pub kind: InviteErrorKind,
+    pub message: String,
+}
+
+impl From<matrix_sdk::Error> for InviteError {
+    fn from(error: matrix_sdk::Error) -> Self {
+        let kind = match error {
+            matrix_sdk::Error::Http(_) => InviteErrorKind::Network,
+            _ => InviteErrorKind::Unknown,
+        };
+        Self {
+            kind,
+            message: error.to_string(),
+        }
+    }
+}

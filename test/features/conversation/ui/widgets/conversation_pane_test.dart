@@ -8,17 +8,25 @@ import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
 import 'package:matrix_messenger/features/conversation/domain/models/timeline_item.dart';
 import 'package:matrix_messenger/features/conversation/ui/widgets/conversation_pane.dart';
+import 'package:matrix_messenger/features/rooms/data/repositories/room_repository.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
+import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
 import '../../../../../testing/models/message.dart';
 import '../../../../../testing/models/room.dart';
 
 void main() {
   late FakeConversationRepository repository;
+  late FakeRoomRepository rooms;
 
-  setUp(() => repository = FakeConversationRepository());
+  setUp(() {
+    repository = FakeConversationRepository();
+    rooms = FakeRoomRepository();
+  });
+
+  tearDown(() => rooms.dispose());
 
   Future<void> pump(
     WidgetTester tester,
@@ -27,8 +35,11 @@ void main() {
   }) async {
     useDesktopSize(tester, size);
     await tester.pumpWidget(
-      RepositoryProvider<ConversationRepository>.value(
-        value: repository,
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<ConversationRepository>.value(value: repository),
+          RepositoryProvider<RoomRepository>.value(value: rooms),
+        ],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: Scaffold(
@@ -99,6 +110,57 @@ void main() {
     expect(find.text('Você foi convidado para esta sala.'), findsOneWidget);
     expect(find.byKey(const Key('message_field')), findsNothing);
     expect(repository.openedRooms, isEmpty);
+  });
+
+  testWidgets('aceitar convite mostra indicador e trava os botões', (
+    tester,
+  ) async {
+    rooms.inviteGate = Completer<void>();
+    await pump(tester, kInviteRoom);
+
+    await tester.tap(find.byKey(const Key('invite_accept')));
+    await tester.pump();
+
+    expect(rooms.accepted, [kInviteRoom.id]);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Aceitar'), findsNothing);
+    final decline = tester.widget<OutlinedButton>(
+      find.byKey(const Key('invite_decline')),
+    );
+    expect(decline.onPressed, isNull);
+    rooms.inviteGate!.complete();
+  });
+
+  testWidgets('recusar convite chama o repositório', (tester) async {
+    await pump(tester, kInviteRoom);
+
+    await tester.tap(find.byKey(const Key('invite_decline')));
+    await tester.pump();
+
+    expect(rooms.declined, [kInviteRoom.id]);
+  });
+
+  testWidgets('falha ao responder convite mostra a mensagem', (tester) async {
+    rooms.inviteResult = Result.error(Exception('rede'));
+    await pump(tester, kInviteRoom);
+
+    await tester.tap(find.byKey(const Key('invite_accept')));
+    await tester.pump();
+
+    expect(find.text('Não foi possível responder ao convite.'), findsOneWidget);
+    expect(find.text('Aceitar'), findsOneWidget);
+  });
+
+  testWidgets('convite aceito vira conversa', (tester) async {
+    await pump(tester, kInviteRoom);
+
+    await pump(
+      tester,
+      Room(id: kInviteRoom.id, name: kInviteRoom.name),
+    );
+
+    expect(repository.openedRooms, [kInviteRoom.id]);
+    expect(find.byKey(const Key('invite_accept')), findsNothing);
   });
 
   testWidgets('enviar pelo campo chama a conversa', (tester) async {

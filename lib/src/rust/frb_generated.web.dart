@@ -162,6 +162,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  InviteError dco_decode_invite_error(dynamic raw);
+
+  @protected
+  InviteErrorKind dco_decode_invite_error_kind(dynamic raw);
+
+  @protected
   LatestMessage dco_decode_latest_message(dynamic raw);
 
   @protected
@@ -395,6 +401,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  InviteError sse_decode_invite_error(SseDeserializer deserializer);
+
+  @protected
+  InviteErrorKind sse_decode_invite_error_kind(SseDeserializer deserializer);
 
   @protected
   LatestMessage sse_decode_latest_message(SseDeserializer deserializer);
@@ -678,6 +690,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_invite_error(InviteError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_invite_error_kind(
+    InviteErrorKind self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_latest_message(LatestMessage self, SseSerializer serializer);

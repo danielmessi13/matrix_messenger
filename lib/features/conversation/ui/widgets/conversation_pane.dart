@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../rooms/data/repositories/room_repository.dart';
 import '../../../rooms/domain/models/room.dart';
+import '../../../rooms/ui/invite/view_models/invite_view_model.dart';
+import '../../../rooms/ui/invite/widgets/invite_actions.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../conversation/view_models/conversation_state.dart';
 import '../conversation/view_models/conversation_view_model.dart';
@@ -36,9 +39,11 @@ class ConversationPane extends StatelessWidget {
             ConversationHeader(room: room),
             Expanded(
               child: Center(
-                child: Text(
-                  'Você foi convidado para esta sala.',
-                  style: _italic(colors, 17),
+                child: BlocProvider(
+                  key: ValueKey(room.id),
+                  create: (context) =>
+                      InviteViewModel(context.read<RoomRepository>(), room.id),
+                  child: const InviteActions(),
                 ),
               ),
             ),

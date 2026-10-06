@@ -102,6 +102,18 @@ class MatrixService {
     return client.openTimeline(roomId: roomId);
   });
 
+  Future<Result<void>> acceptInvite(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    await client.acceptInvite(roomId: roomId);
+  });
+
+  Future<Result<void>> declineInvite(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    await client.declineInvite(roomId: roomId);
+  });
+
   Future<Result<void>> logout() => _guard(() async {
     final client = _client;
     if (client == null) return;
@@ -158,5 +170,6 @@ class MatrixService {
       error is AuthError ||
       error is TimelineError ||
       error is RecoveryError ||
+      error is InviteError ||
       error is LocalStorageException;
 }

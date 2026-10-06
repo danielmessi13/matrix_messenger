@@ -11,12 +11,16 @@ import 'recovery.dart';
 import 'rooms.dart';
 import 'timeline.dart';
 
-// These functions are ignored because they are not marked as `pub`: `finish_new_login`, `forget`, `login_new_device`, `new`, `new`, `new`, `remove_failed_store`, `run_blocking`, `save_on_refresh`, `save_tokens`, `storage`, `stored`, `watch_action`, `watch_session`
+// These functions are ignored because they are not marked as `pub`: `find_room`, `finish_new_login`, `forget`, `invited_room`, `login_new_device`, `new`, `new`, `new`, `remove_failed_store`, `run_blocking`, `save_on_refresh`, `save_tokens`, `storage`, `stored`, `watch_action`, `watch_session`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Vault`, `WatchAction`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `drop`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MatrixClient>>
 abstract class MatrixClient implements RustOpaqueInterface {
+  Future<void> acceptInvite({required String roomId});
+
+  Future<void> declineInvite({required String roomId});
+
   String get deviceId;
 
   static Future<MatrixClient> login({

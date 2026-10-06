@@ -1,4 +1,5 @@
 import '../../../../core/services/matrix_service.dart';
+import '../../../../core/utils/result.dart';
 import '../../../../src/rust/api/rooms.dart' as bridge;
 import '../../domain/models/room.dart';
 import '../../domain/models/sync_state.dart';
@@ -17,6 +18,14 @@ class RoomRepositoryMatrix implements RoomRepository {
   @override
   Stream<SyncState> get syncState =>
       _service.watchSyncStatus().map(_toSyncState);
+
+  @override
+  Future<Result<void>> acceptInvite(String roomId) =>
+      _service.acceptInvite(roomId);
+
+  @override
+  Future<Result<void>> declineInvite(String roomId) =>
+      _service.declineInvite(roomId);
 
   Room _toRoom(bridge.RoomSummary summary) => Room(
     id: summary.id,
