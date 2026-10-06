@@ -67,6 +67,15 @@ void main() {
     await viewModel.close();
   });
 
+  test('guarda qual thread está aberta', () async {
+    final viewModel = HomeViewModel(kUserSession)..openThreadChanged(r'$raiz');
+
+    expect(viewModel.state.openThreadId, r'$raiz');
+    viewModel.openThreadChanged(null);
+    expect(viewModel.state.openThreadId, isNull);
+    await viewModel.close();
+  });
+
   test(
     'abrir a lista à mão com a thread aberta deixa a thread por cima',
     () async {

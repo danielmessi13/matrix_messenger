@@ -72,25 +72,4 @@ void main() {
 
     expect(toggles, 1);
   });
-
-  testWidgets('Threads não mostra número mesmo com valor no mapa', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: Scaffold(
-          body: FilterRail(
-            expanded: true,
-            selected: RoomFilter.inbox,
-            unreadByFilter: const {RoomFilter.threads: 7},
-            onSelect: (_) {},
-            onToggle: () {},
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('7'), findsNothing);
-  });
 }

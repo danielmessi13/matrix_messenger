@@ -315,6 +315,7 @@ class _Panes extends StatelessWidget {
                 state: threads,
                 rooms: list.rooms,
                 selectedRoomId: list.selectedRoomId,
+                openThreadId: home.openThreadId,
                 now: now,
                 onSelect: (thread) => roomListViewModel.selectThread(
                   thread.roomId,
@@ -346,6 +347,7 @@ class _Panes extends StatelessWidget {
               focus: list.focus,
               threadRequest: list.threadRequest,
               onThreadOpenChanged: viewModel.threadVisibilityChanged,
+              onOpenThreadChanged: viewModel.openThreadChanged,
             ),
           ),
         ],

@@ -360,8 +360,7 @@ impl Inner {
             .filter(|thread| thread.room_id == room_id.as_str())
             .filter_map(|thread| OwnedEventId::try_from(thread.root_event_id.as_str()).ok())
             .filter(|root| {
-                root == target
-                    || latest.get(&(room_id.clone(), root.clone())) == Some(target)
+                root == target || latest.get(&(room_id.clone(), root.clone())) == Some(target)
             })
             .collect()
     }
@@ -1286,7 +1285,12 @@ mod tests {
             .contains(&(room_id.to_owned(), event_id!("$root").to_owned())));
     }
 
-    fn root_with_latest(f: &EventFactory, root: &EventId, latest: &EventId, body: &str) -> TimelineEvent {
+    fn root_with_latest(
+        f: &EventFactory,
+        root: &EventId,
+        latest: &EventId,
+        body: &str,
+    ) -> TimelineEvent {
         f.text_msg("raiz")
             .sender(user_id!("@bob:b.c"))
             .event_id(root)
@@ -1321,7 +1325,16 @@ mod tests {
     }
 
     fn latest_body(threads: &RecentThreads) -> Option<String> {
-        threads.inner.snapshot.borrow().threads.first()?.latest_reply.as_ref()?.body.clone()
+        threads
+            .inner
+            .snapshot
+            .borrow()
+            .threads
+            .first()?
+            .latest_reply
+            .as_ref()?
+            .body
+            .clone()
     }
 
     #[tokio::test]
@@ -1335,7 +1348,12 @@ mod tests {
             .mock_room_event()
             .room(room_id)
             .match_event_id()
-            .ok(root_with_latest(&f, event_id!("$raiz"), event_id!("$r0"), "anterior"))
+            .ok(root_with_latest(
+                &f,
+                event_id!("$raiz"),
+                event_id!("$r0"),
+                "anterior",
+            ))
             .expect(1)
             .mount()
             .await;
@@ -1362,7 +1380,12 @@ mod tests {
             .mock_room_event()
             .room(room_id)
             .match_event_id()
-            .ok(root_with_latest(&f, event_id!("$raiz"), event_id!("$r1"), "editada"))
+            .ok(root_with_latest(
+                &f,
+                event_id!("$raiz"),
+                event_id!("$r1"),
+                "editada",
+            ))
             .expect(1)
             .mount()
             .await;
@@ -1384,7 +1407,10 @@ mod tests {
         .unwrap();
 
         server
-            .sync_room(&client, JoinedRoomBuilder::new(room_id).add_timeline_event(edit))
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_timeline_event(edit),
+            )
             .await;
 
         wait_until(|| async { latest_body(&threads).as_deref() == Some("editada") }).await;

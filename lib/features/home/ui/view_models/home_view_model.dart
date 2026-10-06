@@ -33,6 +33,11 @@ class HomeViewModel extends Cubit<HomeState> {
     emit(state.copyWith(threadOpen: open, panesOverThreadWidth: null));
   }
 
+  void openThreadChanged(String? rootEventId) {
+    if (isClosed) return;
+    emit(state.copyWith(openThreadId: rootEventId));
+  }
+
   void dismissSessionWarning() =>
       emit(state.copyWith(sessionWarningDismissed: true));
 

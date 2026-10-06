@@ -38,6 +38,7 @@ void main() {
     Room? room, {
     Size size = const Size(1440, 900),
     ThreadRequest? threadRequest,
+    ValueChanged<String?>? onOpenThreadChanged,
   }) async {
     useDesktopSize(tester, size);
     await tester.pumpWidget(
@@ -53,6 +54,7 @@ void main() {
               room: room,
               now: kDay.add(const Duration(hours: 12)),
               threadRequest: threadRequest,
+              onOpenThreadChanged: onOpenThreadChanged,
             ),
           ),
         ),
@@ -81,6 +83,24 @@ void main() {
     );
     // Pedido novo para a thread já aberta não reabre (openThread ignora a mesma raiz).
     expect(repository.conversation.openedThreads, [r'$raiz']);
+  });
+
+  testWidgets('avisa qual thread abriu e quando fecha', (tester) async {
+    final opened = <String?>[];
+    final request = ThreadRequest(roomId: kTeamRoom.id, rootEventId: r'$raiz');
+    await pump(
+      tester,
+      kTeamRoom,
+      threadRequest: request,
+      onOpenThreadChanged: opened.add,
+    );
+    await tester.pump();
+
+    expect(opened, [r'$raiz']);
+
+    await pump(tester, kDirectRoom, onOpenThreadChanged: opened.add);
+    await tester.pump();
+    expect(opened, [r'$raiz', null]);
   });
 
   testWidgets('pedido de thread de outra sala é ignorado', (tester) async {

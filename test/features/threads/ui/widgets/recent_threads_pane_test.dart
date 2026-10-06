@@ -22,6 +22,8 @@ void main() {
     WidgetTester tester,
     RecentThreadsState state, {
     bool expanded = true,
+    String? selectedRoomId,
+    String? openThreadId,
   }) async {
     useDesktopSize(tester, const Size(1440, 900));
     await tester.pumpWidget(
@@ -34,7 +36,8 @@ void main() {
                 expanded: expanded,
                 state: state,
                 rooms: [kTeamRoom, kDirectRoom],
-                selectedRoomId: null,
+                selectedRoomId: selectedRoomId,
+                openThreadId: openThreadId,
                 now: kNow,
                 onSelect: selected.add,
                 onRetry: () => retries++,
@@ -221,5 +224,40 @@ void main() {
       find.byTooltip('# lançamento-q4\nCarla: Quem revisa o deck?'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('destaca só a thread aberta, não as outras da mesma sala', (
+    tester,
+  ) async {
+    final other = RecentThread(
+      roomId: kTeamThread.roomId,
+      rootEventId: r'$outra-raiz',
+      root: kTeamThread.root,
+      replyCount: 0,
+      activity: kNow,
+    );
+    await pump(
+      tester,
+      RecentThreadsState(
+        status: RecentThreadsStatus.ready,
+        threads: [kTeamThread, other],
+      ),
+      selectedRoomId: kTeamRoom.id,
+      openThreadId: kTeamThread.rootEventId,
+    );
+
+    Color? tileColor(String root) => tester
+        .widget<Material>(
+          find
+              .ancestor(
+                of: find.byKey(Key('thread_${kTeamThread.roomId}_$root')),
+                matching: find.byType(Material),
+              )
+              .first,
+        )
+        .color;
+
+    expect(tileColor(kTeamThread.rootEventId), isNot(Colors.transparent));
+    expect(tileColor(r'$outra-raiz'), Colors.transparent);
   });
 }

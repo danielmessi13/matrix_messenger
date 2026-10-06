@@ -18,6 +18,7 @@ class RecentThreadsPane extends StatelessWidget {
     required this.state,
     required this.rooms,
     required this.selectedRoomId,
+    this.openThreadId,
     required this.now,
     required this.onSelect,
     required this.onRetry,
@@ -31,6 +32,8 @@ class RecentThreadsPane extends StatelessWidget {
   final List<Room> rooms;
 
   final String? selectedRoomId;
+
+  final String? openThreadId;
 
   final DateTime now;
 
@@ -47,7 +50,13 @@ class RecentThreadsPane extends StatelessWidget {
     // Thread de sala que saiu da lista não tem como abrir.
     final entries = [
       for (final thread in state.threads)
-        if (byId[thread.roomId] case final room?) (thread: thread, room: room),
+        if (byId[thread.roomId] case final room?)
+          (
+            thread: thread,
+            room: room,
+            selected:
+                room.id == selectedRoomId && thread.rootEventId == openThreadId,
+          ),
     ];
     return AnimatedPane(
       expanded: expanded,
@@ -65,7 +74,6 @@ class RecentThreadsPane extends StatelessWidget {
             child: _Body(
               status: state.status,
               entries: entries,
-              selectedRoomId: selectedRoomId,
               now: now,
               onSelect: onSelect,
               onRetry: onRetry,
@@ -75,7 +83,6 @@ class RecentThreadsPane extends StatelessWidget {
       ),
       compactChild: _Collapsed(
         entries: entries,
-        selectedRoomId: selectedRoomId,
         onSelect: onSelect,
         onToggle: onToggle,
       ),
@@ -83,7 +90,7 @@ class RecentThreadsPane extends StatelessWidget {
   }
 }
 
-typedef _Entry = ({RecentThread thread, Room room});
+typedef _Entry = ({RecentThread thread, Room room, bool selected});
 
 class _Header extends StatelessWidget {
   const _Header({required this.onToggle});
@@ -130,7 +137,6 @@ class _Body extends StatelessWidget {
   const _Body({
     required this.status,
     required this.entries,
-    required this.selectedRoomId,
     required this.now,
     required this.onSelect,
     required this.onRetry,
@@ -139,8 +145,6 @@ class _Body extends StatelessWidget {
   final RecentThreadsStatus status;
 
   final List<_Entry> entries;
-
-  final String? selectedRoomId;
 
   final DateTime now;
 
@@ -190,7 +194,7 @@ class _Body extends StatelessWidget {
         return _ThreadTile(
           thread: entry.thread,
           room: entry.room,
-          selected: entry.room.id == selectedRoomId,
+          selected: entry.selected,
           now: now,
           onTap: () => onSelect(entry.thread),
         );
@@ -298,14 +302,11 @@ class _ThreadTile extends StatelessWidget {
 class _Collapsed extends StatelessWidget {
   const _Collapsed({
     required this.entries,
-    required this.selectedRoomId,
     required this.onSelect,
     required this.onToggle,
   });
 
   final List<_Entry> entries;
-
-  final String? selectedRoomId;
 
   final ValueChanged<RecentThread> onSelect;
 
@@ -320,7 +321,7 @@ class _Collapsed extends StatelessWidget {
           itemCount: entries.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final (:thread, :room) = entries[index];
+            final (:thread, :room, :selected) = entries[index];
             return Center(
               child: KeyedSubtree(
                 key: Key(
@@ -328,7 +329,7 @@ class _Collapsed extends StatelessWidget {
                 ),
                 child: RoomAvatarTile(
                   room: room,
-                  selected: room.id == selectedRoomId,
+                  selected: selected,
                   unread: 0,
                   onTap: () => onSelect(thread),
                   tooltip:

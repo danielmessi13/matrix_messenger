@@ -35,6 +35,7 @@ class ConversationPane extends StatelessWidget {
     this.focus,
     this.threadRequest,
     this.onThreadOpenChanged,
+    this.onOpenThreadChanged,
   });
 
   final Room? room;
@@ -47,6 +48,9 @@ class ConversationPane extends StatelessWidget {
 
   // A home recolhe a lista de salas para a thread caber ao lado.
   final ValueChanged<bool>? onThreadOpenChanged;
+
+  // A lista de threads recentes destaca a thread aberta.
+  final ValueChanged<String?>? onOpenThreadChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +91,7 @@ class ConversationPane extends StatelessWidget {
             focus: focus,
             child: _ThreadVisibility(
               onChanged: onThreadOpenChanged,
+              onThreadChanged: onOpenThreadChanged,
               child: _ThreadRequestListener(
                 request: threadRequest?.roomId == room.id
                     ? threadRequest
@@ -177,9 +182,15 @@ class _ThreadRequestListenerState extends State<_ThreadRequestListener> {
 }
 
 class _ThreadVisibility extends StatefulWidget {
-  const _ThreadVisibility({required this.onChanged, required this.child});
+  const _ThreadVisibility({
+    required this.onChanged,
+    required this.onThreadChanged,
+    required this.child,
+  });
 
   final ValueChanged<bool>? onChanged;
+
+  final ValueChanged<String?>? onThreadChanged;
 
   final Widget child;
 
@@ -193,9 +204,13 @@ class _ThreadVisibilityState extends State<_ThreadVisibility> {
   @override
   void dispose() {
     final onChanged = widget.onChanged;
+    final onThreadChanged = widget.onThreadChanged;
     // Trocar de sala com a thread aberta também a fecha; avisa fora da desmontagem.
-    if (_open && onChanged != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(false));
+    if (_open) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onChanged?.call(false);
+        onThreadChanged?.call(null);
+      });
     }
     super.dispose();
   }
@@ -203,11 +218,12 @@ class _ThreadVisibilityState extends State<_ThreadVisibility> {
   @override
   Widget build(BuildContext context) =>
       BlocListener<ConversationViewModel, ConversationState>(
-        listenWhen: (a, b) =>
-            (a.openThreadId == null) != (b.openThreadId == null),
+        listenWhen: (a, b) => a.openThreadId != b.openThreadId,
         listener: (context, state) {
-          _open = state.openThreadId != null;
-          widget.onChanged?.call(_open);
+          final open = state.openThreadId != null;
+          if (open != _open) widget.onChanged?.call(open);
+          _open = open;
+          widget.onThreadChanged?.call(state.openThreadId);
         },
         child: widget.child,
       );

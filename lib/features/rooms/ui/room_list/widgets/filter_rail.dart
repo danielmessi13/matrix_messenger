@@ -114,9 +114,7 @@ class _RailContent extends StatelessWidget {
               filter: filter,
               expanded: expanded,
               selected: filter == selected,
-              unread: filter == RoomFilter.threads
-                  ? 0
-                  : unreadByFilter[filter] ?? 0,
+              unread: unreadByFilter[filter] ?? 0,
               onTap: () => onSelect(filter),
             ),
           const Spacer(),
