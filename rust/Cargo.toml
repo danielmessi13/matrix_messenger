@@ -25,5 +25,9 @@ matrix-sdk = { version = "=0.19.1", features = ["bundled-sqlite", "markdown", "t
 matrix-sdk-test = "=0.19.1"
 wiremock = "0.6"
 
+# Simplificar o target/, debug das dependências ocupa maior espaço, vamos deixar só o nosso crate
+[profile.dev.package."*"]
+debug = false
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

@@ -8,8 +8,9 @@ use matrix_sdk::{
 use tokio::sync::broadcast::{self, error::RecvError};
 
 // Com threads ligadas a sala deixa de contar respostas de thread, e cada thread ganha a própria contagem.
-pub(crate) const THREADING: ThreadingSupport =
-    ThreadingSupport::Enabled { with_subscriptions: false };
+pub(crate) const THREADING: ThreadingSupport = ThreadingSupport::Enabled {
+    with_subscriptions: false,
+};
 
 const CAPACITY: usize = 64;
 
@@ -109,7 +110,10 @@ mod tests {
                     .add_timeline_event(f.text_msg("m1").sender(bob).event_id(event_id!("$m1")))
                     .add_timeline_event(f.text_msg("raiz").sender(bob).event_id(root))
                     .add_timeline_event(
-                        f.text_msg("r1").sender(bob).event_id(event_id!("$r1")).in_thread(root, root),
+                        f.text_msg("r1")
+                            .sender(bob)
+                            .event_id(event_id!("$r1"))
+                            .in_thread(root, root),
                     )
                     .add_timeline_event(
                         f.text_msg("r2")
@@ -133,7 +137,12 @@ mod tests {
                 &client,
                 JoinedRoomBuilder::new(room_id).add_receipt(
                     f.read_receipts()
-                        .add(event_id!("$r2"), &own, ReceiptType::Read, ReceiptThread::Thread(root.to_owned()))
+                        .add(
+                            event_id!("$r2"),
+                            &own,
+                            ReceiptType::Read,
+                            ReceiptThread::Thread(root.to_owned()),
+                        )
                         .into_event(),
                 ),
             )
@@ -156,9 +165,12 @@ mod tests {
         assert!(other.is_err());
 
         reads.notify(room_id!("!a:b.c"));
-        tokio::time::timeout(Duration::from_secs(1), changed_in(&mut receiver, room_id!("!a:b.c")))
-            .await
-            .expect("aviso da própria sala");
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            changed_in(&mut receiver, room_id!("!a:b.c")),
+        )
+        .await
+        .expect("aviso da própria sala");
     }
 
     #[tokio::test]
@@ -170,8 +182,11 @@ mod tests {
             reads.notify(room_id!("!outra:b.c"));
         }
 
-        tokio::time::timeout(Duration::from_secs(1), changed_in(&mut receiver, room_id!("!a:b.c")))
-            .await
-            .expect("atraso vale como mudança");
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            changed_in(&mut receiver, room_id!("!a:b.c")),
+        )
+        .await
+        .expect("atraso vale como mudança");
     }
 }

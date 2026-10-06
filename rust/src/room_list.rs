@@ -572,7 +572,10 @@ mod tests {
                 JoinedRoomBuilder::new(room_id)
                     .add_timeline_event(f.text_msg("raiz").sender(bob).event_id(root))
                     .add_timeline_event(
-                        f.text_msg("r1").sender(bob).event_id(event_id!("$r1")).in_thread(root, root),
+                        f.text_msg("r1")
+                            .sender(bob)
+                            .event_id(event_id!("$r1"))
+                            .in_thread(root, root),
                     )
                     .add_timeline_event(
                         f.text_msg("r2")

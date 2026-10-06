@@ -90,7 +90,11 @@ impl MatrixClient {
         &self.rooms
     }
 
-    pub(crate) fn new(client: Client, data_dir: String, saved_session: Option<StoredSession>) -> Self {
+    pub(crate) fn new(
+        client: Client,
+        data_dir: String,
+        saved_session: Option<StoredSession>,
+    ) -> Self {
         let vault = saved_session.map(|stored| Arc::new(Vault::new(data_dir, stored)));
         if let Some(vault) = &vault {
             save_on_refresh(&client, vault.clone());

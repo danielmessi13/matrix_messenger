@@ -34,10 +34,7 @@ class RoomListPane extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    final hidden =
-        !expanded &&
-        state.loaded &&
-        state.visibleRooms.isEmpty;
+    final hidden = !expanded && state.loaded && state.visibleRooms.isEmpty;
 
     return AnimatedPane(
       expanded: expanded,
