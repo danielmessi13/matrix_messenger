@@ -11,12 +11,12 @@ bool continuesGroup(TimelineItem? previous, MessageItem message) =>
     !_repliesToMe(message);
 
 bool sameSenderNearby(TimelineItem? previous, MessageItem message) =>
-    switch (previous) {
-      MessageItem(:final senderId, :final timestamp) =>
-        senderId == message.senderId &&
-            message.timestamp.difference(timestamp).abs() < groupWindow,
-      _ => false,
-    };
+    previous is MessageItem &&
+    sameSender(previous, message) &&
+    message.timestamp.difference(previous.timestamp).abs() < groupWindow;
+
+bool sameSender(TimelineItem? previous, MessageItem message) =>
+    previous is MessageItem && previous.senderId == message.senderId;
 
 bool _repliesToMe(MessageItem message) =>
     !message.isOwn && (message.replyTo?.isOwn ?? false);

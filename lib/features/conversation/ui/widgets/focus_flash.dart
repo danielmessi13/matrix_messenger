@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -61,12 +62,13 @@ mixin FocusFlash<T extends StatefulWidget> on State<T> {
   }
 }
 
+const _openGap = 10.0;
+
 class MessageHighlight extends StatelessWidget {
   const MessageHighlight({
     super.key,
     required this.flashing,
     this.open = false,
-    this.alignEnd = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     required this.child,
   });
@@ -76,8 +78,6 @@ class MessageHighlight extends StatelessWidget {
   // Raiz da thread aberta no painel.
   final bool open;
 
-  final bool alignEnd;
-
   final EdgeInsets padding;
 
   final Widget child;
@@ -85,14 +85,16 @@ class MessageHighlight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    // Na mensagem própria o destaque termina na barra lateral, sem atravessá-la.
-    final radius = alignEnd
-        ? const BorderRadius.horizontal(left: Radius.circular(12))
-        : BorderRadius.circular(12);
+    final radius = BorderRadius.circular(12);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      margin: alignEnd ? EdgeInsets.only(right: padding.right) : null,
-      padding: alignEnd ? padding.copyWith(right: 0) : padding,
+      // Agrupada a mensagem não tem respiro vertical, e a borda colaria no texto.
+      padding: open
+          ? padding.copyWith(
+              top: max(padding.top, _openGap),
+              bottom: max(padding.bottom, _openGap),
+            )
+          : padding,
       decoration: BoxDecoration(
         borderRadius: radius,
         color: flashing

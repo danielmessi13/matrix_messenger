@@ -215,7 +215,7 @@ class _TimelineViewState extends State<TimelineView>
                             ),
                         sameSender:
                             item is MessageItem &&
-                            sameSenderNearby(
+                            sameSender(
                               i > 0 ? rows[i - 1].last : null,
                               item,
                             ),
@@ -223,6 +223,12 @@ class _TimelineViewState extends State<TimelineView>
                             .elementAtOrNull(i + 1)
                             ?.first) {
                           final MessageItem next => continuesGroup(item, next),
+                          _ => false,
+                        },
+                        followedByOwn: switch (rows
+                            .elementAtOrNull(i + 1)
+                            ?.first) {
+                          MessageItem(isOwn: true) => true,
                           _ => false,
                         },
                       ),
@@ -352,6 +358,7 @@ class _TimelineEntry extends StatelessWidget {
     required this.continuation,
     required this.sameSender,
     required this.continuedBelow,
+    required this.followedByOwn,
   });
 
   final TimelineItem item;
@@ -369,6 +376,8 @@ class _TimelineEntry extends StatelessWidget {
   final bool sameSender;
 
   final bool continuedBelow;
+
+  final bool followedByOwn;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -391,7 +400,6 @@ class _TimelineEntry extends StatelessWidget {
       final MessageItem message => MessageHighlight(
         flashing: flashing,
         open: message.eventId != null && message.eventId == openThreadId,
-        alignEnd: message.isOwn,
         padding: EdgeInsets.fromLTRB(
           14,
           continuation ? 0 : 10,
@@ -402,6 +410,7 @@ class _TimelineEntry extends StatelessWidget {
           message: message,
           continuation: continuation,
           continuedBelow: continuedBelow,
+          followedByOwn: followedByOwn,
           onRetry: () => viewModel.retry(message.id),
           onCancel: () => viewModel.cancel(message.id),
           onReply: () => viewModel.startReply(message),

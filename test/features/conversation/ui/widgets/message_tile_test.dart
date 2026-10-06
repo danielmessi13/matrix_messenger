@@ -17,6 +17,7 @@ void main() {
     bool compact = false,
     bool continuation = false,
     bool continuedBelow = false,
+    bool followedByOwn = false,
     VoidCallback? onReply,
     VoidCallback? onStartThread,
     ValueChanged<String>? onQuoteTap,
@@ -36,6 +37,7 @@ void main() {
               compact: compact,
               continuation: continuation,
               continuedBelow: continuedBelow,
+              followedByOwn: followedByOwn,
               onReply: onReply,
               onStartThread: onStartThread,
               onQuoteTap: onQuoteTap,
@@ -633,17 +635,28 @@ void main() {
     expect(find.byKey(const Key('message_time_\$other')), findsNothing);
   });
 
-  testWidgets('própria com continuação abaixo deixa o status para a última', (
+  testWidgets('própria seguida de outra sua deixa o status para a última', (
     tester,
   ) async {
-    await pump(tester, own(SendState.sent), continuedBelow: true);
+    await pump(tester, own(SendState.sent), followedByOwn: true);
     expect(find.text('Enviada'), findsNothing);
 
-    await pump(tester, own(SendState.sending), continuedBelow: true);
+    await pump(tester, own(SendState.sending), followedByOwn: true);
     expect(find.text('Enviando…'), findsNothing);
 
-    await pump(tester, own(SendState.failed), continuedBelow: true);
+    await pump(tester, own(SendState.failed), followedByOwn: true);
     expect(find.text('Não enviada'), findsOneWidget);
     expect(find.byKey(const Key('message_retry')), findsOneWidget);
+  });
+
+  testWidgets('própria seguida de outra sua mantém o recibo de leitura', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      own(SendState.sent, readBy: ['Ana']),
+      followedByOwn: true,
+    );
+    expect(find.text('✓✓ Lida por Ana'), findsOneWidget);
   });
 }

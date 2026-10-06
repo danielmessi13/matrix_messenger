@@ -17,6 +17,7 @@ class MessageTile extends StatelessWidget {
     this.compact = false,
     this.continuation = false,
     this.continuedBelow = false,
+    this.followedByOwn = false,
     this.onReply,
     this.onStartThread,
     this.onQuoteTap,
@@ -37,6 +38,8 @@ class MessageTile extends StatelessWidget {
 
   final bool continuedBelow;
 
+  final bool followedByOwn;
+
   final VoidCallback? onReply;
 
   final VoidCallback? onStartThread;
@@ -55,6 +58,7 @@ class MessageTile extends StatelessWidget {
             compact: compact,
             continuation: continuation,
             continuedBelow: continuedBelow,
+            followedByOwn: followedByOwn,
             colors: colors,
           )
         : _OtherMessage(
@@ -168,6 +172,7 @@ class _OwnMessage extends StatelessWidget {
     required this.compact,
     required this.continuation,
     required this.continuedBelow,
+    required this.followedByOwn,
     required this.colors,
   });
 
@@ -185,10 +190,14 @@ class _OwnMessage extends StatelessWidget {
 
   final bool continuedBelow;
 
+  final bool followedByOwn;
+
   final AppColors colors;
 
+  // O recibo fica no último evento lido, então "Lida por" só existe nesta mensagem.
   bool get _showsStatus =>
-      !continuedBelow ||
+      !followedByOwn ||
+      message.readBy.isNotEmpty ||
       message.sendState == SendState.failed ||
       message.sendState == SendState.rejected;
 

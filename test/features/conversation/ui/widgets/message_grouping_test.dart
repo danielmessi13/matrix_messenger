@@ -130,6 +130,14 @@ void main() {
     expect(sameSenderNearby(msg(sender: '@carla:c.d'), reply), isFalse);
   });
 
+  test('mesmo autor fora da janela segue do mesmo autor', () {
+    final later = msg(at: groupWindow + const Duration(minutes: 1));
+
+    expect(sameSenderNearby(msg(), later), isFalse);
+    expect(sameSender(msg(), later), isTrue);
+    expect(sameSender(msg(sender: '@carla:c.d'), later), isFalse);
+  });
+
   test('primeiro item não continua nada', () {
     expect(continuesGroup(null, msg()), isFalse);
   });
