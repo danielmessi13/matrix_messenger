@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:matrix_messenger/core/services/matrix_service.dart';
 import 'package:matrix_messenger/core/utils/result.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/timeline.dart';
 
 import '../../models/user_session.dart';
 import 'fake_matrix_client.dart';
+import 'fake_room_timeline.dart';
 
 class FakeMatrixService implements MatrixService {
   Result<MatrixClient?> restoreResult = const Result.ok(null);
@@ -27,6 +30,14 @@ class FakeMatrixService implements MatrixService {
   final roomsController = StreamController<List<RoomSummary>>.broadcast();
 
   final syncStatusController = StreamController<SyncStatus>.broadcast();
+
+  final recoveryController = StreamController<RecoveryStatus>.broadcast();
+
+  Result<void> recoverResult = const Result.ok(null);
+
+  final recoverCalls = <String>[];
+
+  Result<RoomTimeline> openTimelineResult = Result.ok(FakeRoomTimeline());
 
   final loginCalls =
       <({String homeserver, String username, String password})>[];
@@ -73,9 +84,23 @@ class FakeMatrixService implements MatrixService {
   @override
   Stream<SyncStatus> watchSyncStatus() => syncStatusController.stream;
 
+  @override
+  Stream<RecoveryStatus> watchRecovery() => recoveryController.stream;
+
+  @override
+  Future<Result<void>> recover(String recoveryKey) async {
+    recoverCalls.add(recoveryKey);
+    return recoverResult;
+  }
+
+  @override
+  Future<Result<RoomTimeline>> openTimeline(String roomId) async =>
+      openTimelineResult;
+
   Future<void> dispose() async {
     await revokedController.close();
     await roomsController.close();
     await syncStatusController.close();
+    await recoveryController.close();
   }
 }

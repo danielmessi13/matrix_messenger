@@ -5,7 +5,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../src/rust/api/auth.dart';
 import '../../src/rust/api/oidc.dart';
+import '../../src/rust/api/recovery.dart';
 import '../../src/rust/api/rooms.dart';
+import '../../src/rust/api/timeline.dart';
 import '../utils/result.dart';
 import 'local_storage_exception.dart';
 import 'matrix_bridge.dart';
@@ -85,6 +87,21 @@ class MatrixService {
   Stream<SyncStatus> watchSyncStatus() =>
       _client?.watchSyncStatus() ?? const Stream.empty();
 
+  Stream<RecoveryStatus> watchRecovery() =>
+      _client?.watchRecovery() ?? const Stream.empty();
+
+  Future<Result<void>> recover(String recoveryKey) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    await client.recover(recoveryKey: recoveryKey);
+  });
+
+  Future<Result<RoomTimeline>> openTimeline(String roomId) => _guard(() async {
+    final client = _client;
+    if (client == null) throw StateError('Sem sessão ativa');
+    return client.openTimeline(roomId: roomId);
+  });
+
   Future<Result<void>> logout() => _guard(() async {
     final client = _client;
     if (client == null) return;
@@ -124,18 +141,22 @@ class MatrixService {
   static Future<Result<T>> _guard<T>(Future<T> Function() action) async {
     try {
       return Result.ok(await action());
-    } on AuthError catch (error) {
-      return Result.error(error);
-    } on LocalStorageException catch (error) {
-      return Result.error(error);
     } catch (error, stackTrace) {
-      log(
-        'Erro inesperado ao chamar o Rust',
-        name: 'matrix',
-        error: error,
-        stackTrace: stackTrace,
-      );
+      if (!_isExpected(error)) {
+        log(
+          'Erro inesperado ao chamar o Rust',
+          name: 'matrix',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
       return Result.error(error is Exception ? error : Exception('$error'));
     }
   }
+
+  static bool _isExpected(Object error) =>
+      error is AuthError ||
+      error is TimelineError ||
+      error is RecoveryError ||
+      error is LocalStorageException;
 }

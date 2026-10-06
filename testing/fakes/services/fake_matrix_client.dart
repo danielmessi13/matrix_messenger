@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/src/rust/api/auth.dart';
+import 'package:matrix_messenger/src/rust/api/recovery.dart';
 import 'package:matrix_messenger/src/rust/api/rooms.dart';
+import 'package:matrix_messenger/src/rust/api/timeline.dart';
+
+import 'fake_room_timeline.dart';
 
 class FakeMatrixClient implements MatrixClient {
   FakeMatrixClient({
@@ -48,11 +52,44 @@ class FakeMatrixClient implements MatrixClient {
   @override
   Stream<SyncStatus> watchSyncStatus() => syncStatusController.stream;
 
+  final recoveryController = StreamController<RecoveryStatus>.broadcast();
+
+  @override
+  Stream<RecoveryStatus> watchRecovery() => recoveryController.stream;
+
+  Object? recoverError;
+
+  final recoveredWith = <String>[];
+
+  @override
+  Future<void> recover({required String recoveryKey}) async {
+    recoveredWith.add(recoveryKey);
+    if (recoverError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+  }
+
+  RoomTimeline? openTimelineResult;
+
+  Object? openTimelineError;
+
+  final openedRooms = <String>[];
+
+  @override
+  Future<RoomTimeline> openTimeline({required String roomId}) async {
+    openedRooms.add(roomId);
+    if (openTimelineError case final error?) {
+      Error.throwWithStackTrace(error, StackTrace.current);
+    }
+    return openTimelineResult ?? FakeRoomTimeline();
+  }
+
   @override
   void dispose() {
     isDisposed = true;
     sessionEventsController.close();
     roomsController.close();
     syncStatusController.close();
+    recoveryController.close();
   }
 }
