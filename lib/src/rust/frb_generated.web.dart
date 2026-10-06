@@ -8,7 +8,9 @@
 
 import 'api/auth.dart';
 import 'api/oidc.dart';
+import 'api/recovery.dart';
 import 'api/rooms.dart';
+import 'api/timeline.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -33,6 +35,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   get rust_arc_decrement_strong_count_OidcLoginPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin;
 
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_RoomTimelinePtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline;
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw);
 
@@ -49,6 +55,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RoomTimeline
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    dynamic raw,
+  );
+
+  @protected
   MatrixClient
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
     dynamic raw,
@@ -57,6 +69,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   OidcLogin
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin(
+    dynamic raw,
+  );
+
+  @protected
+  RoomTimeline
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
     dynamic raw,
   );
 
@@ -73,7 +91,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RoomTimeline
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    dynamic raw,
+  );
+
+  @protected
   RustStreamSink<List<RoomSummary>> dco_decode_StreamSink_list_room_summary_Sse(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<RecoveryStatus> dco_decode_StreamSink_recovery_status_Sse(
     dynamic raw,
   );
 
@@ -84,6 +113,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<SyncStatus> dco_decode_StreamSink_sync_status_Sse(dynamic raw);
+
+  @protected
+  RustStreamSink<TimelineSnapshot> dco_decode_StreamSink_timeline_snapshot_Sse(
+    dynamic raw,
+  );
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -104,7 +138,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
+
+  @protected
   LatestMessage dco_decode_box_autoadd_latest_message(dynamic raw);
+
+  @protected
+  MessageKind dco_decode_box_autoadd_message_kind(dynamic raw);
+
+  @protected
+  ReplyPreview dco_decode_box_autoadd_reply_preview(dynamic raw);
+
+  @protected
+  ThreadInfo dco_decode_box_autoadd_thread_info(dynamic raw);
+
+  @protected
+  TimelineMessage dco_decode_box_autoadd_timeline_message(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
@@ -128,6 +177,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<RoomSummary> dco_decode_list_room_summary(dynamic raw);
 
   @protected
+  List<TimelineEntry> dco_decode_list_timeline_entry(dynamic raw);
+
+  @protected
+  MessageKind dco_decode_message_kind(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -137,16 +192,67 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
+  @protected
   LatestMessage? dco_decode_opt_box_autoadd_latest_message(dynamic raw);
 
   @protected
+  MessageKind? dco_decode_opt_box_autoadd_message_kind(dynamic raw);
+
+  @protected
+  ReplyPreview? dco_decode_opt_box_autoadd_reply_preview(dynamic raw);
+
+  @protected
+  ThreadInfo? dco_decode_opt_box_autoadd_thread_info(dynamic raw);
+
+  @protected
+  TimelineMessage? dco_decode_opt_box_autoadd_timeline_message(dynamic raw);
+
+  @protected
+  RecoveryError dco_decode_recovery_error(dynamic raw);
+
+  @protected
+  RecoveryErrorKind dco_decode_recovery_error_kind(dynamic raw);
+
+  @protected
+  RecoveryStatus dco_decode_recovery_status(dynamic raw);
+
+  @protected
+  ReplyPreview dco_decode_reply_preview(dynamic raw);
+
+  @protected
+  ReplyState dco_decode_reply_state(dynamic raw);
+
+  @protected
   RoomSummary dco_decode_room_summary(dynamic raw);
+
+  @protected
+  SendState dco_decode_send_state(dynamic raw);
 
   @protected
   SessionEvent dco_decode_session_event(dynamic raw);
 
   @protected
   SyncStatus dco_decode_sync_status(dynamic raw);
+
+  @protected
+  ThreadInfo dco_decode_thread_info(dynamic raw);
+
+  @protected
+  TimelineEntry dco_decode_timeline_entry(dynamic raw);
+
+  @protected
+  TimelineError dco_decode_timeline_error(dynamic raw);
+
+  @protected
+  TimelineErrorKind dco_decode_timeline_error_kind(dynamic raw);
+
+  @protected
+  TimelineMessage dco_decode_timeline_message(dynamic raw);
+
+  @protected
+  TimelineSnapshot dco_decode_timeline_snapshot(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -176,6 +282,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RoomTimeline
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   MatrixClient
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
     SseDeserializer deserializer,
@@ -184,6 +296,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   OidcLogin
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RoomTimeline
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
     SseDeserializer deserializer,
   );
 
@@ -200,7 +318,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RoomTimeline
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RustStreamSink<List<RoomSummary>> sse_decode_StreamSink_list_room_summary_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<RecoveryStatus> sse_decode_StreamSink_recovery_status_Sse(
     SseDeserializer deserializer,
   );
 
@@ -211,6 +340,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<SyncStatus> sse_decode_StreamSink_sync_status_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<TimelineSnapshot> sse_decode_StreamSink_timeline_snapshot_Sse(
     SseDeserializer deserializer,
   );
 
@@ -233,7 +367,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
   LatestMessage sse_decode_box_autoadd_latest_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MessageKind sse_decode_box_autoadd_message_kind(SseDeserializer deserializer);
+
+  @protected
+  ReplyPreview sse_decode_box_autoadd_reply_preview(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ThreadInfo sse_decode_box_autoadd_thread_info(SseDeserializer deserializer);
+
+  @protected
+  TimelineMessage sse_decode_box_autoadd_timeline_message(
     SseDeserializer deserializer,
   );
 
@@ -261,6 +414,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<RoomSummary> sse_decode_list_room_summary(SseDeserializer deserializer);
 
   @protected
+  List<TimelineEntry> sse_decode_list_timeline_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MessageKind sse_decode_message_kind(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -270,18 +431,81 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
   LatestMessage? sse_decode_opt_box_autoadd_latest_message(
     SseDeserializer deserializer,
   );
 
   @protected
+  MessageKind? sse_decode_opt_box_autoadd_message_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReplyPreview? sse_decode_opt_box_autoadd_reply_preview(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ThreadInfo? sse_decode_opt_box_autoadd_thread_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TimelineMessage? sse_decode_opt_box_autoadd_timeline_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RecoveryError sse_decode_recovery_error(SseDeserializer deserializer);
+
+  @protected
+  RecoveryErrorKind sse_decode_recovery_error_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RecoveryStatus sse_decode_recovery_status(SseDeserializer deserializer);
+
+  @protected
+  ReplyPreview sse_decode_reply_preview(SseDeserializer deserializer);
+
+  @protected
+  ReplyState sse_decode_reply_state(SseDeserializer deserializer);
+
+  @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer);
+
+  @protected
+  SendState sse_decode_send_state(SseDeserializer deserializer);
 
   @protected
   SessionEvent sse_decode_session_event(SseDeserializer deserializer);
 
   @protected
   SyncStatus sse_decode_sync_status(SseDeserializer deserializer);
+
+  @protected
+  ThreadInfo sse_decode_thread_info(SseDeserializer deserializer);
+
+  @protected
+  TimelineEntry sse_decode_timeline_entry(SseDeserializer deserializer);
+
+  @protected
+  TimelineError sse_decode_timeline_error(SseDeserializer deserializer);
+
+  @protected
+  TimelineErrorKind sse_decode_timeline_error_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TimelineMessage sse_decode_timeline_message(SseDeserializer deserializer);
+
+  @protected
+  TimelineSnapshot sse_decode_timeline_snapshot(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -317,6 +541,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    RoomTimeline self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
     MatrixClient self,
     SseSerializer serializer,
@@ -326,6 +557,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin(
     OidcLogin self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    RoomTimeline self,
     SseSerializer serializer,
   );
 
@@ -344,8 +582,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    RoomTimeline self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_StreamSink_list_room_summary_Sse(
     RustStreamSink<List<RoomSummary>> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_recovery_status_Sse(
+    RustStreamSink<RecoveryStatus> self,
     SseSerializer serializer,
   );
 
@@ -358,6 +609,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_sync_status_Sse(
     RustStreamSink<SyncStatus> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_timeline_snapshot_Sse(
+    RustStreamSink<TimelineSnapshot> self,
     SseSerializer serializer,
   );
 
@@ -381,8 +638,38 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_latest_message(
     LatestMessage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_message_kind(
+    MessageKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_reply_preview(
+    ReplyPreview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_thread_info(
+    ThreadInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_timeline_message(
+    TimelineMessage self,
     SseSerializer serializer,
   );
 
@@ -417,6 +704,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_timeline_entry(
+    List<TimelineEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_message_kind(MessageKind self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -427,19 +723,100 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_latest_message(
     LatestMessage? self,
     SseSerializer serializer,
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_message_kind(
+    MessageKind? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_reply_preview(
+    ReplyPreview? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_thread_info(
+    ThreadInfo? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_timeline_message(
+    TimelineMessage? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_recovery_error(RecoveryError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_recovery_error_kind(
+    RecoveryErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_recovery_status(
+    RecoveryStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_reply_preview(ReplyPreview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_reply_state(ReplyState self, SseSerializer serializer);
+
+  @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_send_state(SendState self, SseSerializer serializer);
 
   @protected
   void sse_encode_session_event(SessionEvent self, SseSerializer serializer);
 
   @protected
   void sse_encode_sync_status(SyncStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_thread_info(ThreadInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_timeline_entry(TimelineEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_timeline_error(TimelineError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_timeline_error_kind(
+    TimelineErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_timeline_message(
+    TimelineMessage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_timeline_snapshot(
+    TimelineSnapshot self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -490,6 +867,22 @@ class RustLibWire implements BaseWire {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin(
         ptr,
       );
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+        ptr,
+      );
 }
 
 @JS('wasm_bindgen')
@@ -515,6 +908,16 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external void
   rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin(
+    int ptr,
+  );
+
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
     int ptr,
   );
 }

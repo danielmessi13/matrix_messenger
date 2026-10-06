@@ -7,7 +7,7 @@ use std::{
 };
 
 use eyeball_im::Vector;
-use futures_util::{pin_mut, StreamExt};
+use futures_util::pin_mut;
 use matrix_sdk::{
     latest_events::LatestEventValue,
     ruma::{
@@ -35,8 +35,8 @@ use tokio::{
 };
 
 use crate::api::rooms::{LatestMessage, LatestMessageKind, RoomSummary, SyncStatus};
-
-const DEBOUNCE: Duration = Duration::from_millis(100);
+use crate::diff_window::{next_batch, next_batch_or};
+use crate::threads::{unread_by_thread, ThreadReads};
 
 // Um Running mais curto que isto antes de cair no Offline conta como falha persistente, não falta de rede.
 const MIN_STABLE_RUNNING: Duration = Duration::from_secs(5);
@@ -56,6 +56,7 @@ pub(crate) struct RoomSyncStopper {
 
 struct Inner {
     client: Client,
+    reads: ThreadReads,
     service: OnceCell<Arc<SyncService>>,
     started: AtomicBool,
     stopped: AtomicBool,
@@ -64,11 +65,12 @@ struct Inner {
 }
 
 impl RoomSync {
-    pub(crate) fn new(client: Client, runtime: Handle) -> Self {
+    pub(crate) fn new(client: Client, reads: ThreadReads, runtime: Handle) -> Self {
         let (status, _) = watch::channel(SyncStatus::Connecting);
         Self {
             inner: Arc::new(Inner {
                 client,
+                reads,
                 service: OnceCell::new(),
                 started: AtomicBool::new(false),
                 stopped: AtomicBool::new(false),
@@ -83,7 +85,7 @@ impl RoomSync {
         let inner = self.inner.clone();
         let task = self.runtime.spawn(async move {
             if let Some(service) = inner.service().await {
-                if let Err(error) = run_room_list(&service, emit).await {
+                if let Err(error) = run_room_list(&service, inner.reads.clone(), emit).await {
                     log::warn!("lista de salas indisponível: {error}");
                     inner.status.send_replace(SyncStatus::Error);
                 }
@@ -245,6 +247,8 @@ async fn supervise(service: Arc<SyncService>, inner: Arc<Inner>) {
         match &state {
             State::Running => {
                 running = Some((Instant::now(), matches!(previous, State::Offline)));
+                // Uma falha de envio desliga a fila da sala; com a conexão de volta, o que ficou pendente sai.
+                inner.client.send_queue().set_enabled(true).await;
                 inner.status.send_replace(SyncStatus::Running);
             }
             // Servidor alcançável mas o sync falhando: sem isto o modo offline religa na hora, em laço.
@@ -277,6 +281,7 @@ async fn supervise(service: Arc<SyncService>, inner: Arc<Inner>) {
 
 async fn run_room_list(
     service: &SyncService,
+    reads: ThreadReads,
     mut emit: impl FnMut(Vec<RoomSummary>) -> bool,
 ) -> Result<(), matrix_sdk_ui::room_list_service::Error> {
     let room_list = service.room_list_service().all_rooms().await?;
@@ -294,15 +299,11 @@ async fn run_room_list(
         Box::new(new_filter_deduplicate_versions()),
     ])));
     pin_mut!(stream);
+    // Inscrito antes da primeira lista; o aviso só recalcula depois dela, para não emitir lista vazia.
+    let mut changed = reads.subscribe();
     let mut rooms: Vector<RoomListItem> = Vector::new();
-    while let Some(diffs) = stream.next().await {
-        diffs.into_iter().for_each(|diff| diff.apply(&mut rooms));
-        // Janela fixa a partir da primeira mudança: um fluxo contínuo de diffs não adia a emissão.
-        let deadline = tokio::time::Instant::now() + DEBOUNCE;
-        while let Ok(next) = tokio::time::timeout_at(deadline, stream.next()).await {
-            let Some(diffs) = next else { return Ok(()) };
-            diffs.into_iter().for_each(|diff| diff.apply(&mut rooms));
-        }
+    let mut more = next_batch(&mut stream, &mut rooms).await;
+    while more {
         let mut summaries = Vec::with_capacity(rooms.len());
         for item in rooms.iter() {
             summaries.push(summarize(item).await);
@@ -310,6 +311,10 @@ async fn run_room_list(
         if !emit(summaries) {
             return Ok(());
         }
+        more = next_batch_or(&mut stream, &mut rooms, async {
+            let _ = changed.recv().await;
+        })
+        .await;
     }
     Ok(())
 }
@@ -355,6 +360,10 @@ async fn summarize(room: &Room) -> RoomSummary {
         is_invite: room.state() == RoomState::Invited,
         unread_messages: count(room.num_unread_messages()),
         unread_mentions: count(room.num_unread_mentions()),
+        unread_thread_replies: unread_by_thread(room)
+            .await
+            .values()
+            .fold(0, |sum: u32, count| sum.saturating_add(*count)),
         member_count: count(room.joined_members_count()),
         heroes: room.heroes().await.into_iter().map(hero_name).collect(),
         latest: latest_message(room).await,
@@ -436,6 +445,8 @@ mod tests {
     };
 
     use super::*;
+    use crate::test_support::{threaded_client, wait_until};
+    use crate::threads::ThreadReads;
 
     fn event(kind: &str, content: serde_json::Value) -> AnySyncTimelineEvent {
         serde_json::from_value(json!({
@@ -542,6 +553,36 @@ mod tests {
         assert!(!latest.is_own);
     }
 
+    #[tokio::test]
+    async fn summarize_counts_unread_thread_replies_apart_from_the_room() {
+        let server = MatrixMockServer::new().await;
+        let client = threaded_client(&server).await;
+        let room_id = room_id!("!a:b.c");
+        let bob = user_id!("@bob:b.c");
+        let root = event_id!("$root");
+        let f = EventFactory::new().room(room_id);
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(f.text_msg("raiz").sender(bob).event_id(root))
+                    .add_timeline_event(
+                        f.text_msg("r1").sender(bob).event_id(event_id!("$r1")).in_thread(root, root),
+                    )
+                    .add_timeline_event(
+                        f.text_msg("r2")
+                            .sender(bob)
+                            .event_id(event_id!("$r2"))
+                            .in_thread(root, event_id!("$r1")),
+                    ),
+            )
+            .await;
+        let room = &room;
+
+        wait_until(|| async move { summarize(room).await.unread_thread_replies == 2 }).await;
+        assert_eq!(summarize(room).await.unread_messages, 1);
+    }
+
     // Responde a cada 50 ms, mais rápido que a janela de 100 ms da emissão.
     async fn mock_sliding_sync(server: &MatrixMockServer) {
         Mock::given(method("POST"))
@@ -587,7 +628,7 @@ mod tests {
             .mount()
             .await;
         mock_sliding_sync(&server).await;
-        let sync = RoomSync::new(client, Handle::current());
+        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
         let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -631,7 +672,7 @@ mod tests {
             .mount()
             .await;
         mock_sliding_sync(server).await;
-        let sync = RoomSync::new(client, Handle::current());
+        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_status(move |status| status_tx.send(status).is_ok());
         sync.watch_rooms(|_| true);
@@ -666,6 +707,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn running_reenables_the_send_queue() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().no_server_versions().build().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
+        mock_sliding_sync(&server).await;
+        client.send_queue().set_enabled(false).await;
+        let sync = RoomSync::new(client.clone(), ThreadReads::default(), Handle::current());
+        let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
+        sync.watch_status(move |status| status_tx.send(status).is_ok());
+        sync.watch_rooms(|_| true);
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while status_rx.recv().await != Some(SyncStatus::Running) {}
+        })
+        .await
+        .expect("sync rodando em até 5 s");
+
+        assert!(client.send_queue().is_enabled());
+    }
+
+    #[tokio::test]
     async fn persistent_sync_error_backs_off_instead_of_looping() {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -688,7 +755,7 @@ mod tests {
             })
             .mount(server.server())
             .await;
-        let sync = RoomSync::new(client, Handle::current());
+        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_status(move |status| status_tx.send(status).is_ok());
         sync.watch_rooms(|_| true);
@@ -710,7 +777,7 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().no_server_versions().build().await;
         server.mock_versions().ok().mount().await;
-        let sync = RoomSync::new(client, Handle::current());
+        let sync = RoomSync::new(client, ThreadReads::default(), Handle::current());
         let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
         sync.watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
         let (status_tx, mut status_rx) = tokio::sync::mpsc::unbounded_channel();

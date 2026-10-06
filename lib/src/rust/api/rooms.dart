@@ -44,7 +44,13 @@ class LatestMessage {
           timestampMs == other.timestampMs;
 }
 
-enum LatestMessageKind { text, image, file, encrypted, other }
+enum LatestMessageKind {
+  text,
+  image,
+  file,
+  encrypted,
+  other,
+}
 
 class RoomSummary {
   final String id;
@@ -53,6 +59,7 @@ class RoomSummary {
   final bool isInvite;
   final int unreadMessages;
   final int unreadMentions;
+  final int unreadThreadReplies;
   final int memberCount;
   final List<String> heroes;
   final LatestMessage? latest;
@@ -64,6 +71,7 @@ class RoomSummary {
     required this.isInvite,
     required this.unreadMessages,
     required this.unreadMentions,
+    required this.unreadThreadReplies,
     required this.memberCount,
     required this.heroes,
     this.latest,
@@ -77,6 +85,7 @@ class RoomSummary {
       isInvite.hashCode ^
       unreadMessages.hashCode ^
       unreadMentions.hashCode ^
+      unreadThreadReplies.hashCode ^
       memberCount.hashCode ^
       heroes.hashCode ^
       latest.hashCode;
@@ -92,9 +101,16 @@ class RoomSummary {
           isInvite == other.isInvite &&
           unreadMessages == other.unreadMessages &&
           unreadMentions == other.unreadMentions &&
+          unreadThreadReplies == other.unreadThreadReplies &&
           memberCount == other.memberCount &&
           heroes == other.heroes &&
           latest == other.latest;
 }
 
-enum SyncStatus { connecting, running, offline, unsupported, error }
+enum SyncStatus {
+  connecting,
+  running,
+  offline,
+  unsupported,
+  error,
+}

@@ -5,7 +5,9 @@
 
 import 'api/auth.dart';
 import 'api/oidc.dart';
+import 'api/recovery.dart';
 import 'api/rooms.dart';
+import 'api/timeline.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -40,8 +42,12 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
   /// Initialize flutter_rust_bridge in mock mode.
   /// No libraries for FFI are loaded.
-  static void initMock({required RustLibApi api}) {
-    instance.initMockImpl(api: api);
+  static void initMock({
+    required RustLibApi api,
+  }) {
+    instance.initMockImpl(
+      api: api,
+    );
   }
 
   /// Dispose flutter_rust_bridge
@@ -71,7 +77,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1624060032;
+  int get rustContentHash => -979790701;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -94,6 +100,16 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiAuthMatrixClientLogout({required MatrixClient that});
 
+  Future<RoomTimeline> crateApiAuthMatrixClientOpenTimeline({
+    required MatrixClient that,
+    required String roomId,
+  });
+
+  Future<void> crateApiAuthMatrixClientRecover({
+    required MatrixClient that,
+    required String recoveryKey,
+  });
+
   Future<MatrixClient?> crateApiAuthMatrixClientRestoreSession({
     required String dataDir,
   });
@@ -105,6 +121,10 @@ abstract class RustLibApi extends BaseApi {
   bool crateApiAuthMatrixClientSessionSaved({required MatrixClient that});
 
   String crateApiAuthMatrixClientUserId({required MatrixClient that});
+
+  Stream<RecoveryStatus> crateApiAuthMatrixClientWatchRecovery({
+    required MatrixClient that,
+  });
 
   Stream<List<RoomSummary>> crateApiAuthMatrixClientWatchRooms({
     required MatrixClient that,
@@ -125,6 +145,38 @@ abstract class RustLibApi extends BaseApi {
     required String dataDir,
   });
 
+  Future<void> crateApiTimelineRoomTimelineCancel({
+    required RoomTimeline that,
+    required String itemId,
+  });
+
+  Future<void> crateApiTimelineRoomTimelineMarkAsRead({
+    required RoomTimeline that,
+  });
+
+  Future<RoomTimeline> crateApiTimelineRoomTimelineOpenThread({
+    required RoomTimeline that,
+    required String rootEventId,
+  });
+
+  Future<bool> crateApiTimelineRoomTimelinePaginateBackwards({
+    required RoomTimeline that,
+  });
+
+  Future<void> crateApiTimelineRoomTimelineRetry({
+    required RoomTimeline that,
+    required String itemId,
+  });
+
+  Future<void> crateApiTimelineRoomTimelineSendMarkdown({
+    required RoomTimeline that,
+    required String body,
+  });
+
+  Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
+    required RoomTimeline that,
+  });
+
   Future<void> crateApiInitInitApp();
 
   RustArcIncrementStrongCountFnType
@@ -142,6 +194,14 @@ abstract class RustLibApi extends BaseApi {
   get rust_arc_decrement_strong_count_OidcLogin;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_OidcLoginPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_RoomTimeline;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_RoomTimeline;
+
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RoomTimelinePtr;
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -250,7 +310,87 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta get kCrateApiAuthMatrixClientLogoutConstMeta =>
-      const TaskConstMeta(debugName: "MatrixClient_logout", argNames: ["that"]);
+      const TaskConstMeta(
+        debugName: "MatrixClient_logout",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<RoomTimeline> crateApiAuthMatrixClientOpenTimeline({
+    required MatrixClient that,
+    required String roomId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
+            that,
+            serializer,
+          );
+          sse_encode_String(roomId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiAuthMatrixClientOpenTimelineConstMeta,
+        argValues: [that, roomId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAuthMatrixClientOpenTimelineConstMeta =>
+      const TaskConstMeta(
+        debugName: "MatrixClient_open_timeline",
+        argNames: ["that", "roomId"],
+      );
+
+  @override
+  Future<void> crateApiAuthMatrixClientRecover({
+    required MatrixClient that,
+    required String recoveryKey,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
+            that,
+            serializer,
+          );
+          sse_encode_String(recoveryKey, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_recovery_error,
+        ),
+        constMeta: kCrateApiAuthMatrixClientRecoverConstMeta,
+        argValues: [that, recoveryKey],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAuthMatrixClientRecoverConstMeta =>
+      const TaskConstMeta(
+        debugName: "MatrixClient_recover",
+        argNames: ["that", "recoveryKey"],
+      );
 
   @override
   Future<MatrixClient?> crateApiAuthMatrixClientRestoreSession({
@@ -264,7 +404,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 6,
             port: port_,
           );
         },
@@ -304,7 +444,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 5,
+              funcId: 7,
               port: port_,
             );
           },
@@ -337,7 +477,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_bool,
@@ -366,7 +506,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -383,6 +523,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "MatrixClient_user_id",
         argNames: ["that"],
+      );
+
+  @override
+  Stream<RecoveryStatus> crateApiAuthMatrixClientWatchRecovery({
+    required MatrixClient that,
+  }) {
+    final sink = RustStreamSink<RecoveryStatus>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
+              that,
+              serializer,
+            );
+            sse_encode_StreamSink_recovery_status_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 10,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiAuthMatrixClientWatchRecoveryConstMeta,
+          argValues: [that, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiAuthMatrixClientWatchRecoveryConstMeta =>
+      const TaskConstMeta(
+        debugName: "MatrixClient_watch_recovery",
+        argNames: ["that", "sink"],
       );
 
   @override
@@ -403,7 +584,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 8,
+              funcId: 11,
               port: port_,
             );
           },
@@ -444,7 +625,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 9,
+              funcId: 12,
               port: port_,
             );
           },
@@ -477,7 +658,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -509,7 +690,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 14,
             port: port_,
           );
         },
@@ -525,7 +706,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta get kCrateApiOidcOidcLoginCancelConstMeta =>
-      const TaskConstMeta(debugName: "OidcLogin_cancel", argNames: ["that"]);
+      const TaskConstMeta(
+        debugName: "OidcLogin_cancel",
+        argNames: ["that"],
+      );
 
   @override
   Future<MatrixClient> crateApiOidcOidcLoginComplete({
@@ -542,7 +726,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 15,
             port: port_,
           );
         },
@@ -559,7 +743,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta get kCrateApiOidcOidcLoginCompleteConstMeta =>
-      const TaskConstMeta(debugName: "OidcLogin_complete", argNames: ["that"]);
+      const TaskConstMeta(
+        debugName: "OidcLogin_complete",
+        argNames: ["that"],
+      );
 
   @override
   Future<OidcLogin> crateApiOidcOidcLoginStart({
@@ -575,7 +762,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 16,
             port: port_,
           );
         },
@@ -597,6 +784,272 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<void> crateApiTimelineRoomTimelineCancel({
+    required RoomTimeline that,
+    required String itemId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_String(itemId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineCancelConstMeta,
+        argValues: [that, itemId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineCancelConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_cancel",
+        argNames: ["that", "itemId"],
+      );
+
+  @override
+  Future<void> crateApiTimelineRoomTimelineMarkAsRead({
+    required RoomTimeline that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineMarkAsReadConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineMarkAsReadConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_mark_as_read",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<RoomTimeline> crateApiTimelineRoomTimelineOpenThread({
+    required RoomTimeline that,
+    required String rootEventId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_String(rootEventId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineOpenThreadConstMeta,
+        argValues: [that, rootEventId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineOpenThreadConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_open_thread",
+        argNames: ["that", "rootEventId"],
+      );
+
+  @override
+  Future<bool> crateApiTimelineRoomTimelinePaginateBackwards({
+    required RoomTimeline that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 20,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelinePaginateBackwardsConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelinePaginateBackwardsConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_paginate_backwards",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<void> crateApiTimelineRoomTimelineRetry({
+    required RoomTimeline that,
+    required String itemId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_String(itemId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineRetryConstMeta,
+        argValues: [that, itemId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineRetryConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_retry",
+        argNames: ["that", "itemId"],
+      );
+
+  @override
+  Future<void> crateApiTimelineRoomTimelineSendMarkdown({
+    required RoomTimeline that,
+    required String body,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+            that,
+            serializer,
+          );
+          sse_encode_String(body, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_timeline_error,
+        ),
+        constMeta: kCrateApiTimelineRoomTimelineSendMarkdownConstMeta,
+        argValues: [that, body],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineSendMarkdownConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_send_markdown",
+        argNames: ["that", "body"],
+      );
+
+  @override
+  Stream<TimelineSnapshot> crateApiTimelineRoomTimelineWatch({
+    required RoomTimeline that,
+  }) {
+    final sink = RustStreamSink<TimelineSnapshot>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+              that,
+              serializer,
+            );
+            sse_encode_StreamSink_timeline_snapshot_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 23,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiTimelineRoomTimelineWatchConstMeta,
+          argValues: [that, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiTimelineRoomTimelineWatchConstMeta =>
+      const TaskConstMeta(
+        debugName: "RoomTimeline_watch",
+        argNames: ["that", "sink"],
+      );
+
+  @override
   Future<void> crateApiInitInitApp() {
     return handler.executeNormal(
       NormalTask(
@@ -605,7 +1058,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 24,
             port: port_,
           );
         },
@@ -620,8 +1073,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiInitInitAppConstMeta =>
-      const TaskConstMeta(debugName: "init_app", argNames: []);
+  TaskConstMeta get kCrateApiInitInitAppConstMeta => const TaskConstMeta(
+    debugName: "init_app",
+    argNames: [],
+  );
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_MatrixClient => wire
@@ -638,6 +1093,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType
   get rust_arc_decrement_strong_count_OidcLogin => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerOidcLogin;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_RoomTimeline => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_RoomTimeline => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline;
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
@@ -664,6 +1127,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomTimeline
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RoomTimelineImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   MatrixClient
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
     dynamic raw,
@@ -679,6 +1151,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return OidcLoginImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  RoomTimeline
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RoomTimelineImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -700,7 +1181,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomTimeline
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RoomTimelineImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   RustStreamSink<List<RoomSummary>> dco_decode_StreamSink_list_room_summary_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<RecoveryStatus> dco_decode_StreamSink_recovery_status_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -717,6 +1215,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<SyncStatus> dco_decode_StreamSink_sync_status_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<TimelineSnapshot> dco_decode_StreamSink_timeline_snapshot_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -765,9 +1271,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_i_64(raw);
+  }
+
+  @protected
   LatestMessage dco_decode_box_autoadd_latest_message(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_latest_message(raw);
+  }
+
+  @protected
+  MessageKind dco_decode_box_autoadd_message_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_message_kind(raw);
+  }
+
+  @protected
+  ReplyPreview dco_decode_box_autoadd_reply_preview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_reply_preview(raw);
+  }
+
+  @protected
+  ThreadInfo dco_decode_box_autoadd_thread_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_thread_info(raw);
+  }
+
+  @protected
+  TimelineMessage dco_decode_box_autoadd_timeline_message(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_timeline_message(raw);
   }
 
   @protected
@@ -822,6 +1358,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<TimelineEntry> dco_decode_list_timeline_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_timeline_entry).toList();
+  }
+
+  @protected
+  MessageKind dco_decode_message_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return MessageKind.values[raw as int];
+  }
+
+  @protected
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
@@ -841,17 +1389,91 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
+  }
+
+  @protected
   LatestMessage? dco_decode_opt_box_autoadd_latest_message(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_latest_message(raw);
   }
 
   @protected
+  MessageKind? dco_decode_opt_box_autoadd_message_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_message_kind(raw);
+  }
+
+  @protected
+  ReplyPreview? dco_decode_opt_box_autoadd_reply_preview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_reply_preview(raw);
+  }
+
+  @protected
+  ThreadInfo? dco_decode_opt_box_autoadd_thread_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_thread_info(raw);
+  }
+
+  @protected
+  TimelineMessage? dco_decode_opt_box_autoadd_timeline_message(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_timeline_message(raw);
+  }
+
+  @protected
+  RecoveryError dco_decode_recovery_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RecoveryError(
+      kind: dco_decode_recovery_error_kind(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  RecoveryErrorKind dco_decode_recovery_error_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RecoveryErrorKind.values[raw as int];
+  }
+
+  @protected
+  RecoveryStatus dco_decode_recovery_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RecoveryStatus.values[raw as int];
+  }
+
+  @protected
+  ReplyPreview dco_decode_reply_preview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ReplyPreview(
+      state: dco_decode_reply_state(arr[0]),
+      senderName: dco_decode_opt_String(arr[1]),
+      kind: dco_decode_opt_box_autoadd_message_kind(arr[2]),
+      body: dco_decode_opt_String(arr[3]),
+    );
+  }
+
+  @protected
+  ReplyState dco_decode_reply_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ReplyState.values[raw as int];
+  }
+
+  @protected
   RoomSummary dco_decode_room_summary(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return RoomSummary(
       id: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
@@ -859,10 +1481,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       isInvite: dco_decode_bool(arr[3]),
       unreadMessages: dco_decode_u_32(arr[4]),
       unreadMentions: dco_decode_u_32(arr[5]),
-      memberCount: dco_decode_u_32(arr[6]),
-      heroes: dco_decode_list_String(arr[7]),
-      latest: dco_decode_opt_box_autoadd_latest_message(arr[8]),
+      unreadThreadReplies: dco_decode_u_32(arr[6]),
+      memberCount: dco_decode_u_32(arr[7]),
+      heroes: dco_decode_list_String(arr[8]),
+      latest: dco_decode_opt_box_autoadd_latest_message(arr[9]),
     );
+  }
+
+  @protected
+  SendState dco_decode_send_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return SendState.values[raw as int];
   }
 
   @protected
@@ -875,6 +1504,85 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SyncStatus dco_decode_sync_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return SyncStatus.values[raw as int];
+  }
+
+  @protected
+  ThreadInfo dco_decode_thread_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ThreadInfo(
+      rootEventId: dco_decode_String(arr[0]),
+      replies: dco_decode_u_32(arr[1]),
+      latestSender: dco_decode_opt_String(arr[2]),
+      latestTimestampMs: dco_decode_opt_box_autoadd_i_64(arr[3]),
+      unread: dco_decode_u_32(arr[4]),
+    );
+  }
+
+  @protected
+  TimelineEntry dco_decode_timeline_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return TimelineEntry(
+      dateDividerMs: dco_decode_opt_box_autoadd_i_64(arr[0]),
+      message: dco_decode_opt_box_autoadd_timeline_message(arr[1]),
+    );
+  }
+
+  @protected
+  TimelineError dco_decode_timeline_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return TimelineError(
+      kind: dco_decode_timeline_error_kind(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  TimelineErrorKind dco_decode_timeline_error_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return TimelineErrorKind.values[raw as int];
+  }
+
+  @protected
+  TimelineMessage dco_decode_timeline_message(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return TimelineMessage(
+      id: dco_decode_String(arr[0]),
+      senderId: dco_decode_String(arr[1]),
+      senderName: dco_decode_String(arr[2]),
+      isOwn: dco_decode_bool(arr[3]),
+      timestampMs: dco_decode_i_64(arr[4]),
+      kind: dco_decode_message_kind(arr[5]),
+      body: dco_decode_opt_String(arr[6]),
+      edited: dco_decode_bool(arr[7]),
+      sendState: dco_decode_send_state(arr[8]),
+      thread: dco_decode_opt_box_autoadd_thread_info(arr[9]),
+      replyTo: dco_decode_opt_box_autoadd_reply_preview(arr[10]),
+      readBy: dco_decode_list_String(arr[11]),
+    );
+  }
+
+  @protected
+  TimelineSnapshot dco_decode_timeline_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return TimelineSnapshot(
+      items: dco_decode_list_timeline_entry(arr[0]),
+      reachedStart: dco_decode_bool(arr[1]),
+    );
   }
 
   @protected
@@ -933,6 +1641,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomTimeline
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return RoomTimelineImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   MatrixClient
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
     SseDeserializer deserializer,
@@ -951,6 +1671,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return OidcLoginImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  RoomTimeline
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return RoomTimelineImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -981,7 +1713,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RoomTimeline
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return RoomTimelineImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   RustStreamSink<List<RoomSummary>> sse_decode_StreamSink_list_room_summary_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<RecoveryStatus> sse_decode_StreamSink_recovery_status_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -998,6 +1750,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<SyncStatus> sse_decode_StreamSink_sync_status_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<TimelineSnapshot> sse_decode_StreamSink_timeline_snapshot_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1044,11 +1804,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_64(deserializer));
+  }
+
+  @protected
   LatestMessage sse_decode_box_autoadd_latest_message(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_latest_message(deserializer));
+  }
+
+  @protected
+  MessageKind sse_decode_box_autoadd_message_kind(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_message_kind(deserializer));
+  }
+
+  @protected
+  ReplyPreview sse_decode_box_autoadd_reply_preview(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_reply_preview(deserializer));
+  }
+
+  @protected
+  ThreadInfo sse_decode_box_autoadd_thread_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_thread_info(deserializer));
+  }
+
+  @protected
+  TimelineMessage sse_decode_box_autoadd_timeline_message(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_timeline_message(deserializer));
   }
 
   @protected
@@ -1121,6 +1917,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<TimelineEntry> sse_decode_list_timeline_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <TimelineEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_timeline_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  MessageKind sse_decode_message_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return MessageKind.values[inner];
+  }
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1148,6 +1965,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_64(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   LatestMessage? sse_decode_opt_box_autoadd_latest_message(
     SseDeserializer deserializer,
   ) {
@@ -1161,6 +1989,104 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  MessageKind? sse_decode_opt_box_autoadd_message_kind(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_message_kind(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ReplyPreview? sse_decode_opt_box_autoadd_reply_preview(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_reply_preview(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ThreadInfo? sse_decode_opt_box_autoadd_thread_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_thread_info(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  TimelineMessage? sse_decode_opt_box_autoadd_timeline_message(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_timeline_message(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  RecoveryError sse_decode_recovery_error(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_recovery_error_kind(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return RecoveryError(kind: var_kind, message: var_message);
+  }
+
+  @protected
+  RecoveryErrorKind sse_decode_recovery_error_kind(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return RecoveryErrorKind.values[inner];
+  }
+
+  @protected
+  RecoveryStatus sse_decode_recovery_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return RecoveryStatus.values[inner];
+  }
+
+  @protected
+  ReplyPreview sse_decode_reply_preview(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_state = sse_decode_reply_state(deserializer);
+    var var_senderName = sse_decode_opt_String(deserializer);
+    var var_kind = sse_decode_opt_box_autoadd_message_kind(deserializer);
+    var var_body = sse_decode_opt_String(deserializer);
+    return ReplyPreview(
+      state: var_state,
+      senderName: var_senderName,
+      kind: var_kind,
+      body: var_body,
+    );
+  }
+
+  @protected
+  ReplyState sse_decode_reply_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ReplyState.values[inner];
+  }
+
+  @protected
   RoomSummary sse_decode_room_summary(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -1169,6 +2095,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_isInvite = sse_decode_bool(deserializer);
     var var_unreadMessages = sse_decode_u_32(deserializer);
     var var_unreadMentions = sse_decode_u_32(deserializer);
+    var var_unreadThreadReplies = sse_decode_u_32(deserializer);
     var var_memberCount = sse_decode_u_32(deserializer);
     var var_heroes = sse_decode_list_String(deserializer);
     var var_latest = sse_decode_opt_box_autoadd_latest_message(deserializer);
@@ -1179,10 +2106,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       isInvite: var_isInvite,
       unreadMessages: var_unreadMessages,
       unreadMentions: var_unreadMentions,
+      unreadThreadReplies: var_unreadThreadReplies,
       memberCount: var_memberCount,
       heroes: var_heroes,
       latest: var_latest,
     );
+  }
+
+  @protected
+  SendState sse_decode_send_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return SendState.values[inner];
   }
 
   @protected
@@ -1197,6 +2132,90 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return SyncStatus.values[inner];
+  }
+
+  @protected
+  ThreadInfo sse_decode_thread_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_rootEventId = sse_decode_String(deserializer);
+    var var_replies = sse_decode_u_32(deserializer);
+    var var_latestSender = sse_decode_opt_String(deserializer);
+    var var_latestTimestampMs = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_unread = sse_decode_u_32(deserializer);
+    return ThreadInfo(
+      rootEventId: var_rootEventId,
+      replies: var_replies,
+      latestSender: var_latestSender,
+      latestTimestampMs: var_latestTimestampMs,
+      unread: var_unread,
+    );
+  }
+
+  @protected
+  TimelineEntry sse_decode_timeline_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_dateDividerMs = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_message = sse_decode_opt_box_autoadd_timeline_message(deserializer);
+    return TimelineEntry(
+      dateDividerMs: var_dateDividerMs,
+      message: var_message,
+    );
+  }
+
+  @protected
+  TimelineError sse_decode_timeline_error(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_timeline_error_kind(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return TimelineError(kind: var_kind, message: var_message);
+  }
+
+  @protected
+  TimelineErrorKind sse_decode_timeline_error_kind(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return TimelineErrorKind.values[inner];
+  }
+
+  @protected
+  TimelineMessage sse_decode_timeline_message(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_senderId = sse_decode_String(deserializer);
+    var var_senderName = sse_decode_String(deserializer);
+    var var_isOwn = sse_decode_bool(deserializer);
+    var var_timestampMs = sse_decode_i_64(deserializer);
+    var var_kind = sse_decode_message_kind(deserializer);
+    var var_body = sse_decode_opt_String(deserializer);
+    var var_edited = sse_decode_bool(deserializer);
+    var var_sendState = sse_decode_send_state(deserializer);
+    var var_thread = sse_decode_opt_box_autoadd_thread_info(deserializer);
+    var var_replyTo = sse_decode_opt_box_autoadd_reply_preview(deserializer);
+    var var_readBy = sse_decode_list_String(deserializer);
+    return TimelineMessage(
+      id: var_id,
+      senderId: var_senderId,
+      senderName: var_senderName,
+      isOwn: var_isOwn,
+      timestampMs: var_timestampMs,
+      kind: var_kind,
+      body: var_body,
+      edited: var_edited,
+      sendState: var_sendState,
+      thread: var_thread,
+      replyTo: var_replyTo,
+      readBy: var_readBy,
+    );
+  }
+
+  @protected
+  TimelineSnapshot sse_decode_timeline_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_items = sse_decode_list_timeline_entry(deserializer);
+    var var_reachedStart = sse_decode_bool(deserializer);
+    return TimelineSnapshot(items: var_items, reachedStart: var_reachedStart);
   }
 
   @protected
@@ -1259,6 +2278,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    RoomTimeline self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as RoomTimelineImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMatrixClient(
     MatrixClient self,
     SseSerializer serializer,
@@ -1279,6 +2311,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as OidcLoginImpl).frbInternalSseEncode(move: false),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    RoomTimeline self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as RoomTimelineImpl).frbInternalSseEncode(move: false),
       serializer,
     );
   }
@@ -1310,6 +2355,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRoomTimeline(
+    RoomTimeline self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as RoomTimelineImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_StreamSink_list_room_summary_Sse(
     RustStreamSink<List<RoomSummary>> self,
     SseSerializer serializer,
@@ -1319,6 +2377,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_room_summary,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_recovery_status_Sse(
+    RustStreamSink<RecoveryStatus> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_recovery_status,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -1353,6 +2428,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_timeline_snapshot_Sse(
+    RustStreamSink<TimelineSnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_timeline_snapshot,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -1402,12 +2494,57 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_latest_message(
     LatestMessage self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_latest_message(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_message_kind(
+    MessageKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_message_kind(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_reply_preview(
+    ReplyPreview self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_reply_preview(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_thread_info(
+    ThreadInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_thread_info(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_timeline_message(
+    TimelineMessage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_timeline_message(self, serializer);
   }
 
   @protected
@@ -1473,6 +2610,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_timeline_entry(
+    List<TimelineEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_timeline_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_message_kind(MessageKind self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1500,6 +2655,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_64(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_latest_message(
     LatestMessage? self,
     SseSerializer serializer,
@@ -1513,6 +2681,98 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_message_kind(
+    MessageKind? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_message_kind(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_reply_preview(
+    ReplyPreview? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_reply_preview(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_thread_info(
+    ThreadInfo? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_thread_info(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_timeline_message(
+    TimelineMessage? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_timeline_message(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_recovery_error(RecoveryError self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_recovery_error_kind(self.kind, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_recovery_error_kind(
+    RecoveryErrorKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_recovery_status(
+    RecoveryStatus self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_reply_preview(ReplyPreview self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_reply_state(self.state, serializer);
+    sse_encode_opt_String(self.senderName, serializer);
+    sse_encode_opt_box_autoadd_message_kind(self.kind, serializer);
+    sse_encode_opt_String(self.body, serializer);
+  }
+
+  @protected
+  void sse_encode_reply_state(ReplyState self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_room_summary(RoomSummary self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -1521,9 +2781,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.isInvite, serializer);
     sse_encode_u_32(self.unreadMessages, serializer);
     sse_encode_u_32(self.unreadMentions, serializer);
+    sse_encode_u_32(self.unreadThreadReplies, serializer);
     sse_encode_u_32(self.memberCount, serializer);
     sse_encode_list_String(self.heroes, serializer);
     sse_encode_opt_box_autoadd_latest_message(self.latest, serializer);
+  }
+
+  @protected
+  void sse_encode_send_state(SendState self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected
@@ -1536,6 +2803,69 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_sync_status(SyncStatus self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_thread_info(ThreadInfo self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.rootEventId, serializer);
+    sse_encode_u_32(self.replies, serializer);
+    sse_encode_opt_String(self.latestSender, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.latestTimestampMs, serializer);
+    sse_encode_u_32(self.unread, serializer);
+  }
+
+  @protected
+  void sse_encode_timeline_entry(TimelineEntry self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_i_64(self.dateDividerMs, serializer);
+    sse_encode_opt_box_autoadd_timeline_message(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_timeline_error(TimelineError self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_timeline_error_kind(self.kind, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_timeline_error_kind(
+    TimelineErrorKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_timeline_message(
+    TimelineMessage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.senderId, serializer);
+    sse_encode_String(self.senderName, serializer);
+    sse_encode_bool(self.isOwn, serializer);
+    sse_encode_i_64(self.timestampMs, serializer);
+    sse_encode_message_kind(self.kind, serializer);
+    sse_encode_opt_String(self.body, serializer);
+    sse_encode_bool(self.edited, serializer);
+    sse_encode_send_state(self.sendState, serializer);
+    sse_encode_opt_box_autoadd_thread_info(self.thread, serializer);
+    sse_encode_opt_box_autoadd_reply_preview(self.replyTo, serializer);
+    sse_encode_list_String(self.readBy, serializer);
+  }
+
+  @protected
+  void sse_encode_timeline_snapshot(
+    TimelineSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_timeline_entry(self.items, serializer);
+    sse_encode_bool(self.reachedStart, serializer);
   }
 
   @protected
@@ -1581,26 +2911,50 @@ class MatrixClientImpl extends RustOpaque implements MatrixClient {
         RustLib.instance.api.rust_arc_decrement_strong_count_MatrixClientPtr,
   );
 
-  String get deviceId =>
-      RustLib.instance.api.crateApiAuthMatrixClientDeviceId(that: this);
+  String get deviceId => RustLib.instance.api.crateApiAuthMatrixClientDeviceId(
+    that: this,
+  );
 
-  Future<void> logout() =>
-      RustLib.instance.api.crateApiAuthMatrixClientLogout(that: this);
+  Future<void> logout() => RustLib.instance.api.crateApiAuthMatrixClientLogout(
+    that: this,
+  );
+
+  Future<RoomTimeline> openTimeline({required String roomId}) => RustLib
+      .instance
+      .api
+      .crateApiAuthMatrixClientOpenTimeline(that: this, roomId: roomId);
+
+  Future<void> recover({required String recoveryKey}) => RustLib.instance.api
+      .crateApiAuthMatrixClientRecover(that: this, recoveryKey: recoveryKey);
 
   Stream<SessionEvent> sessionEvents() =>
-      RustLib.instance.api.crateApiAuthMatrixClientSessionEvents(that: this);
+      RustLib.instance.api.crateApiAuthMatrixClientSessionEvents(
+        that: this,
+      );
 
   bool get sessionSaved =>
-      RustLib.instance.api.crateApiAuthMatrixClientSessionSaved(that: this);
+      RustLib.instance.api.crateApiAuthMatrixClientSessionSaved(
+        that: this,
+      );
 
-  String get userId =>
-      RustLib.instance.api.crateApiAuthMatrixClientUserId(that: this);
+  String get userId => RustLib.instance.api.crateApiAuthMatrixClientUserId(
+    that: this,
+  );
+
+  Stream<RecoveryStatus> watchRecovery() =>
+      RustLib.instance.api.crateApiAuthMatrixClientWatchRecovery(
+        that: this,
+      );
 
   Stream<List<RoomSummary>> watchRooms() =>
-      RustLib.instance.api.crateApiAuthMatrixClientWatchRooms(that: this);
+      RustLib.instance.api.crateApiAuthMatrixClientWatchRooms(
+        that: this,
+      );
 
   Stream<SyncStatus> watchSyncStatus() =>
-      RustLib.instance.api.crateApiAuthMatrixClientWatchSyncStatus(that: this);
+      RustLib.instance.api.crateApiAuthMatrixClientWatchSyncStatus(
+        that: this,
+      );
 }
 
 @sealed
@@ -1623,11 +2977,66 @@ class OidcLoginImpl extends RustOpaque implements OidcLogin {
   );
 
   String get authorizationUrl =>
-      RustLib.instance.api.crateApiOidcOidcLoginAuthorizationUrl(that: this);
+      RustLib.instance.api.crateApiOidcOidcLoginAuthorizationUrl(
+        that: this,
+      );
 
-  Future<void> cancel() =>
-      RustLib.instance.api.crateApiOidcOidcLoginCancel(that: this);
+  Future<void> cancel() => RustLib.instance.api.crateApiOidcOidcLoginCancel(
+    that: this,
+  );
 
   Future<MatrixClient> complete() =>
-      RustLib.instance.api.crateApiOidcOidcLoginComplete(that: this);
+      RustLib.instance.api.crateApiOidcOidcLoginComplete(
+        that: this,
+      );
+}
+
+@sealed
+class RoomTimelineImpl extends RustOpaque implements RoomTimeline {
+  // Not to be used by end users
+  RoomTimelineImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  RoomTimelineImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
+    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_RoomTimeline,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_RoomTimeline,
+    rustArcDecrementStrongCountPtr:
+        RustLib.instance.api.rust_arc_decrement_strong_count_RoomTimelinePtr,
+  );
+
+  Future<void> cancel({required String itemId}) => RustLib.instance.api
+      .crateApiTimelineRoomTimelineCancel(that: this, itemId: itemId);
+
+  Future<void> markAsRead() =>
+      RustLib.instance.api.crateApiTimelineRoomTimelineMarkAsRead(
+        that: this,
+      );
+
+  Future<RoomTimeline> openThread({required String rootEventId}) =>
+      RustLib.instance.api.crateApiTimelineRoomTimelineOpenThread(
+        that: this,
+        rootEventId: rootEventId,
+      );
+
+  Future<bool> paginateBackwards() =>
+      RustLib.instance.api.crateApiTimelineRoomTimelinePaginateBackwards(
+        that: this,
+      );
+
+  Future<void> retry({required String itemId}) => RustLib.instance.api
+      .crateApiTimelineRoomTimelineRetry(that: this, itemId: itemId);
+
+  Future<void> sendMarkdown({required String body}) => RustLib.instance.api
+      .crateApiTimelineRoomTimelineSendMarkdown(that: this, body: body);
+
+  Stream<TimelineSnapshot> watch() =>
+      RustLib.instance.api.crateApiTimelineRoomTimelineWatch(
+        that: this,
+      );
 }

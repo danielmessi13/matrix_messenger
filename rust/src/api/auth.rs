@@ -14,7 +14,7 @@ use matrix_sdk::{
         },
         OAuthError,
     },
-    ruma::api::error::ErrorKind,
+    ruma::{api::error::ErrorKind, OwnedRoomId},
     AuthSession, Client, ClientBuildError, HttpError, SessionChange,
 };
 use tokio::{
@@ -24,11 +24,18 @@ use tokio::{
 };
 
 use crate::{
-    api::rooms::{RoomSummary, SyncStatus},
+    api::{
+        recovery::{self, RecoveryError, RecoveryStatus},
+        rooms::{RoomSummary, SyncStatus},
+        timeline::{RoomTimeline, TimelineError, TimelineErrorKind},
+    },
     frb_generated::StreamSink,
     oidc_callback::CallbackError,
     room_list::{RoomSync, RoomSyncStopper},
     session_store::{self, SavedAuth, StoredSession},
+    client_builder::client_builder,
+    threads::ThreadReads,
+    timeline::TimelineHandle,
 };
 
 const DEVICE_DISPLAY_NAME: &str = "Matrix Messenger (desktop)";
@@ -47,6 +54,7 @@ pub struct MatrixClient {
     client: ManuallyDrop<Client>,
     rooms: ManuallyDrop<RoomSync>,
     runtime: Handle,
+    thread_reads: ThreadReads,
     vault: Option<Arc<Vault>>,
     events: EventSink,
     session_watcher: AbortHandle,
@@ -102,7 +110,7 @@ impl MatrixClient {
 
         let saved = stored.clone();
         let stores_dir = session_store::stores_dir(&data_dir);
-        let client = Client::builder()
+        let client = client_builder()
             .homeserver_url(&stored.homeserver_url)
             .sqlite_store(
                 stores_dir.join(&stored.store_name),
@@ -129,7 +137,6 @@ impl MatrixClient {
         // Daqui em diante um UnknownToken vem do próprio logout, não de uma revogação.
         self.session_watcher.abort();
         self.rooms.stop().await;
-        // TODO: ativar key backup/recovery do SDK; sem isso o próximo login não decifra o histórico das salas cifradas.
         tokio::time::timeout(LOGOUT_TIMEOUT, self.client.logout())
             .await
             .ok();
@@ -175,6 +182,25 @@ impl MatrixClient {
             .watch_status(move |status| sink.add(status).is_ok());
     }
 
+    pub fn watch_recovery(&self, sink: StreamSink<RecoveryStatus>) {
+        recovery::watch(&self.client, &self.runtime, move |status| {
+            sink.add(status).is_ok()
+        });
+    }
+
+    pub async fn recover(&self, recovery_key: String) -> Result<(), RecoveryError> {
+        recovery::recover(&self.client, &recovery_key).await
+    }
+
+    pub async fn open_timeline(&self, room_id: String) -> Result<RoomTimeline, TimelineError> {
+        let room = OwnedRoomId::try_from(room_id.as_str())
+            .ok()
+            .and_then(|room_id| self.client.get_room(&room_id))
+            .ok_or_else(|| TimelineError::new(TimelineErrorKind::RoomNotFound, room_id))?;
+        let handle = TimelineHandle::open(room, None, self.thread_reads.clone(), self.runtime.clone()).await?;
+        Ok(RoomTimeline::new(handle))
+    }
+
     #[cfg(test)]
     pub(crate) fn room_sync(&self) -> &RoomSync {
         &self.rooms
@@ -188,7 +214,8 @@ impl MatrixClient {
         let events = EventSink::default();
         // Inscrito aqui, e não dentro da task, para não perder um evento antes de ela rodar.
         let changes = client.subscribe_to_session_changes();
-        let rooms = RoomSync::new(client.clone(), Handle::current());
+        let thread_reads = ThreadReads::default();
+        let rooms = RoomSync::new(client.clone(), thread_reads.clone(), Handle::current());
         let session_watcher = tokio::spawn(watch_session(
             changes,
             vault.clone(),
@@ -200,6 +227,7 @@ impl MatrixClient {
             client: ManuallyDrop::new(client),
             rooms: ManuallyDrop::new(rooms),
             runtime: Handle::current(),
+            thread_reads,
             vault,
             events,
             session_watcher,
@@ -351,7 +379,7 @@ async fn login_new_device(
     store_path: &Path,
     passphrase: &str,
 ) -> Result<Client, AuthError> {
-    let client = Client::builder()
+    let client = client_builder()
         .server_name_or_homeserver_url(homeserver.trim())
         .sqlite_store(store_path, Some(passphrase))
         .handle_refresh_tokens()
@@ -515,6 +543,7 @@ mod tests {
         ruma::api::error::UnknownTokenErrorData,
     };
 
+    use crate::api::timeline::{SendState, TimelineErrorKind};
     use crate::test_support::{offline_client, session_meta, store_count, temp_data_dir, tokens};
 
     #[test]
@@ -611,8 +640,81 @@ mod tests {
         assert!(vault().stored(None).is_none());
     }
 
+    // A variável de ambiente tem prioridade sobre o .env da raiz do app.
     fn env_var(name: &str) -> String {
-        std::env::var(name).unwrap_or_else(|_| panic!("defina {name}"))
+        std::env::var(name)
+            .ok()
+            .or_else(|| dotenv_value(name))
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| panic!("defina {name} no ambiente ou no .env"))
+    }
+
+    fn dotenv_value(name: &str) -> Option<String> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.env");
+        std::fs::read_to_string(path).ok()?.lines().find_map(|line| {
+            let (key, value) = line.split_once('=')?;
+            (key.trim() == name).then(|| value.trim().to_owned())
+        })
+    }
+
+    #[tokio::test]
+    async fn open_timeline_of_unknown_room_is_room_not_found() {
+        let store_path = std::path::PathBuf::from(temp_data_dir("timeline_unknown")).join("store");
+        let client = MatrixClient::new(
+            offline_client(&store_path).await,
+            temp_data_dir("timeline_unknown_data"),
+            None,
+        );
+
+        for room_id in ["!naoexiste:b.c", "isto não é um id"] {
+            let error = client.open_timeline(room_id.to_owned()).await.err().unwrap();
+            assert_eq!(error.kind, TimelineErrorKind::RoomNotFound, "{room_id}");
+        }
+    }
+
+    /// Requer MATRIX_HOMESERVER, MATRIX_USERNAME e MATRIX_PASSWORD e uma sala na conta.
+    #[tokio::test]
+    #[ignore]
+    async fn timeline_send_with_real_account() {
+        let client = MatrixClient::login(
+            env_var("MATRIX_HOMESERVER"),
+            env_var("MATRIX_USERNAME"),
+            env_var("MATRIX_PASSWORD"),
+            temp_data_dir("real_timeline"),
+        )
+        .await
+        .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));
+        let (rooms_tx, mut rooms_rx) = tokio::sync::mpsc::unbounded_channel();
+        client.room_sync().watch_rooms(move |rooms| rooms_tx.send(rooms).is_ok());
+        let rooms = tokio::time::timeout(Duration::from_secs(60), rooms_rx.recv())
+            .await
+            .expect("lista em até 60 s")
+            .expect("sync encerrado");
+        let room = rooms.iter().find(|room| !room.is_invite).expect("uma sala na conta");
+
+        let timeline = client.open_timeline(room.id.clone()).await.unwrap();
+        timeline
+            .handle
+            .send_markdown("teste do **matrix_messenger**".to_owned())
+            .await
+            .unwrap();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        timeline.handle.watch(move |snapshot| tx.send(snapshot).is_ok());
+        loop {
+            let snapshot = tokio::time::timeout(Duration::from_secs(30), rx.recv())
+                .await
+                .expect("snapshot em até 30 s")
+                .expect("timeline encerrada");
+            let sent = snapshot.items.iter().filter_map(|entry| entry.message.as_ref()).any(|m| {
+                m.is_own && m.send_state == SendState::Sent && m.body.as_deref() == Some("teste do **matrix_messenger**")
+            });
+            if sent {
+                break;
+            }
+        }
+
+        drop(timeline);
+        client.logout().await.unwrap_or_else(|e| panic!("logout falhou: {}", e.message));
     }
 
     #[test]

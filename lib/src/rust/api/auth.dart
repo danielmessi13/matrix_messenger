@@ -7,7 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+import 'recovery.dart';
 import 'rooms.dart';
+import 'timeline.dart';
 
 // These functions are ignored because they are not marked as `pub`: `finish_new_login`, `forget`, `login_new_device`, `new`, `new`, `new`, `remove_failed_store`, `run_blocking`, `save_on_refresh`, `save_tokens`, `storage`, `stored`, `watch_action`, `watch_session`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Vault`, `WatchAction`
@@ -31,6 +33,10 @@ abstract class MatrixClient implements RustOpaqueInterface {
 
   Future<void> logout();
 
+  Future<RoomTimeline> openTimeline({required String roomId});
+
+  Future<void> recover({required String recoveryKey});
+
   static Future<MatrixClient?> restoreSession({required String dataDir}) =>
       RustLib.instance.api.crateApiAuthMatrixClientRestoreSession(
         dataDir: dataDir,
@@ -42,6 +48,8 @@ abstract class MatrixClient implements RustOpaqueInterface {
 
   String get userId;
 
+  Stream<RecoveryStatus> watchRecovery();
+
   Stream<List<RoomSummary>> watchRooms();
 
   Stream<SyncStatus> watchSyncStatus();
@@ -51,7 +59,10 @@ class AuthError implements FrbException {
   final AuthErrorKind kind;
   final String message;
 
-  const AuthError({required this.kind, required this.message});
+  const AuthError({
+    required this.kind,
+    required this.message,
+  });
 
   @override
   int get hashCode => kind.hashCode ^ message.hashCode;
@@ -79,4 +90,6 @@ enum AuthErrorKind {
   unknown,
 }
 
-enum SessionEvent { revoked }
+enum SessionEvent {
+  revoked,
+}

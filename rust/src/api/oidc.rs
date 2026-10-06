@@ -18,6 +18,7 @@ use url::Url;
 
 use crate::{
     api::auth::{finish_new_login, remove_failed_store, AuthError, AuthErrorKind, MatrixClient},
+    client_builder::client_builder,
     oidc_callback::CallbackServer,
     session_store,
 };
@@ -146,7 +147,7 @@ async fn prepare(
     store_path: &Path,
     passphrase: &str,
 ) -> Result<(Client, CallbackServer, OAuthAuthorizationData), AuthError> {
-    let client = Client::builder()
+    let client = client_builder()
         .server_name_or_homeserver_url(homeserver.trim())
         .sqlite_store(store_path, Some(passphrase))
         .handle_refresh_tokens()

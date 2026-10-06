@@ -1,7 +1,13 @@
+// Os futures da Timeline do matrix-sdk-ui passam do limite padrão de 128 na checagem de tipos.
+#![recursion_limit = "256"]
 pub mod api;
+mod client_builder;
+mod diff_window;
 mod frb_generated;
 mod oidc_callback;
 mod room_list;
 mod session_store;
+mod threads;
+mod timeline;
 #[cfg(test)]
 mod test_support;
