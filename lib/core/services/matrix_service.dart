@@ -48,6 +48,7 @@ class MatrixService {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) => _guard(() async {
     final dataDir = await _dataDir();
     await cancelBrowserLogin();
@@ -58,6 +59,7 @@ class MatrixService {
       username: username,
       password: password,
       dataDir: dataDir,
+      keepSignedIn: keepSignedIn,
     );
     return _adopt(client);
   });
@@ -65,6 +67,7 @@ class MatrixService {
   Future<Result<MatrixClient>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   }) => _guard(() async {
     final dataDir = await _dataDir();
     await cancelBrowserLogin();
@@ -72,6 +75,7 @@ class MatrixService {
     final login = await _bridge.startBrowserLogin(
       homeserver: homeserver,
       dataDir: dataDir,
+      keepSignedIn: keepSignedIn,
     );
     _pendingBrowserLogin = login;
     try {

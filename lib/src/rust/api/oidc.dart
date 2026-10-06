@@ -24,8 +24,10 @@ abstract class OidcLogin implements RustOpaqueInterface {
   static Future<OidcLogin> start({
     required String homeserver,
     required String dataDir,
+    required bool keepSignedIn,
   }) => RustLib.instance.api.crateApiOidcOidcLoginStart(
     homeserver: homeserver,
     dataDir: dataDir,
+    keepSignedIn: keepSignedIn,
   );
 }

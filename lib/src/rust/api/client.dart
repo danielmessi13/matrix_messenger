@@ -39,11 +39,13 @@ abstract class MatrixClient implements RustOpaqueInterface {
     required String username,
     required String password,
     required String dataDir,
+    required bool keepSignedIn,
   }) => RustLib.instance.api.crateApiClientMatrixClientLogin(
     homeserver: homeserver,
     username: username,
     password: password,
     dataDir: dataDir,
+    keepSignedIn: keepSignedIn,
   );
 
   Future<void> logout();

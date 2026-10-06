@@ -458,6 +458,7 @@ mod tests {
             env_var("MATRIX_USERNAME"),
             env_var("MATRIX_PASSWORD"),
             temp_data_dir("real_rooms"),
+            true,
         )
         .await
         .unwrap_or_else(|e| panic!("login falhou: {:?} - {}", e.kind, e.message));

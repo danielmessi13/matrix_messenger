@@ -231,4 +231,23 @@ void main() {
     expect(await service.recover('EsTx'), isA<Error<void>>());
     expect(await service.watchRecovery().toList(), isEmpty);
   });
+
+  test('repassa keepSignedIn para a ponte nos dois logins', () async {
+    await service.login(
+      homeserver: 'matrix.org',
+      username: 'alice',
+      password: 'x',
+      keepSignedIn: false,
+    );
+    final browser = service.loginWithBrowser(
+      homeserver: 'matrix.org',
+      onAuthorizationUrl: (_) {},
+      keepSignedIn: false,
+    );
+    await flush();
+    bridge.browserLogin.finish(FakeMatrixClient.of(kUserSession));
+    await browser;
+
+    expect(bridge.keepSignedInCalls, [false, false]);
+  });
 }

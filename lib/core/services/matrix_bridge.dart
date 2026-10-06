@@ -13,15 +13,22 @@ class MatrixBridge {
     required String username,
     required String password,
     required String dataDir,
+    required bool keepSignedIn,
   }) => MatrixClient.login(
     homeserver: homeserver,
     username: username,
     password: password,
     dataDir: dataDir,
+    keepSignedIn: keepSignedIn,
   );
 
   Future<OidcLogin> startBrowserLogin({
     required String homeserver,
     required String dataDir,
-  }) => OidcLogin.start(homeserver: homeserver, dataDir: dataDir);
+    required bool keepSignedIn,
+  }) => OidcLogin.start(
+    homeserver: homeserver,
+    dataDir: dataDir,
+    keepSignedIn: keepSignedIn,
+  );
 }

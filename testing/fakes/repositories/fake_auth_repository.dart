@@ -39,6 +39,8 @@ class FakeAuthRepository implements AuthRepository {
 
   int logoutCalls = 0;
 
+  final keepSignedInCalls = <bool>[];
+
   @override
   AuthFailureType? lastSignOutReason;
 
@@ -71,7 +73,9 @@ class FakeAuthRepository implements AuthRepository {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) async {
+    keepSignedInCalls.add(keepSignedIn);
     loginCalls.add((
       homeserver: homeserver,
       username: username,
@@ -98,7 +102,9 @@ class FakeAuthRepository implements AuthRepository {
   Future<Result<UserSession>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   }) async {
+    keepSignedInCalls.add(keepSignedIn);
     browserLoginCalls.add(homeserver);
     final cancel = _browserCancel = Completer<void>();
     onAuthorizationUrl(authorizationUrl);

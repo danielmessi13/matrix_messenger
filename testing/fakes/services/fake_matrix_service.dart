@@ -26,6 +26,7 @@ class FakeMatrixService implements MatrixService {
     'https://account.matrix.org/authorize?state=abc',
   );
   final loginWithBrowserCalls = <String>[];
+  final keepSignedInCalls = <bool>[];
   int cancelBrowserLoginCalls = 0;
   final revokedController = StreamController<void>.broadcast();
 
@@ -52,7 +53,9 @@ class FakeMatrixService implements MatrixService {
     required String homeserver,
     required String username,
     required String password,
+    bool keepSignedIn = true,
   }) async {
+    keepSignedInCalls.add(keepSignedIn);
     loginCalls.add((
       homeserver: homeserver,
       username: username,
@@ -71,7 +74,9 @@ class FakeMatrixService implements MatrixService {
   Future<Result<MatrixClient>> loginWithBrowser({
     required String homeserver,
     required void Function(Uri url) onAuthorizationUrl,
+    bool keepSignedIn = true,
   }) async {
+    keepSignedInCalls.add(keepSignedIn);
     loginWithBrowserCalls.add(homeserver);
     onAuthorizationUrl(authorizationUrl);
     return loginWithBrowserResult;
