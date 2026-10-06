@@ -372,7 +372,7 @@ class _RenderNoIntrinsicWidth extends RenderProxyBox {
   double computeMaxIntrinsicWidth(double height) => 0;
 }
 
-// Ancorado no balão, meio acima do canto, como no protótipo; fica numa camada acima para o clique funcionar fora do balão.
+// Ancorado no balão, ao lado do canto superior; fica numa camada acima para o clique funcionar fora do balão.
 class _HoverActions extends StatefulWidget {
   const _HoverActions({
     required this.messageId,
@@ -447,7 +447,8 @@ class _HoverActionsState extends State<_HoverActions> {
           // Cresce para o lado oposto à borda da tela: balão curto colado na direita não empurra o menu para fora.
           targetAnchor: end ? Alignment.topLeft : Alignment.topRight,
           followerAnchor: end ? Alignment.topRight : Alignment.topLeft,
-          offset: Offset(end ? 12 : -12, -20),
+          // Fora do balão, para não cobrir a hora no cabeçalho.
+          offset: Offset(end ? -12 : 12, -20),
           child: MouseRegion(
             onEnter: (_) => _hover(bar: true),
             onExit: (_) => _hover(bar: false),

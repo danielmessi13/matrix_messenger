@@ -156,26 +156,56 @@ class _Panes extends StatelessWidget {
   final DateTime now;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      FilterRail(
-        expanded: home.filtersExpanded,
-        selected: list.filter,
-        unreadByFilter: list.unreadByFilter,
-        onSelect: roomListViewModel.selectFilter,
-        onToggle: viewModel.toggleFilters,
-      ),
-      RoomListPane(
-        expanded: home.roomListExpanded,
-        state: list,
-        now: now,
-        onSelect: roomListViewModel.selectRoom,
-        onToggle: viewModel.toggleRoomList,
-      ),
-      Expanded(
-        child: ConversationPane(room: list.selectedRoom, now: now),
-      ),
-    ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final panes = visiblePanes(home, box.maxWidth);
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilterRail(
+            expanded: panes.filters,
+            selected: list.filter,
+            unreadByFilter: list.unreadByFilter,
+            onSelect: roomListViewModel.selectFilter,
+            onToggle: panes.filters
+                ? viewModel.toggleFilters
+                : () => viewModel.expandFilters(width: box.maxWidth),
+          ),
+          RoomListPane(
+            expanded: panes.list,
+            state: list,
+            now: now,
+            onSelect: roomListViewModel.selectRoom,
+            onToggle: panes.list
+                ? viewModel.toggleRoomList
+                : () => viewModel.expandRoomList(width: box.maxWidth),
+          ),
+          Expanded(
+            child: ConversationPane(
+              room: list.selectedRoom,
+              now: now,
+              onThreadOpenChanged: viewModel.threadVisibilityChanged,
+            ),
+          ),
+        ],
+      );
+    },
   );
+}
+
+// Com a thread aberta, recolhe lista e filtros que tirariam o espaço dela ao lado da conversa.
+({bool filters, bool list}) visiblePanes(HomeState home, double width) {
+  var filters = home.filtersExpanded;
+  var list = home.roomListExpanded;
+  final keptWidth = home.panesOverThreadWidth;
+  if (!home.threadOpen || (keptWidth != null && width >= keptWidth)) {
+    return (filters: filters, list: list);
+  }
+  double needed() =>
+      (filters ? kFilterRailWidth : kFilterRailCompactWidth) +
+      (list ? kRoomListWidth : kRoomListCompactWidth) +
+      kThreadSideBySideWidth;
+  if (list && needed() > width) list = false;
+  if (filters && needed() > width) filters = false;
+  return (filters: filters, list: list);
 }

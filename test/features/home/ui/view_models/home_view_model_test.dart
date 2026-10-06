@@ -56,4 +56,44 @@ void main() {
     act: (viewModel) => viewModel.dismissSessionWarning(),
     verify: (viewModel) => expect(viewModel.state.showSessionWarning, isFalse),
   );
+
+  test('thread aberta e fechada', () async {
+    final viewModel = HomeViewModel(kUserSession)
+      ..threadVisibilityChanged(true);
+
+    expect(viewModel.state.threadOpen, isTrue);
+    viewModel.threadVisibilityChanged(false);
+    expect(viewModel.state.threadOpen, isFalse);
+    await viewModel.close();
+  });
+
+  test(
+    'abrir a lista à mão com a thread aberta deixa a thread por cima',
+    () async {
+      final viewModel = HomeViewModel(kUserSession)
+        ..threadVisibilityChanged(true)
+        ..expandRoomList(width: 1440);
+
+      expect(viewModel.state.roomListExpanded, isTrue);
+      expect(viewModel.state.panesOverThreadWidth, 1440);
+      viewModel.threadVisibilityChanged(false);
+      expect(viewModel.state.panesOverThreadWidth, isNull);
+      await viewModel.close();
+    },
+  );
+
+  test('abrir os filtros à mão sem thread não muda a sobreposição', () async {
+    final viewModel = HomeViewModel(kUserSession)..expandFilters(width: 1440);
+
+    expect(viewModel.state.filtersExpanded, isTrue);
+    expect(viewModel.state.panesOverThreadWidth, isNull);
+    await viewModel.close();
+  });
+
+  test('aviso de thread depois de fechado não quebra', () async {
+    final viewModel = HomeViewModel(kUserSession);
+    await viewModel.close();
+
+    expect(() => viewModel.threadVisibilityChanged(false), returnsNormally);
+  });
 }

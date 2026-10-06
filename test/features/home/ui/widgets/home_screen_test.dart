@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix_messenger/app/theme.dart';
+import 'package:matrix_messenger/core/ui/animated_pane.dart';
 import 'package:matrix_messenger/features/auth/data/repositories/auth_repository.dart';
 import 'package:matrix_messenger/features/auth/domain/models/user_session.dart';
 import 'package:matrix_messenger/features/conversation/data/repositories/conversation_repository.dart';
@@ -13,12 +14,14 @@ import 'package:matrix_messenger/features/recovery/data/repositories/recovery_re
 import 'package:matrix_messenger/features/recovery/domain/models/recovery_status.dart';
 import 'package:matrix_messenger/features/rooms/domain/models/room.dart';
 import 'package:matrix_messenger/features/rooms/ui/room_list/view_models/room_list_view_model.dart';
+import 'package:matrix_messenger/features/rooms/ui/room_list/widgets/room_list_pane.dart';
 
 import '../../../../../testing/desktop_size.dart';
 import '../../../../../testing/fakes/repositories/fake_auth_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_conversation_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_recovery_repository.dart';
 import '../../../../../testing/fakes/repositories/fake_room_repository.dart';
+import '../../../../../testing/models/message.dart';
 import '../../../../../testing/models/room.dart';
 import '../../../../../testing/models/user_session.dart';
 
@@ -26,11 +29,13 @@ void main() {
   late FakeAuthRepository authRepository;
   late FakeRoomRepository roomRepository;
   late FakeRecoveryRepository recoveryRepository;
+  late FakeConversationRepository conversationRepository;
 
   setUp(() {
     authRepository = FakeAuthRepository(savedSession: kUserSession);
     roomRepository = FakeRoomRepository();
     recoveryRepository = FakeRecoveryRepository();
+    conversationRepository = FakeConversationRepository();
   });
 
   tearDown(() async {
@@ -57,7 +62,7 @@ void main() {
             value: recoveryRepository,
           ),
           RepositoryProvider<ConversationRepository>.value(
-            value: FakeConversationRepository(),
+            value: conversationRepository,
           ),
         ],
         child: MaterialApp(
@@ -268,4 +273,120 @@ void main() {
       expect(find.byKey(const Key('recovery_banner')), findsOneWidget);
     },
   );
+
+  double roomListWidth(WidgetTester tester) =>
+      tester.getSize(find.byType(RoomListPane)).width;
+
+  // Sem pumpAndSettle: a conversa tem spinner. Dois passos cobrem o atraso do ticker e a remoção de quem sai.
+  Future<void> settlePanes(WidgetTester tester) async {
+    await tester.pump(kPaneAnimationDuration);
+    await tester.pump(kPaneAnimationDuration);
+  }
+
+  Future<void> openThread(WidgetTester tester) async {
+    await tester.tap(find.byKey(Key('room_${kTeamRoom.id}')));
+    await tester.pump();
+    conversationRepository.conversation.snapshots.add(kSnapshot);
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('thread_toggle_\$root')));
+    await tester.pump();
+    await tester.pump();
+    await settlePanes(tester);
+  }
+
+  testWidgets('abrir a thread recolhe a lista e fechar devolve', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+    expect(roomListWidth(tester), kRoomListWidth);
+
+    await openThread(tester);
+    expect(roomListWidth(tester), kRoomListCompactWidth);
+    final panel = tester.getRect(find.byKey(const Key('thread_panel')));
+    final timeline = tester.getRect(find.byKey(const Key('timeline_list')));
+    expect(timeline.right, lessThanOrEqualTo(panel.left));
+
+    await tester.tap(find.byKey(const Key('thread_panel_close')));
+    await tester.pump();
+    await tester.pump();
+    await settlePanes(tester);
+    expect(roomListWidth(tester), kRoomListWidth);
+  });
+
+  testWidgets('diminuir a janela com a thread aberta recolhe a lista', (
+    tester,
+  ) async {
+    await pumpScreen(tester, size: const Size(1700, 900));
+    await showRooms(tester);
+    await openThread(tester);
+    expect(roomListWidth(tester), kRoomListWidth);
+
+    tester.view.physicalSize = const Size(1300, 900);
+    await tester.pump();
+    await settlePanes(tester);
+
+    expect(roomListWidth(tester), kRoomListCompactWidth);
+  });
+
+  testWidgets(
+    'abrir a lista à mão com a thread aberta deixa a thread por cima',
+    (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await showRooms(tester);
+      await openThread(tester);
+
+      await tester.tap(find.byKey(const Key('toggle_room_list')));
+      await tester.pump();
+      await settlePanes(tester);
+
+      expect(roomListWidth(tester), kRoomListWidth);
+      expect(find.byKey(const Key('thread_panel')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('trocar de sala com a thread aberta devolve a lista', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+    await openThread(tester);
+    expect(roomListWidth(tester), kRoomListCompactWidth);
+
+    final other = kRooms.firstWhere(
+      (room) => room.id != kTeamRoom.id && !room.isInvite,
+    );
+    await tester.tap(find.byKey(Key('room_avatar_${other.id}')));
+    await tester.pump();
+    await tester.pump();
+    await settlePanes(tester);
+
+    expect(roomListWidth(tester), kRoomListWidth);
+  });
+
+  testWidgets('lista aberta à mão recolhe de novo se a janela diminuir', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await showRooms(tester);
+    await openThread(tester);
+    await tester.tap(find.byKey(const Key('toggle_room_list')));
+    await tester.pump();
+    await settlePanes(tester);
+    expect(roomListWidth(tester), kRoomListWidth);
+
+    tester.view.physicalSize = const Size(1300, 900);
+    await tester.pump();
+    await settlePanes(tester);
+    expect(roomListWidth(tester), kRoomListCompactWidth);
+
+    await tester.tap(find.byKey(const Key('toggle_room_list')));
+    await tester.pump();
+    await settlePanes(tester);
+    expect(roomListWidth(tester), kRoomListWidth);
+  });
 }
